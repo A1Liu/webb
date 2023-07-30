@@ -7,6 +7,11 @@ node_modules
 .env.*
 !.env.example
 
+/src-tauri
+/.cargo
+/.github
+/static
+
 # Ignore files for PNPM, NPM and YARN
 pnpm-lock.yaml
 package-lock.json
