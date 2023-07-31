@@ -15,7 +15,9 @@ runs:
       uses: actions/cache/restore@v3
       with:
         key: ${{ runner.os }}-${{ hashFiles('yarn.lock', 'package.json') }}
-        path: "**/node_modules"
+        path: |
+          **/node_modules
+          .svelte-kit
 
     - name: Install dependencies
       if: steps.cache-check.outputs.cache-hit != 'true'
@@ -29,4 +31,6 @@ runs:
       uses: actions/cache/save@v3
       with:
         key: ${{ runner.os }}-${{ hashFiles('yarn.lock', 'package.json') }}
-        path: "**/node_modules"
+        path: |
+          **/node_modules
+          .svelte-kit
