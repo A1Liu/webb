@@ -1,15 +1,19 @@
 [package]
-name = "app"
+name = "webb"
 version = "0.1.0"
-description = "A Tauri App"
+description = "Tauri App"
 authors = ["you"]
 license = ""
 repository = ""
-default-run = "app"
+default-run = "webb"
 edition = "2021"
 rust-version = "1.60"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name="webb"
+path = "tauri/main.rs"
 
 [build-dependencies]
 tauri-build = { version = "1.4.0", features = [] }
