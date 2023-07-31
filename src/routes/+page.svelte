@@ -15,9 +15,7 @@
     try editing <strong>src/routes/+page.svelte</strong>
   </h2>
 
-  <a href="/file?path=temp">
-    Start session
-  </a>
+  <a href="/file?path=temp"> Start session </a>
 </section>
 
 <style>

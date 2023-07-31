@@ -18,11 +18,7 @@
   $: path = $page.url.searchParams.get("path");
 </script>
 
-<a href="/">
-  go back
-</a>
-
-
+<a href="/"> go back </a>
 
 <div>
   path = {path}
