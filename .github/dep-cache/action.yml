@@ -22,6 +22,7 @@ runs:
       shell: bash
       run: |
         yarn install --frozen-lockfile
+        yarn prepare
 
     - name: Cache dependencies
       if: steps.cache-check.outputs.cache-hit != 'true'
