@@ -14,7 +14,7 @@ runs:
       id: cache-check
       uses: actions/cache/restore@v3
       with:
-        key: ${{ runner.os }}-${{ hashFiles('yarn.lock', 'package.json') }}
+        key: node-dep-cache-${{ runner.os }}-${{ hashFiles('yarn.lock', 'package.json') }}
         path: |
           **/node_modules
           .svelte-kit
@@ -30,7 +30,7 @@ runs:
       if: steps.cache-check.outputs.cache-hit != 'true'
       uses: actions/cache/save@v3
       with:
-        key: ${{ runner.os }}-${{ hashFiles('yarn.lock', 'package.json') }}
+        key: node-dep-cache-${{ runner.os }}-${{ hashFiles('yarn.lock', 'package.json') }}
         path: |
           **/node_modules
           .svelte-kit
