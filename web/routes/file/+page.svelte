@@ -8,7 +8,7 @@
 <a href="/"> go back </a>
 
 <div>
-  path = {path}
+  PATH = {path}
 </div>
 
 <EditCell />

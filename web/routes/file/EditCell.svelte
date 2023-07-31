@@ -6,6 +6,7 @@
       }
     });
     ro.observe(element);
+
     return {
       destroy() {
         ro.disconnect();
@@ -21,8 +22,8 @@
 <textarea
   bind:value
   on:input={(e) => {
-    e.target.style.height = 0;
-    e.target.style.height = e.target.scrollHeight + "px";
+    e.target.style.minHeight = 0;
+    e.target.style.minHeight = e.target.scrollHeight + "px";
   }}
 />
 
@@ -30,7 +31,9 @@
   textarea {
     font-family: var(--font-mono);
     width: 32rem;
-    height: 1.375rem;
+    border: none;
+    height: 1.15rem;
+    padding: 0px;
     resize: none;
     overflow-y: hidden;
   }

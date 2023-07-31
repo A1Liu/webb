@@ -9,6 +9,13 @@ const config = {
 
   kit: {
     adapter: adapter(),
+    files: {
+      lib: "web/lib",
+      params: "web/params",
+      routes: "web/routes",
+      appTemplate: "web/app.html",
+      errorTemplate: "web/error.html",
+    },
   },
 };
 
