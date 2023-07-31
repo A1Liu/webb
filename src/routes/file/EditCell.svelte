@@ -19,7 +19,7 @@
 </script>
 
 <textarea
-  bind:value={value}
+  bind:value
   on:input={(e) => {
     e.target.style.height = 0;
     e.target.style.height = e.target.scrollHeight + "px";
