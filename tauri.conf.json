@@ -4,7 +4,7 @@
     "beforeBuildCommand": "yarn build:web",
     "beforeDevCommand": "yarn dev:web",
     "devPath": "http://localhost:5173",
-    "distDir": "../build"
+    "distDir": "./build"
   },
   "package": {
     "productName": "webb",
