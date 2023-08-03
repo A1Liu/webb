@@ -27,7 +27,9 @@
   $: cellInfo = sheet.cells.get(cellId)!;
 </script>
 
-{#if !cellInfo}{:else}
+{#if !cellInfo}
+  <textarea disabled />
+{:else}
   <textarea
     bind:value={$cellInfo.contents}
     on:input={inputHandler}
