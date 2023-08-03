@@ -36,7 +36,9 @@
   "type": "module",
   "dependencies": {
     "@tauri-apps/api": "^1.4.0",
-    "normalize.css": "^8.0.1"
+    "@types/uuid": "^9.0.2",
+    "normalize.css": "^8.0.1",
+    "uuid": "^9.0.0"
   },
   "prettier": {
     "plugins": [

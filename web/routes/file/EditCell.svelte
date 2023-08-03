@@ -1,31 +1,39 @@
 <script lang="ts" context="module">
-  function resize(element, handler: (element, detail) => unknown) {
-    const ro = new ResizeObserver((entries, observer) => {
-      for (let entry of entries) {
-        handler(element, entry);
-      }
-    });
-    ro.observe(element);
+  const inputHandler = (e: Event) => {
+    if (!e.target) return;
 
-    return {
-      destroy() {
-        ro.disconnect();
-      },
-    };
-  }
+    const target = e.target as HTMLTextAreaElement;
+
+    target.style.minHeight = "0px";
+    target.style.minHeight = target.scrollHeight + "px";
+  };
+
+  const keyHandler = (e: KeyboardEvent, sheet: Sheet) => {
+    if (!e.target) return;
+    if (e.isComposing || e.keyCode === 229) return;
+
+    if (e.key === "Enter" && e.metaKey) sheet.createCell();
+
+    console.log("aliu", e);
+  };
 </script>
 
 <script lang="ts">
-  let value;
+  import type { Sheet } from "./cellStore";
+
+  export let sheet: Sheet;
+  export let cellId: string;
+
+  $: cellInfo = sheet.cells.get(cellId)!;
 </script>
 
-<textarea
-  bind:value
-  on:input={(e) => {
-    e.target.style.minHeight = 0;
-    e.target.style.minHeight = e.target.scrollHeight + "px";
-  }}
-/>
+{#if !cellInfo}{:else}
+  <textarea
+    bind:value={$cellInfo.contents}
+    on:input={inputHandler}
+    on:keydown={(e) => keyHandler(e, sheet)}
+  />
+{/if}
 
 <style>
   textarea {
