@@ -1,35 +1,59 @@
-import { writable } from "svelte/store";
+import { writable, readable } from "svelte/store";
 import { v4 as uuid } from "uuid";
-import type { Writable } from "svelte/store";
+import type { Writable, Readable } from "svelte/store";
 
 export interface CellInfo {
   readonly id: string;
+  readonly index: number;
   contents: string;
+  focus: boolean;
 }
 
 export class Sheet {
-  public readonly cellLayout = writable<string[]>([]);
+  public readonly cellLayout: Readable<string[]>;
   public readonly cells = new Map<string, Writable<CellInfo>>();
+  private cellLayoutRef: string[] = [];
+  private readonly cellLayoutSetters: ((s: string[]) => unknown)[] = [];
 
-  createCell(): string {
-    const id = uuid();
-    const store = writable({
-      id,
-      contents: "",
+  constructor() {
+    this.cellLayout = readable<string[]>([], (set) => {
+      this.cellLayoutSetters.push(set);
+
+      return function stop() {};
     });
+  }
 
-    this.cellLayout.update((prev) => [...prev, id]);
+  createCell({
+    id = uuid(),
+    contents = "",
+    focus = false,
+  }: Partial<CellInfo> = {}): string {
+    const store = writable({ id, contents, focus });
+
     this.cells.set(id, store);
+
+    this.cellLayoutRef = [...this.cellLayoutRef, id];
+    this.cellLayoutSetters.forEach((s) => s(this.cellLayoutRef));
 
     return id;
   }
 
-  *cellIter(cells: string[]): Generator<CellInfo, void, unknown> {
-    for (const cellId of cells) {
-      const cellInfo = this.cells.get(cellId);
-      if (!cellInfo) continue;
-
-      yield cellInfo;
+  moveDownFrom(id: string) {
+    const index = this.cellLayoutRef.indexOf(id);
+    if (index === -1) {
+      return;
     }
+
+    const targetIndex = index + 1;
+    if (!this.cellLayoutRef[targetIndex]) {
+      this.createCell({ focus: true });
+      return;
+    }
+
+    const nextId = this.cellLayoutRef[targetIndex];
+    this.cells.get(nextId)!.update((prev) => ({
+      ...prev,
+      focus: true,
+    }));
   }
 }

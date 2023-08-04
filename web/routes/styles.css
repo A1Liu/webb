@@ -36,6 +36,10 @@ body {
     );
 }
 
+* {
+  margin: 0px;
+}
+
 div {
   box-sizing: border-box;
 }
@@ -69,15 +73,6 @@ pre {
   color: var(--color-text);
 }
 
-.text-column {
-  display: flex;
-  max-width: 48rem;
-  flex: 0.6;
-  flex-direction: column;
-  justify-content: center;
-  margin: 0 auto;
-}
-
 input,
 button {
   font-size: inherit;
@@ -86,22 +81,4 @@ button {
 
 button:focus:not(:focus-visible) {
   outline: none;
-}
-
-@media (min-width: 720px) {
-  h1 {
-    font-size: 2.4rem;
-  }
-}
-
-.visually-hidden {
-  border: 0;
-  clip: rect(0 0 0 0);
-  height: auto;
-  margin: 0;
-  overflow: hidden;
-  padding: 0;
-  position: absolute;
-  width: 1px;
-  white-space: nowrap;
 }
