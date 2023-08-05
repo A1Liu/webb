@@ -10,7 +10,8 @@
     "sourceMap": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "noEmit": true
   }
   // Path aliases are handled by https://kit.svelte.dev/docs/configuration#alias
   //

@@ -27,8 +27,9 @@ export class Sheet {
     id = uuid(),
     contents = "",
     focus = false,
-  }: Partial<CellInfo> = {}): string {
-    const store = writable({ id, contents, focus });
+  }: Partial<Omit<CellInfo, "index">> = {}): string {
+    const index = this.cellLayoutRef.length;
+    const store = writable({ id, index, contents, focus });
 
     this.cells.set(id, store);
 
@@ -44,14 +45,13 @@ export class Sheet {
       return;
     }
 
-    const targetIndex = index + 1;
-    if (!this.cellLayoutRef[targetIndex]) {
+    const targetId = this.cellLayoutRef[index + 1];
+    if (!targetId) {
       this.createCell({ focus: true });
       return;
     }
 
-    const nextId = this.cellLayoutRef[targetIndex];
-    this.cells.get(nextId)!.update((prev) => ({
+    this.cells.get(targetId)!.update((prev) => ({
       ...prev,
       focus: true,
     }));

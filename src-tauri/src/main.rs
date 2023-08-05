@@ -1,23 +1,86 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use lazy_static::lazy_static;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::{atomic::Ordering, Arc};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
+use tokio::sync::Mutex;
+
+struct RunningCommand {
+    status: Option<CommandStatus>,
+    channel: Option<tokio::sync::mpsc::Receiver<CommandData>>,
+}
+
+lazy_static! {
+// TODO: will this be a bottleneck?
+static ref RUNNING_COMMANDS: Mutex<HashMap<String, RunningCommand>> =
+    Mutex::new(HashMap::new());
+}
+
+#[derive(Serialize, Clone, Copy)]
+pub struct CommandStatus {
+    pub success: bool,
+    pub exit_code: Option<i32>,
+}
 
 #[derive(Serialize)]
-struct CommandOutput {
-    success: bool,
-    exit_code: Option<i32>,
-    stdout: String,
-    stderr: String,
-    combined: String,
+pub struct CommandOutput {
+    pub status: Option<CommandStatus>,
+    pub data: Vec<CommandData>,
+}
+
+#[derive(Serialize, Clone)]
+pub enum CommandData {
+    Status(CommandStatus),
+    Stdout(String),
+    Stderr(String),
 }
 
 #[tauri::command]
-async fn run_zsh(command: String) -> CommandOutput {
+async fn poll_command(id: String) -> Result<CommandOutput, String> {
+    let (mut channel, mut status) = {
+        let mut commands = RUNNING_COMMANDS.lock().await;
+        let command = commands.get_mut(&id).ok_or("command doesn't exist")?;
+
+        let channel = command
+            .channel
+            .take()
+            .ok_or("multiple concurrent consumers")?;
+
+        (channel, command.status)
+    };
+
+    let mut data = Vec::new();
+    match channel.recv().await {
+        Some(CommandData::Status(s)) => status = Some(s),
+        Some(item) => data.push(item),
+        None => return Ok(CommandOutput { status, data }),
+    }
+
+    while data.len() < 25 {
+        use tokio::sync::mpsc::error::TryRecvError::*;
+        match channel.try_recv() {
+            Err(Disconnected) => return Ok(CommandOutput { status, data }),
+            Err(Empty) => break,
+            Ok(CommandData::Status(s)) => status = Some(s),
+            Ok(d) => data.push(d),
+        }
+    }
+
+    let mut commands = RUNNING_COMMANDS.lock().await;
+    let command = commands.get_mut(&id).ok_or("command doesn't exist")?;
+    command.status = status;
+    command.channel = Some(channel);
+
+    return Ok(CommandOutput { status, data });
+}
+
+#[tauri::command]
+async fn run_zsh(id: String, command: String) {
     let mut child = Command::new("zsh")
         .arg("-c")
         .arg(&command)
@@ -34,13 +97,7 @@ async fn run_zsh(command: String) -> CommandOutput {
     let stdout = child.stdout.take().expect("Failed to open stdin");
     let stderr = child.stderr.take().expect("Failed to open stdin");
 
-    enum Data {
-        Stderr(String),
-        Stdout(String),
-        Status(std::process::ExitStatus),
-    }
-
-    let (txout, mut rx) = tokio::sync::mpsc::channel(128);
+    let (txout, rx) = tokio::sync::mpsc::channel(128);
     let txerr = txout.clone();
     let txstat = txout.clone();
     let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -63,13 +120,17 @@ async fn run_zsh(command: String) -> CommandOutput {
                 }
             };
 
-            if len == 0 && done.load(Ordering::SeqCst) {
-                break;
+            if len == 0 {
+                if done.load(Ordering::SeqCst) {
+                    break;
+                }
+
+                continue;
             }
 
             // TODO: should not do string conversion here
             let line = String::from_utf8_lossy(&bytes[..len]).into_owned();
-            tx.send(Data::Stdout(line)).await.expect("wtf");
+            tx.send(CommandData::Stdout(line)).await.expect("wtf");
         }
     });
 
@@ -88,13 +149,17 @@ async fn run_zsh(command: String) -> CommandOutput {
                 }
             };
 
-            if len == 0 && done.load(Ordering::SeqCst) {
-                break;
+            if len == 0 {
+                if done.load(Ordering::SeqCst) {
+                    break;
+                }
+
+                continue;
             }
 
             // TODO: should not do string conversion here
             let line = String::from_utf8_lossy(&bytes[..len]).into_owned();
-            tx.send(Data::Stderr(line)).await.expect("wtf");
+            tx.send(CommandData::Stderr(line)).await.expect("wtf");
         }
     });
 
@@ -104,42 +169,33 @@ async fn run_zsh(command: String) -> CommandOutput {
             .await
             .expect("child process encountered an error");
 
-        txstat.send(Data::Status(status)).await.expect("wtf");
+        txstat
+            .send(CommandData::Status(CommandStatus {
+                success: status.success(),
+                exit_code: status.code(),
+            }))
+            .await
+            .expect("wtf");
 
         // TODO: too lazy to think about acq rel order right now
         donestat.store(true, Ordering::SeqCst);
     });
 
-    let mut output = CommandOutput {
-        success: false,
-        exit_code: None,
-        stdout: String::new(),
-        stderr: String::new(),
-        combined: String::new(),
-    };
-    while let Some(i) = rx.recv().await {
-        match i {
-            Data::Status(s) => {
-                output.success = s.success();
-                output.exit_code = s.code();
-            }
-            Data::Stdout(s) => {
-                output.stdout += &s;
-                output.combined += &s;
-            }
-            Data::Stderr(s) => {
-                output.stderr += &s;
-                output.combined += &s;
-            }
-        }
+    {
+        let mut commands = RUNNING_COMMANDS.lock().await;
+        commands.insert(
+            id,
+            RunningCommand {
+                status: None,
+                channel: Some(rx),
+            },
+        );
     }
-
-    return output;
 }
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![run_zsh])
+        .invoke_handler(tauri::generate_handler![run_zsh, poll_command])
         .run(tauri::generate_context!())
         .expect("error while running webb");
 }

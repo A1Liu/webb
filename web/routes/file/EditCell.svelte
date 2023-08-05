@@ -45,9 +45,12 @@
       e.preventDefault();
       sheet.moveDownFrom(cell.id);
 
-      return invoke("run_zsh", {
+      await invoke("run_zsh", {
+        id: cell.id,
         command: cell.contents,
       });
+
+      return cell;
     }
   }
 </script>
@@ -79,21 +82,52 @@
       bind:value={$cellInfo.contents}
       on:input={inputHandler}
       on:keydown={(e) =>
-        void keyHandler(e, sheet, $cellInfo).then((out) => {
-          if (!out) return;
+        void keyHandler(e, sheet, $cellInfo).then(async (cell) => {
+          if (!cell) return;
 
-          output = out;
+          output = { status: null, data: [] };
+
+          while (true) {
+            const pollOut = await invoke("poll_command", {
+              id: cell.id,
+            });
+
+            console.log(pollOut);
+
+            output = {
+              status: output.status ?? pollOut.status,
+              data: [...output.data, ...pollOut.data],
+            };
+
+            if (output.status !== null && pollOut === null) {
+              break;
+            }
+          }
         })}
     />
   {/if}
 
   {#if output !== null}
     <div class="row">
-      {#if output.success}SUCCESS{:else}FAILED{/if}
+      {#if output.status === null}
+        RUNNING
+      {:else if output.status.success}
+        SUCCESS
+      {:else}
+        FAILED
+      {/if}
     </div>
 
-    {#if output.combined !== ""}
-      <pre><code>{output.combined}</code></pre>
+    {#if output.data.length > 0}
+      <pre><code
+          >{output.data
+            .map((d) => {
+              if (d.Stdout) return d.Stdout;
+              if (d.Stderr) return d.Stderr;
+              return "";
+            })
+            .join("")}</code
+        ></pre>
     {/if}
   {/if}
 </div>
