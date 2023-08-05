@@ -28,7 +28,7 @@
     stdout: string;
     stderr: string;
   }
-  async function keyHandler(
+  function keyHandler(
     e: KeyboardEvent,
     sheet: Sheet,
     cell: CellInfo
@@ -45,12 +45,13 @@
       e.preventDefault();
       sheet.moveDownFrom(cell.id);
 
-      await invoke("run_zsh", {
-        id: cell.id,
-        command: cell.contents,
-      });
-
-      return cell;
+      return {
+        cell,
+        commandId: invoke("run_zsh", {
+          id: cell.id,
+          command: cell.contents,
+        }),
+      };
     }
   }
 </script>
@@ -81,29 +82,33 @@
       bind:this={ref}
       bind:value={$cellInfo.contents}
       on:input={inputHandler}
-      on:keydown={(e) =>
-        void keyHandler(e, sheet, $cellInfo).then(async (cell) => {
-          if (!cell) return;
+      on:keydown={async (e) => {
+        const res = keyHandler(e, sheet, $cellInfo);
+        if (!res) return;
 
-          output = { status: null, data: [] };
+        const { cell, commandId: c } = res;
+        const commandId = await c;
 
-          while (true) {
-            const pollOut = await invoke("poll_command", {
-              id: cell.id,
-            });
+        output = { status: null, data: [] };
 
-            console.log(pollOut);
+        while (true) {
+          const pollOut = await invoke("poll_command", {
+            id: cell.id,
+            commandId,
+          });
 
-            output = {
-              status: output.status ?? pollOut.status,
-              data: [...output.data, ...pollOut.data],
-            };
+          console.log(pollOut);
 
-            if (output.status !== null && pollOut === null) {
-              break;
-            }
+          output = {
+            status: pollOut.status ?? output.status,
+            data: [...output.data, ...pollOut.data],
+          };
+
+          if (pollOut.end) {
+            break;
           }
-        })}
+        }
+      }}
     />
   {/if}
 
