@@ -11,8 +11,9 @@ use tokio::process::Command;
 use tokio::sync::Mutex;
 
 struct RunningCommand {
-    status: Option<CommandStatus>,
+    exit_status: Option<CommandStatus>,
     channel: Option<tokio::sync::mpsc::Receiver<CommandData>>,
+    kill: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
 lazy_static! {
@@ -51,7 +52,7 @@ async fn poll_command(id: String) -> Result<CommandOutput, String> {
             .take()
             .ok_or("multiple concurrent consumers")?;
 
-        (channel, command.status)
+        (channel, command.exit_status)
     };
 
     let mut data = Vec::new();
@@ -73,7 +74,7 @@ async fn poll_command(id: String) -> Result<CommandOutput, String> {
 
     let mut commands = RUNNING_COMMANDS.lock().await;
     let command = commands.get_mut(&id).ok_or("command doesn't exist")?;
-    command.status = status;
+    command.exit_status = status;
     command.channel = Some(channel);
 
     return Ok(CommandOutput { status, data });
@@ -89,6 +90,8 @@ async fn run_zsh(id: String, command: String) {
         .stderr(Stdio::piped())
         .spawn()
         .expect("failed to spawn process");
+
+    let (send_kill, recv_kill) = tokio::sync::oneshot::channel::<()>();
 
     // Stdin should auto-close for now
     let stdin = child.stdin.take().expect("Failed to open stdin");
@@ -164,10 +167,20 @@ async fn run_zsh(id: String, command: String) {
     });
 
     tokio::spawn(async move {
-        let status = child
-            .wait()
-            .await
-            .expect("child process encountered an error");
+        let status = tokio::select! {
+            status_res = child.wait() => {
+                Some(status_res.expect("child process encountered an error"))
+            }
+            _ = recv_kill => {
+                child.kill().await.expect("kill failed");
+                None
+            }
+        };
+
+        let status = match status {
+            Some(s) => s,
+            None => return,
+        };
 
         txstat
             .send(CommandData::Status(CommandStatus {
@@ -181,15 +194,26 @@ async fn run_zsh(id: String, command: String) {
         donestat.store(true, Ordering::SeqCst);
     });
 
-    {
-        let mut commands = RUNNING_COMMANDS.lock().await;
-        commands.insert(
-            id,
-            RunningCommand {
-                status: None,
-                channel: Some(rx),
-            },
-        );
+    let mut commands = RUNNING_COMMANDS.lock().await;
+    if let Some(RunningCommand {
+        exit_status,
+        kill: Some(kill),
+        ..
+    }) = commands.insert(
+        id,
+        RunningCommand {
+            exit_status: None,
+            channel: Some(rx),
+            kill: Some(send_kill),
+        },
+    ) {
+        match exit_status {
+            None => {
+                kill.send(()).expect("failed to kill child process");
+                println!("killed process");
+            }
+            Some(_) => {}
+        }
     }
 }
 
