@@ -1,6 +1,7 @@
 {
   "name": "webb",
   "version": "0.0.1",
+  "license": "MIT",
   "scripts": {
     "dev": "yarn tauri dev",
     "dev:web": "vite dev",
@@ -38,7 +39,9 @@
     "@tauri-apps/api": "^1.4.0",
     "@types/uuid": "^9.0.2",
     "normalize.css": "^8.0.1",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "xterm": "^5.2.1",
+    "xterm-addon-fit": "^0.7.0"
   },
   "prettier": {
     "plugins": [

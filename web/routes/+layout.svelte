@@ -1,6 +1,7 @@
 <script>
   import "normalize.css";
   import "./styles.css";
+  import "xterm/css/xterm.css";
 </script>
 
 <div class="app">

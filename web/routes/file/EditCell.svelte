@@ -17,7 +17,6 @@
   function inputHandler(e: Event) {
     if (!e.target) return;
 
-    console.log("input evt");
     const target = e.target as HTMLTextAreaElement;
 
     target.style.minHeight = "0px";
@@ -32,8 +31,8 @@
     e: KeyboardEvent,
     sheet: Sheet,
     cell: CellInfo
-  ): Promise<CommandOutput | undefined> {
-    if (!e.target) return;
+  ): CommandOutput | undefined {
+    if (!e.target) return undefined;
     if (e.isComposing || e.keyCode === 229) return undefined;
 
     if (matchKey(e, "Enter", { shift: true })) return undefined;
@@ -43,7 +42,6 @@
       (matchKey(e, "Enter") && cell.contents.split("\n").length <= 1)
     ) {
       e.preventDefault();
-      sheet.moveDownFrom(cell.id);
 
       return {
         cell,
@@ -59,27 +57,117 @@
 <script lang="ts">
   import type { Sheet } from "./cellStore";
   import { Handlers } from "$lib/handlers";
+  import { Terminal } from "xterm";
+  import { FitAddon } from "xterm-addon-fit";
+  import { onDestroy } from "svelte";
+
+  const term = new Terminal({
+    disableStdin: true,
+    convertEol: true,
+    rows: 1,
+    theme: {
+      foreground: "#d2d2d2",
+      background: "#2b2b2b",
+      cursor: "#adadad",
+      black: "#000000",
+      red: "#d81e00",
+      green: "#5ea702",
+      yellow: "#cfae00",
+      blue: "#427ab3",
+      magenta: "#89658e",
+      cyan: "#00a7aa",
+      white: "#dbded8",
+      brightBlack: "#686a66",
+      brightRed: "#f54235",
+      brightGreen: "#99e343",
+      brightYellow: "#fdeb61",
+      brightBlue: "#84b0d8",
+      brightMagenta: "#bc94b7",
+      brightCyan: "#37e6e8",
+      brightWhite: "#f1f1f0",
+    },
+  });
+  const fitAddon = new FitAddon();
+  term.loadAddon(fitAddon);
 
   export let sheet: Sheet;
   export let cellId: string;
 
-  let ref = null;
+  let inputRef = null;
+  let termRef = null;
+  let commandId = null;
   let output = null;
+  let moveDown = false;
+  let newlineBuffered = false;
+
+  const listenerDisposerLF = term.onLineFeed(() => {
+    if (term.rows < 30) {
+      term.resize(term.cols, term.rows + 1);
+    }
+  });
 
   $: cellInfo = sheet.cells.get(cellId)!;
+  $: if (moveDown) {
+    moveDown = false;
+    sheet.moveDownFrom($cellInfo.id);
+  }
 
-  $: if ($cellInfo.focus && ref !== null) {
-    ref.focus();
+  $: if ($cellInfo.focus && inputRef !== null) {
+    inputRef.focus();
     $cellInfo.focus = false;
   }
+
+  $: if (termRef !== null && commandId !== null) {
+    newlineBuffered = false;
+    term.reset();
+    term.resize(term.cols, 1);
+    term.open(termRef);
+    fitAddon.fit();
+    term.write("\x1b[?25l");
+  }
+
+  $: if (output !== null && output?.data.length > 0) {
+    const textBlocks = output.data.flatMap((data) => {
+      const out = [];
+      if (data.Stderr) out.push(data.Stderr);
+      if (data.Stdout) out.push(data.Stdout);
+
+      return out;
+    });
+
+    newlineBuffered = textBlocks.reduce((nl, block) => {
+      if (nl) term.write("\n");
+
+      const r = block.endsWith("\n");
+
+      term.write(block.slice(0, block.length - (r ? 1 : 0)));
+
+      return r;
+    }, newlineBuffered);
+
+    output = {
+      status: output.status,
+      uuid: output.uuid,
+      data: [],
+    };
+  }
+
+  onDestroy(() => {
+    listenerDisposerLF.dispose();
+  });
 </script>
 
 <div class="wrapper">
   {#if !cellInfo}
     <textarea disabled />
   {:else}
+    <!--
+      spellcheck=false prevents the OS from doing stupid stuff like making changing
+      consecutive dashes into an em-dash.
+    -->
     <textarea
-      bind:this={ref}
+      spellcheck="false"
+      bind:this={inputRef}
       bind:value={$cellInfo.contents}
       on:input={inputHandler}
       on:keydown={async (e) => {
@@ -87,24 +175,25 @@
         if (!res) return;
 
         const { cell, commandId: c } = res;
-        const commandId = await c;
+        const uuid = await c;
 
-        output = { status: null, data: [] };
+        output = { uuid, status: null, data: [] };
+        commandId = uuid;
 
-        while (true) {
+        while (uuid === commandId) {
           const pollOut = await invoke("poll_command", {
             id: cell.id,
-            commandId,
+            commandId: uuid,
           });
 
-          console.log(pollOut);
-
           output = {
+            uuid,
             status: pollOut.status ?? output.status,
             data: [...output.data, ...pollOut.data],
           };
 
           if (pollOut.end) {
+            moveDown = true;
             break;
           }
         }
@@ -112,29 +201,23 @@
     />
   {/if}
 
-  {#if output !== null}
-    <div class="row">
-      {#if output.status === null}
-        RUNNING
-      {:else if output.status.success}
-        SUCCESS
-      {:else}
-        FAILED
-      {/if}
-    </div>
+  {#key output?.uuid}
+    {#if output !== null}
+      <div class="row">
+        {#if output.status === null}
+          RUNNING
+        {:else if output.status.success}
+          SUCCESS
+        {:else}
+          FAILED
+        {/if}
+      </div>
 
-    {#if output.data.length > 0}
-      <pre><code
-          >{output.data
-            .map((d) => {
-              if (d.Stdout) return d.Stdout;
-              if (d.Stderr) return d.Stderr;
-              return "";
-            })
-            .join("")}</code
-        ></pre>
+      {#if output !== null}
+        <div bind:this={termRef} class="terminal" />
+      {/if}
     {/if}
-  {/if}
+  {/key}
 </div>
 
 <style>
@@ -144,12 +227,16 @@
     gap: 0.5rem;
     padding: 0.25rem;
     background-color: rgb(128, 128, 128);
-    width: 32rem;
+    width: 40rem;
   }
 
   .row {
     display: flex;
     gap: 0.5rem;
+  }
+
+  .terminal {
+    width: 100%;
   }
 
   textarea {
@@ -160,11 +247,5 @@
     padding: 0px;
     resize: none;
     overflow-y: hidden;
-  }
-
-  pre {
-    padding: 0.5rem;
-    border-radius: 0.25rem;
-    white-space: pre-wrap;
   }
 </style>
