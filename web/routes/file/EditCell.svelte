@@ -106,7 +106,37 @@
     }
   });
 
+  async function invokeCommand(commandUuid: string) {
+    let timeoutMs = 50;
+    while (commandUuid === commandId) {
+      const pollOut = await invoke("poll_command", {
+        id: $cellInfo.id,
+        timeoutMs,
+      });
+      if (!pollOut) {
+        timeoutMs *= 2;
+        timeoutMs = Math.min(500, timeoutMs);
+      } else {
+        timeoutMs = 50;
+      }
+
+      output = {
+        uuid: commandUuid,
+        status: pollOut.status ?? output.status,
+        data: [...output.data, ...pollOut.data],
+      };
+
+      if (pollOut.end) {
+        moveDown = true;
+        break;
+      }
+    }
+  }
+
   $: cellInfo = sheet.cells.get(cellId)!;
+
+  $: if (commandId !== null) invokeCommand(commandId);
+
   $: if (moveDown) {
     moveDown = false;
     sheet.moveDownFrom($cellInfo.id);
@@ -170,33 +200,15 @@
       bind:this={inputRef}
       bind:value={$cellInfo.contents}
       on:input={inputHandler}
-      on:keydown={async (e) => {
+      on:keydown={(e) => {
         const res = keyHandler(e, sheet, $cellInfo);
         if (!res) return;
 
-        const { cell, commandId: c } = res;
-        const uuid = await c;
-
-        output = { uuid, status: null, data: [] };
-        commandId = uuid;
-
-        while (uuid === commandId) {
-          const pollOut = await invoke("poll_command", {
-            id: cell.id,
-            commandId: uuid,
-          });
-
-          output = {
-            uuid,
-            status: pollOut.status ?? output.status,
-            data: [...output.data, ...pollOut.data],
-          };
-
-          if (pollOut.end) {
-            moveDown = true;
-            break;
-          }
-        }
+        const { cell, commandId: uuid } = res;
+        uuid.then((uuid) => {
+          output = { uuid, status: null, data: [] };
+          commandId = uuid;
+        });
       }}
     />
   {/if}
