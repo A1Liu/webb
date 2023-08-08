@@ -1,31 +1,33 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(debug_assertions, allow(//
+    dead_code,
+    unused_imports,
+    unused_variables
+))]
 
-mod commands;
-mod sheet;
+pub mod commands;
+pub mod sheet;
+pub mod util;
 
-use commands::{Command, CommandData, CommandId, CommandOutput, CommandStatus};
+use commands::{Command, CommandId, CommandOutput};
 use lazy_static::lazy_static;
+use sheet::{CellId, Sheet};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use uuid::Uuid;
-
-pub struct RunningCommand {
-    pub uuid: Uuid,
-    pub exit_status: Option<CommandStatus>,
-    pub channel: Option<tokio::sync::mpsc::Receiver<CommandData>>,
-    pub kill: Option<tokio::sync::oneshot::Sender<()>>,
-}
 
 lazy_static! {
+// TODO: will this be a bottleneck?
+static ref SHEET: Mutex<Sheet> = Mutex::new(Sheet::new());
+
 // TODO: will this be a bottleneck?
 static ref RUNNING_COMMANDS: Mutex<HashMap<String, Arc<Mutex<Command>>>> =
     Mutex::new(HashMap::new());
 }
 
 #[tauri::command]
-async fn poll_command(id: String, timeout_ms: u32) -> Option<CommandOutput> {
+async fn poll_command(cell: CellId, timeout_ms: u32) -> Option<CommandOutput> {
     println!("running poll_command");
 
     let command = {

@@ -10,11 +10,11 @@ use tokio::io::AsyncReadExt;
 use tokio::process::{Child, Command as OsCommand};
 use uuid::Uuid;
 
-#[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Serialize, Deserialize, Debug)]
 #[repr(transparent)]
 pub struct CommandId(Uuid);
 
-#[derive(Serialize, Clone, Copy)]
+#[derive(Serialize, Debug, Clone, Copy)]
 pub struct CommandStatus {
     pub success: bool,
     pub exit_code: Option<i32>,
@@ -52,6 +52,17 @@ pub struct Command {
     channel: tokio::sync::mpsc::Receiver<CommandData>,
     exit_status: Option<CommandStatus>,
     kill: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+impl std::fmt::Debug for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Command")
+            .field("id", &self.id)
+            .field("command", &self.command)
+            .field("exit_status", &self.exit_status)
+            .field("done", &self.done.load(Ordering::SeqCst))
+            .finish()
+    }
 }
 
 impl Command {

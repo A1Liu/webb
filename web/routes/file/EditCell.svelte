@@ -24,8 +24,8 @@
   }
 
   interface CommandOutput {
-    stdout: string;
-    stderr: string;
+    cell: CellInfo;
+    commandId: Promise<string>;
   }
   function keyHandler(
     e: KeyboardEvent,
@@ -115,7 +115,8 @@
       });
       if (!pollOut) {
         timeoutMs *= 2;
-        timeoutMs = Math.min(500, timeoutMs);
+        timeoutMs = Math.min(400, timeoutMs);
+        continue;
       } else {
         timeoutMs = 50;
       }
