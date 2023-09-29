@@ -10,6 +10,9 @@ runs:
         cache-dependency-path: yarn.lock
         cache: yarn
 
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+
     - name: Check Cache
       id: cache-check
       uses: actions/cache/restore@v3
@@ -34,3 +37,9 @@ runs:
         path: |
           **/node_modules
           .svelte-kit
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-all-crates: true
+        key: ${{ hashFiles('src-tauri/tauri.conf.json') }}
