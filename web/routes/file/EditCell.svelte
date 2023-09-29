@@ -1,4 +1,5 @@
 <script lang="ts" context="module">
+  import type { CellInfo, Sheet } from "./cellStore";
   import { invoke } from "@tauri-apps/api/tauri";
 
   function matchKey(
@@ -29,7 +30,6 @@
   }
   function keyHandler(
     e: KeyboardEvent,
-    sheet: Sheet,
     cell: CellInfo
   ): CommandOutput | undefined {
     if (!e.target) return undefined;
@@ -46,7 +46,6 @@
       return {
         cell,
         commandId: invoke("run_zsh", {
-          id: cell.id,
           command: cell.contents,
         }),
       };
@@ -55,11 +54,14 @@
 </script>
 
 <script lang="ts">
-  import type { Sheet } from "./cellStore";
-  import { Handlers } from "$lib/handlers";
   import { Terminal } from "xterm";
   import { FitAddon } from "xterm-addon-fit";
   import { onDestroy } from "svelte";
+  import {
+    pollCommand,
+    type CommandData,
+    type CommandStatus,
+  } from "$lib/handlers";
 
   const term = new Terminal({
     disableStdin: true,
@@ -93,10 +95,14 @@
   export let sheet: Sheet;
   export let cellId: string;
 
-  let inputRef = null;
-  let termRef = null;
-  let commandId = null;
-  let output = null;
+  let inputRef: HTMLTextAreaElement | null = null;
+  let termRef: any = null;
+  let commandId: string | null = null;
+  let output: {
+    uuid: string;
+    status: CommandStatus | null;
+    data: CommandData[];
+  } | null = null;
   let moveDown = false;
   let newlineBuffered = false;
 
@@ -109,8 +115,8 @@
   async function invokeCommand(commandUuid: string) {
     let timeoutMs = 50;
     while (commandUuid === commandId) {
-      const pollOut = await invoke("poll_command", {
-        id: $cellInfo.id,
+      const pollOut = await pollCommand({
+        id: commandUuid,
         timeoutMs,
       });
       if (!pollOut) {
@@ -123,8 +129,8 @@
 
       output = {
         uuid: commandUuid,
-        status: pollOut.status ?? output.status,
-        data: [...output.data, ...pollOut.data],
+        status: pollOut.status ?? output?.status ?? null,
+        data: [...(output?.data ?? []), ...pollOut.data],
       };
 
       if (pollOut.end) {
@@ -202,10 +208,10 @@
       bind:value={$cellInfo.contents}
       on:input={inputHandler}
       on:keydown={(e) => {
-        const res = keyHandler(e, sheet, $cellInfo);
+        const res = keyHandler(e, $cellInfo);
         if (!res) return;
 
-        const { cell, commandId: uuid } = res;
+        const { commandId: uuid } = res;
         uuid.then((uuid) => {
           output = { uuid, status: null, data: [] };
           commandId = uuid;

@@ -10,7 +10,7 @@ use tokio::io::AsyncReadExt;
 use tokio::process::{Child, Command as OsCommand};
 use uuid::Uuid;
 
-#[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Eq, Serialize, Deserialize, Debug)]
 #[repr(transparent)]
 pub struct CommandId(Uuid);
 
@@ -32,12 +32,6 @@ pub enum CommandData {
     Status(CommandStatus),
     Stdout(String),
     Stderr(String),
-}
-
-lazy_static! {
-// TODO: will this be a bottleneck?
-static ref RUNNING_COMMANDS: Mutex<HashMap<CommandId, Option<CommandStatus>>> =
-    Mutex::new(HashMap::new());
 }
 
 pub struct Command {

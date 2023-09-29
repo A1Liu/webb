@@ -7,27 +7,22 @@
 ))]
 
 pub mod commands;
-pub mod sheet;
 pub mod util;
 
 use commands::{Command, CommandId, CommandOutput};
 use lazy_static::lazy_static;
-use sheet::{CellId, Sheet};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 lazy_static! {
 // TODO: will this be a bottleneck?
-static ref SHEET: Mutex<Sheet> = Mutex::new(Sheet::new());
-
-// TODO: will this be a bottleneck?
-static ref RUNNING_COMMANDS: Mutex<HashMap<String, Arc<Mutex<Command>>>> =
+static ref RUNNING_COMMANDS: Mutex<HashMap<CommandId, Arc<Mutex<Command>>>> =
     Mutex::new(HashMap::new());
 }
 
 #[tauri::command]
-async fn poll_command(cell: CellId, timeout_ms: u32) -> Option<CommandOutput> {
+async fn poll_command(id: CommandId, timeout_ms: u32) -> Option<CommandOutput> {
     println!("running poll_command");
 
     let command = {
@@ -44,14 +39,14 @@ async fn poll_command(cell: CellId, timeout_ms: u32) -> Option<CommandOutput> {
 }
 
 #[tauri::command]
-async fn run_zsh(id: String, command: String) -> Result<CommandId, String> {
+async fn run_zsh(command: String) -> Result<CommandId, String> {
     println!("running zsh");
 
     let command = Command::new(command)?;
     let uuid = command.id();
 
     let mut commands = RUNNING_COMMANDS.lock().await;
-    if let Some(prev) = commands.insert(id, Arc::new(Mutex::new(command))) {
+    if let Some(prev) = commands.insert(uuid, Arc::new(Mutex::new(command))) {
         let mut prev = prev.lock().await;
         prev.kill();
     }
