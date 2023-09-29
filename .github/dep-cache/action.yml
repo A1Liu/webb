@@ -46,9 +46,8 @@ runs:
         key: ${{ hashFiles('src-tauri/tauri.conf.json') }}
 
     - name: Install Rust dependencies
-      if: steps.rust-cache-check.outputs.cache-hi != 'true'
+      if: steps.rust-cache-check.outputs.cache-hit != 'true'
       shell: bash
-      run |
+      run: |
         cd src-tauri
         cargo fetch
-      if: steps.
