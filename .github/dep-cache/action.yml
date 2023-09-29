@@ -39,7 +39,16 @@ runs:
           .svelte-kit
 
     - name: Cache Rust dependencies
+      id: rust-cache-check
       uses: Swatinem/rust-cache@v2
       with:
         cache-all-crates: true
         key: ${{ hashFiles('src-tauri/tauri.conf.json') }}
+
+    - name: Install Rust dependencies
+      if: steps.rust-cache-check.outputs.cache-hi != 'true'
+      shell: bash
+      run |
+        cd src-tauri
+        cargo fetch
+      if: steps.
