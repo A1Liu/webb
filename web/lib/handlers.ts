@@ -10,11 +10,11 @@ declare global {
 // Function avoids 'window not defined' in SSR
 const invoke = () => window.__TAURI_INVOKE__;
 
-export function runZsh(id: string, command: string) {
-    return invoke()<CommandId>("run_zsh", { id,command })
+export function runZsh(command: string) {
+    return invoke()<CommandId>("run_zsh", { command })
 }
 
-export function pollCommand(id: string, timeoutMs: number) {
+export function pollCommand(id: CommandId, timeoutMs: number) {
     return invoke()<CommandOutput | null>("poll_command", { id,timeoutMs })
 }
 
