@@ -29,6 +29,7 @@ pub struct CommandOutput {
 }
 
 #[derive(Serialize, Clone, Type)]
+#[serde(tag = "kind", content = "value")]
 pub enum CommandData {
     Status(CommandStatus),
     Stdout(String),

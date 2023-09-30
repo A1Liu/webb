@@ -1,6 +1,12 @@
 <script lang="ts" context="module">
   import type { CellInfo, Sheet } from "./cellStore";
   import { invoke } from "@tauri-apps/api/tauri";
+  import {
+    pollCommand,
+    type CommandOutput,
+    type CommandStatus,
+    type CommandData,
+  } from "$lib/handlers";
 
   function matchKey(
     e: KeyboardEvent,
@@ -24,14 +30,14 @@
     target.style.minHeight = target.scrollHeight + "px";
   }
 
-  interface CommandOutput {
+  interface HandlerOutput {
     cell: CellInfo;
     commandId: Promise<string>;
   }
   function keyHandler(
     e: KeyboardEvent,
     cell: CellInfo
-  ): CommandOutput | undefined {
+  ): HandlerOutput | undefined {
     if (!e.target) return undefined;
     if (e.isComposing || e.keyCode === 229) return undefined;
 
@@ -57,11 +63,6 @@
   import { Terminal } from "xterm";
   import { FitAddon } from "xterm-addon-fit";
   import { onDestroy } from "svelte";
-  import {
-    pollCommand,
-    type CommandData,
-    type CommandStatus,
-  } from "$lib/handlers";
 
   const term = new Terminal({
     disableStdin: true,
@@ -115,10 +116,7 @@
   async function invokeCommand(commandUuid: string) {
     let timeoutMs = 50;
     while (commandUuid === commandId) {
-      const pollOut = await pollCommand({
-        id: commandUuid,
-        timeoutMs,
-      });
+      const pollOut = await pollCommand(commandUuid, timeoutMs);
       if (!pollOut) {
         timeoutMs *= 2;
         timeoutMs = Math.min(400, timeoutMs);
@@ -166,8 +164,14 @@
   $: if (output !== null && output?.data.length > 0) {
     const textBlocks = output.data.flatMap((data) => {
       const out = [];
-      if (data.Stderr) out.push(data.Stderr);
-      if (data.Stdout) out.push(data.Stdout);
+      switch (data.kind) {
+        case "Stderr":
+        case "Stdout":
+          out.push(data.value);
+          break;
+        default:
+          break;
+      }
 
       return out;
     });
