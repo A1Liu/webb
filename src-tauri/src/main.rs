@@ -22,6 +22,7 @@ static ref RUNNING_COMMANDS: Mutex<HashMap<CommandId, Arc<Mutex<Command>>>> =
 }
 
 #[tauri::command]
+#[specta::specta]
 async fn poll_command(id: CommandId, timeout_ms: u32) -> Option<CommandOutput> {
     println!("running poll_command");
 
@@ -39,10 +40,11 @@ async fn poll_command(id: CommandId, timeout_ms: u32) -> Option<CommandOutput> {
 }
 
 #[tauri::command]
-async fn run_zsh(command: String) -> Result<CommandId, String> {
+#[specta::specta]
+async fn run_zsh(config: commands::CommandConfig) -> Result<CommandId, String> {
     println!("running zsh");
 
-    let command = Command::new(command)?;
+    let command = Command::new(config).await?;
     let uuid = command.id();
 
     let mut commands = RUNNING_COMMANDS.lock().await;
@@ -55,6 +57,13 @@ async fn run_zsh(command: String) -> Result<CommandId, String> {
 }
 
 fn main() {
+    #[cfg(debug_assertions)]
+    tauri_specta::ts::export(
+        specta::collect_types![run_zsh, poll_command],
+        "../web/lib/handlers.ts",
+    )
+    .unwrap();
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![run_zsh, poll_command])
         .run(tauri::generate_context!())

@@ -1,6 +1,8 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
@@ -10,24 +12,31 @@ use tokio::io::AsyncReadExt;
 use tokio::process::{Child, Command as OsCommand};
 use uuid::Uuid;
 
-#[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Type)]
+pub struct CommandConfig {
+    pub command: String,
+    pub working_directory: String,
+}
+
+#[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Eq, Serialize, Deserialize, Debug, Type)]
 #[repr(transparent)]
 pub struct CommandId(Uuid);
 
-#[derive(Serialize, Debug, Clone, Copy)]
+#[derive(Serialize, Debug, Clone, Copy, Type)]
 pub struct CommandStatus {
     pub success: bool,
     pub exit_code: Option<i32>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Type)]
 pub struct CommandOutput {
     pub end: bool,
     pub status: Option<CommandStatus>,
     pub data: Vec<CommandData>,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Type)]
+#[serde(tag = "kind", content = "value")]
 pub enum CommandData {
     Status(CommandStatus),
     Stdout(String),
@@ -37,6 +46,8 @@ pub enum CommandData {
 pub struct Command {
     id: CommandId,
     command: String,
+
+    working_directory: PathBuf,
 
     // I'd like to not have to ARC everything, but for now, there's a lot of running
     // tasks that needs shared references to synchronization variables, and this
@@ -60,10 +71,16 @@ impl std::fmt::Debug for Command {
 }
 
 impl Command {
-    pub fn new(command: String) -> Result<Self, String> {
+    pub async fn new(config: CommandConfig) -> Result<Self, String> {
+        let command = config.command;
+        let working_directory = tokio::fs::canonicalize(config.working_directory)
+            .await
+            .map_err(|e| "invalid working directory")?;
+
         let mut child = OsCommand::new("zsh")
             .arg("-c")
             .arg(&command)
+            .current_dir(&working_directory)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -83,6 +100,7 @@ impl Command {
         let sel = Self {
             id,
             command,
+            working_directory,
             done: Arc::new(AtomicBool::new(false)),
             exit_status: None,
             channel: rx,
