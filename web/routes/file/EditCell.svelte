@@ -6,6 +6,7 @@
     type CommandOutput,
     type CommandStatus,
     type CommandData,
+    runZsh,
   } from "$lib/handlers";
 
   function matchKey(
@@ -51,8 +52,9 @@
 
       return {
         cell,
-        commandId: invoke("run_zsh", {
+        commandId: runZsh({
           command: cell.contents,
+          working_directory: "/Users/a1liu/code",
         }),
       };
     }
@@ -163,17 +165,13 @@
 
   $: if (output !== null && output?.data.length > 0) {
     const textBlocks = output.data.flatMap((data) => {
-      const out = [];
       switch (data.kind) {
         case "Stderr":
         case "Stdout":
-          out.push(data.value);
-          break;
+          return [data.value];
         default:
-          break;
+          return [];
       }
-
-      return out;
     });
 
     newlineBuffered = textBlocks.reduce((nl, block) => {

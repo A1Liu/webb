@@ -41,10 +41,10 @@ async fn poll_command(id: CommandId, timeout_ms: u32) -> Option<CommandOutput> {
 
 #[tauri::command]
 #[specta::specta]
-async fn run_zsh(command: String) -> Result<CommandId, String> {
+async fn run_zsh(config: commands::CommandConfig) -> Result<CommandId, String> {
     println!("running zsh");
 
-    let command = Command::new(command)?;
+    let command = Command::new(config).await?;
     let uuid = command.id();
 
     let mut commands = RUNNING_COMMANDS.lock().await;
