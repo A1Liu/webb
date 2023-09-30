@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::atomic::AtomicBool;
@@ -10,34 +11,28 @@ use tokio::io::AsyncReadExt;
 use tokio::process::{Child, Command as OsCommand};
 use uuid::Uuid;
 
-#[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Eq, Serialize, Deserialize, Debug, Type)]
 #[repr(transparent)]
 pub struct CommandId(Uuid);
 
-#[derive(Serialize, Clone, Copy)]
+#[derive(Serialize, Debug, Clone, Copy, Type)]
 pub struct CommandStatus {
     pub success: bool,
     pub exit_code: Option<i32>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Type)]
 pub struct CommandOutput {
     pub end: bool,
     pub status: Option<CommandStatus>,
     pub data: Vec<CommandData>,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Type)]
 pub enum CommandData {
     Status(CommandStatus),
     Stdout(String),
     Stderr(String),
-}
-
-lazy_static! {
-// TODO: will this be a bottleneck?
-static ref RUNNING_COMMANDS: Mutex<HashMap<CommandId, Option<CommandStatus>>> =
-    Mutex::new(HashMap::new());
 }
 
 pub struct Command {
@@ -52,6 +47,17 @@ pub struct Command {
     channel: tokio::sync::mpsc::Receiver<CommandData>,
     exit_status: Option<CommandStatus>,
     kill: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+impl std::fmt::Debug for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Command")
+            .field("id", &self.id)
+            .field("command", &self.command)
+            .field("exit_status", &self.exit_status)
+            .field("done", &self.done.load(Ordering::SeqCst))
+            .finish()
+    }
 }
 
 impl Command {
