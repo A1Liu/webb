@@ -244,7 +244,7 @@
             }
             case "cd": {
               nextDir = result.nextDir;
-      moveDown = true;
+              moveDown = true;
               break;
             }
           }
