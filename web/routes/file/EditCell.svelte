@@ -168,8 +168,9 @@
 
   $: if (moveDown) {
     moveDown = false;
-    sheet.moveDownFrom($cellInfo.id, {
-      directory: nextDir,
+    sheet.moveDownFrom({
+      id: $cellInfo.id,
+      directory: nextDir ?? undefined,
     });
   }
 

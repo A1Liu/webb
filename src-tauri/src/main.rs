@@ -29,6 +29,12 @@ struct PathSuggest {
 
 #[tauri::command]
 #[specta::specta]
+fn user_home_dir() -> std::path::PathBuf {
+    return dirs::home_dir().unwrap();
+}
+
+#[tauri::command]
+#[specta::specta]
 async fn suggest_path(s: String, from: String) -> PathSuggest {
     println!("running suggest_path");
 
@@ -49,7 +55,7 @@ async fn suggest_path(s: String, from: String) -> PathSuggest {
         }
 
         if !cur_str.pop() {
-            break 'find_closest std::env::current_dir().unwrap();
+            break 'find_closest dirs::home_dir().unwrap();
         };
         jumps += 1;
     };
@@ -102,7 +108,7 @@ async fn run_zsh(config: commands::CommandConfig) -> Result<CommandId, String> {
 fn main() {
     #[cfg(debug_assertions)]
     tauri_specta::ts::export(
-        specta::collect_types![run_zsh, poll_command, suggest_path],
+        specta::collect_types![run_zsh, poll_command, suggest_path, user_home_dir],
         "../web/lib/handlers.ts",
     )
     .unwrap();
@@ -111,7 +117,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             run_zsh,
             poll_command,
-            suggest_path
+            suggest_path,
+            user_home_dir
         ])
         .run(tauri::generate_context!())
         .expect("error while running webb");

@@ -1,6 +1,10 @@
 import { writable, readable } from "svelte/store";
 import { v4 as uuid } from "uuid";
 import type { Writable, Readable } from "svelte/store";
+import { userHomeDir } from "$lib/handlers";
+
+let HOME_DIR = "";
+userHomeDir().then((dir) => (HOME_DIR = dir));
 
 export interface CellInfo {
   readonly id: string;
@@ -9,6 +13,21 @@ export interface CellInfo {
   contents: string;
   focus: boolean;
 }
+
+interface MoveDownCommand {
+  id: string;
+  directory?: string;
+}
+
+export type SheetCommand =
+  | {
+      kind: "createCell";
+      options: Partial<Omit<CellInfo, "index">>;
+    }
+  | {
+      kind: "moveDownFrom";
+      options: MoveDownCommand;
+    };
 
 export class Sheet {
   public readonly cellLayout: Readable<string[]>;
@@ -26,12 +45,18 @@ export class Sheet {
 
   createCell({
     id = uuid(),
-    directory = "/",
+    directory,
     contents = "",
     focus = false,
   }: Partial<Omit<CellInfo, "index">> = {}): string {
     const index = this.cellLayoutRef.length;
-    const store = writable({ id, index, directory, contents, focus });
+    const store = writable({
+      id,
+      index,
+      directory: directory ?? HOME_DIR,
+      contents,
+      focus,
+    });
 
     this.cells.set(id, store);
 
@@ -41,13 +66,11 @@ export class Sheet {
     return id;
   }
 
-  moveDownFrom(id: string, options?: { directory?: string | null }) {
+  moveDownFrom({ id, directory }: MoveDownCommand) {
     const index = this.cellLayoutRef.indexOf(id);
     if (index === -1) {
       return;
     }
-
-    const directory = options?.directory ?? undefined;
 
     const targetId = this.cellLayoutRef[index + 1];
     if (!targetId) {

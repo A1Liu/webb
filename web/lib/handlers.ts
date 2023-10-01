@@ -22,6 +22,10 @@ export function suggestPath(s: string, from: string) {
     return invoke()<PathSuggest>("suggest_path", { s,from })
 }
 
+export function userHomeDir() {
+    return invoke()<string>("user_home_dir")
+}
+
 export type CommandId = string
 export type CommandOutput = { end: boolean; status: CommandStatus | null; data: CommandData[] }
 export type CommandConfig = { command: string; working_directory: string }
