@@ -5,6 +5,7 @@ import type { Writable, Readable } from "svelte/store";
 export interface CellInfo {
   readonly id: string;
   readonly index: number;
+  readonly directory: string;
   contents: string;
   focus: boolean;
 }
@@ -25,11 +26,12 @@ export class Sheet {
 
   createCell({
     id = uuid(),
+    directory = "/",
     contents = "",
     focus = false,
   }: Partial<Omit<CellInfo, "index">> = {}): string {
     const index = this.cellLayoutRef.length;
-    const store = writable({ id, index, contents, focus });
+    const store = writable({ id, index, directory, contents, focus });
 
     this.cells.set(id, store);
 
@@ -39,15 +41,17 @@ export class Sheet {
     return id;
   }
 
-  moveDownFrom(id: string) {
+  moveDownFrom(id: string, options?: { directory?: string | null }) {
     const index = this.cellLayoutRef.indexOf(id);
     if (index === -1) {
       return;
     }
 
+    const directory = options?.directory ?? undefined;
+
     const targetId = this.cellLayoutRef[index + 1];
     if (!targetId) {
-      this.createCell({ focus: true });
+      this.createCell({ focus: true, directory });
       return;
     }
 

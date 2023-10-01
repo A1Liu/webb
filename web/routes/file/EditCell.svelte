@@ -1,8 +1,10 @@
 <script lang="ts" context="module">
   import type { CellInfo, Sheet } from "./cellStore";
   import { invoke } from "@tauri-apps/api/tauri";
+  import { v4 as uuid } from "uuid";
   import {
     pollCommand,
+    suggestPath,
     type CommandOutput,
     type CommandStatus,
     type CommandData,
@@ -33,7 +35,10 @@
 
   interface HandlerOutput {
     cell: CellInfo;
-    commandId: Promise<string>;
+    result: Promise<
+      | { kind: "command"; commandId: string }
+      | { kind: "cd"; nextDir: string | null }
+    >;
   }
   function keyHandler(
     e: KeyboardEvent,
@@ -50,12 +55,28 @@
     ) {
       e.preventDefault();
 
+      const trimmed = cell.contents.trim();
+      if (trimmed.startsWith("cd")) {
+        return {
+          cell,
+          result: suggestPath(trimmed.slice(2).trim(), cell.directory).then(
+            ({ valid, closest_path }) => {
+              if (valid) {
+                return { kind: "cd", nextDir: closest_path };
+              }
+
+              return { kind: "cd", nextDir: null };
+            }
+          ),
+        };
+      }
+
       return {
         cell,
-        commandId: runZsh({
+        result: runZsh({
           command: cell.contents,
-          working_directory: "/Users/a1liu/code",
-        }),
+          working_directory: cell.directory,
+        }).then((s) => ({ kind: "command", commandId: s })),
       };
     }
   }
@@ -107,6 +128,7 @@
     data: CommandData[];
   } | null = null;
   let moveDown = false;
+  let nextDir: string | null = null;
   let newlineBuffered = false;
 
   const listenerDisposerLF = term.onLineFeed(() => {
@@ -146,7 +168,9 @@
 
   $: if (moveDown) {
     moveDown = false;
-    sheet.moveDownFrom($cellInfo.id);
+    sheet.moveDownFrom($cellInfo.id, {
+      directory: nextDir,
+    });
   }
 
   $: if ($cellInfo.focus && inputRef !== null) {
@@ -210,13 +234,20 @@
       bind:value={$cellInfo.contents}
       on:input={inputHandler}
       on:keydown={(e) => {
-        const res = keyHandler(e, $cellInfo);
-        if (!res) return;
-
-        const { commandId: uuid } = res;
-        uuid.then((uuid) => {
-          output = { uuid, status: null, data: [] };
-          commandId = uuid;
+        keyHandler(e, $cellInfo)?.result.then((result) => {
+          switch (result.kind) {
+            case "command": {
+              const uuid = result.commandId;
+              output = { uuid, status: null, data: [] };
+              commandId = uuid;
+              break;
+            }
+            case "cd": {
+              nextDir = result.nextDir;
+              moveDown = true;
+              break;
+            }
+          }
         });
       }}
     />

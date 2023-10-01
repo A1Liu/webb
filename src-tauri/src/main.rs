@@ -21,6 +21,49 @@ static ref RUNNING_COMMANDS: Mutex<HashMap<CommandId, Arc<Mutex<Command>>>> =
     Mutex::new(HashMap::new());
 }
 
+#[derive(Clone, Debug, serde::Serialize, specta::Type)]
+struct PathSuggest {
+    valid: bool,
+    closest_path: String,
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn suggest_path(s: String, from: String) -> PathSuggest {
+    println!("running suggest_path");
+
+    // Lots of this probably doesn't need to be async, but I'm not too excited about e.g.
+    // exhausting the worker threads in the tauri runtime by calling blocking functions here.
+    // Additionally, while trying to research this, I accidentally fell down a rabbit hole of
+    //  rust drama, and am now exhausted myself.
+    let mut jumps = 0;
+    let mut cur_str = std::path::Path::new(&from).to_path_buf();
+    cur_str.push(&s);
+
+    let closest_path = 'find_closest: loop {
+        match tokio::fs::canonicalize(&cur_str).await {
+            Ok(v) => break 'find_closest v,
+            Err(e) => {
+                println!("{:?} had error: {:?}", cur_str, e);
+            }
+        }
+
+        if !cur_str.pop() {
+            break 'find_closest std::env::current_dir().unwrap();
+        };
+        jumps += 1;
+    };
+
+    let closest_path = closest_path.display().to_string();
+
+    let result = PathSuggest {
+        valid: jumps == 0,
+        closest_path,
+    };
+    println!("running suggest_path {:#?}", &result);
+    return result;
+}
+
 #[tauri::command]
 #[specta::specta]
 async fn poll_command(id: CommandId, timeout_ms: u32) -> Option<CommandOutput> {
@@ -59,13 +102,17 @@ async fn run_zsh(config: commands::CommandConfig) -> Result<CommandId, String> {
 fn main() {
     #[cfg(debug_assertions)]
     tauri_specta::ts::export(
-        specta::collect_types![run_zsh, poll_command],
+        specta::collect_types![run_zsh, poll_command, suggest_path],
         "../web/lib/handlers.ts",
     )
     .unwrap();
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![run_zsh, poll_command])
+        .invoke_handler(tauri::generate_handler![
+            run_zsh,
+            poll_command,
+            suggest_path
+        ])
         .run(tauri::generate_context!())
         .expect("error while running webb");
 }

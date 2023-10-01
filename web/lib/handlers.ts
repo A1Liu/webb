@@ -18,8 +18,13 @@ export function pollCommand(id: CommandId, timeoutMs: number) {
     return invoke()<CommandOutput | null>("poll_command", { id,timeoutMs })
 }
 
+export function suggestPath(s: string, from: string) {
+    return invoke()<PathSuggest>("suggest_path", { s,from })
+}
+
 export type CommandId = string
 export type CommandOutput = { end: boolean; status: CommandStatus | null; data: CommandData[] }
 export type CommandConfig = { command: string; working_directory: string }
 export type CommandStatus = { success: boolean; exit_code: number | null }
+export type PathSuggest = { valid: boolean; closest_path: string }
 export type CommandData = { kind: "Status"; value: CommandStatus } | { kind: "Stdout"; value: string } | { kind: "Stderr"; value: string }
