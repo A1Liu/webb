@@ -33,13 +33,15 @@ export class Sheet {
   public readonly cellLayout: Readable<string[]>;
   public readonly cells = new Map<string, Writable<CellInfo>>();
   private cellLayoutRef: string[] = [];
-  private readonly cellLayoutSetters: ((s: string[]) => unknown)[] = [];
+  private readonly cellLayoutSetters = new Set<(s: string[]) => unknown>();
 
   constructor() {
     this.cellLayout = readable<string[]>([], (set) => {
-      this.cellLayoutSetters.push(set);
+      this.cellLayoutSetters.add(set);
 
-      return function stop() {};
+      return () => {
+        this.cellLayoutSetters.delete(set);
+      };
     });
   }
 
