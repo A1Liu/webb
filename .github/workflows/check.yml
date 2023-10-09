@@ -52,3 +52,12 @@ jobs:
       - uses: ./.github/dep-cache
       - name: Check Types
         run: pnpm ts-check
+
+  rs-types:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/dep-cache
+      - name: Check Rust Types
+        run: pnpm build
