@@ -10,7 +10,7 @@ runs:
   using: "composite"
   steps:
     - name: install dependencies (ubuntu only)
-      if: runner.os == 'Linux' && inputs.include-rust
+      if: runner.os == 'Linux' && inputs.include-rust == 'true'
       shell: bash
       run: |
         sudo apt-get update
@@ -27,7 +27,7 @@ runs:
         cache: pnpm
 
     - name: Install Rust stable
-      if: inputs.include-rust
+      if: inputs.include-rust == 'true'
       uses: dtolnay/rust-toolchain@stable
 
     - name: Check Cache
@@ -58,14 +58,14 @@ runs:
 
     - name: Cache Rust dependencies
       id: rust-cache-check
-      if: inputs.include-rust
+      if: inputs.include-rust == 'true'
       uses: Swatinem/rust-cache@v2
       with:
         cache-all-crates: true
         key: ${{ hashFiles('src-tauri/tauri.conf.json') }}
 
     - name: Install Rust dependencies
-      if: steps.rust-cache-check.outputs.cache-hit != 'true' && inputs.include-rust
+      if: steps.rust-cache-check.outputs.cache-hit != 'true' && inputs.include-rust == 'true'
       shell: bash
       run: |
         cd src-tauri

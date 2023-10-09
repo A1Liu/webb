@@ -22,6 +22,8 @@ jobs:
         with:
           lfs: true
       - uses: ./.github/dep-cache
+        with:
+          include-rust: true
 
       - uses: tauri-apps/tauri-action@v0
         env:
