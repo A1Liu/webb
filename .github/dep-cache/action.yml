@@ -1,16 +1,33 @@
 name: Cache dependencies
 description: Install and cache dependencies, including any `node_modules` folders
 
+inputs:
+  include-rust:
+    description: Include Rust dependencies
+    default: false
+
 runs:
   using: "composite"
   steps:
+    - name: install dependencies (ubuntu only)
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      if: runner.os == 'Linux' && inputs.include-rust == 'true'
+      with:
+        packages: libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+        version: 1.0
+
+    - uses: pnpm/action-setup@v2.4.0
+      with:
+        version: 8
+
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
-        cache-dependency-path: yarn.lock
-        cache: yarn
+        cache-dependency-path: pnpm-lock.yaml
+        cache: pnpm
 
     - name: Install Rust stable
+      if: inputs.include-rust == 'true'
       uses: dtolnay/rust-toolchain@stable
 
     - name: Check Cache
@@ -26,8 +43,9 @@ runs:
       if: steps.cache-check.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        yarn install --frozen-lockfile
-        yarn prepare
+        # TODO: use pnpm ci when available
+        pnpm install
+        pnpm prepare
 
     - name: Cache dependencies
       if: steps.cache-check.outputs.cache-hit != 'true'
@@ -40,13 +58,14 @@ runs:
 
     - name: Cache Rust dependencies
       id: rust-cache-check
+      if: inputs.include-rust == 'true'
       uses: Swatinem/rust-cache@v2
       with:
         cache-all-crates: true
         key: ${{ hashFiles('src-tauri/tauri.conf.json') }}
 
     - name: Install Rust dependencies
-      if: steps.rust-cache-check.outputs.cache-hit != 'true'
+      if: steps.rust-cache-check.outputs.cache-hit != 'true' && inputs.include-rust == 'true'
       shell: bash
       run: |
         cd src-tauri

@@ -3,6 +3,8 @@ import { v4 as uuid } from "uuid";
 import type { Writable, Readable } from "svelte/store";
 import { userHomeDir } from "$lib/handlers";
 
+// There's a race condition here for getting the proper home directory. I guess
+// I don't really care right now about that. Oh well.
 let HOME_DIR = "";
 userHomeDir().then((dir) => (HOME_DIR = dir));
 
@@ -33,13 +35,15 @@ export class Sheet {
   public readonly cellLayout: Readable<string[]>;
   public readonly cells = new Map<string, Writable<CellInfo>>();
   private cellLayoutRef: string[] = [];
-  private readonly cellLayoutSetters: ((s: string[]) => unknown)[] = [];
+  private readonly cellLayoutSetters = new Set<(s: string[]) => unknown>();
 
   constructor() {
     this.cellLayout = readable<string[]>([], (set) => {
-      this.cellLayoutSetters.push(set);
+      this.cellLayoutSetters.add(set);
 
-      return function stop() {};
+      return () => {
+        this.cellLayoutSetters.delete(set);
+      };
     });
   }
 
