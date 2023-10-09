@@ -4,6 +4,13 @@ description: Install and cache dependencies, including any `node_modules` folder
 runs:
   using: "composite"
   steps:
+    - name: install dependencies (ubuntu only)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
     - uses: pnpm/action-setup@v2.4.0
       with:
         version: 8
