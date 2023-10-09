@@ -10,15 +10,15 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          cache-dependency-path: yarn.lock
-          cache: yarn
+          cache-dependency-path: pnpm-lock.yaml
+          cache: pnpm
 
       - name: Install dependencies
         run: |
-          yarn install
+          pnpm install
 
           if ! test -z "`git diff --stat`"; then
-            echo "Changes were found; please run 'yarn install' and commit the output."
+            echo "Changes were found; please run 'pnpm install' and commit the output."
             echo
             git diff --name-only
             exit 1
@@ -31,10 +31,10 @@ jobs:
       - uses: ./.github/dep-cache
       - name: Check Formatting
         run: |
-          yarn format
+          pnpm format
 
           if ! test -z "`git diff --stat`"; then
-            echo "Changes were found; please run 'yarn format' and commit the output."
+            echo "Changes were found; please run 'pnpm format' and commit the output."
             echo
             git diff --name-only
             exit 1
@@ -47,4 +47,4 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/dep-cache
       - name: Check Types
-        run: yarn ts-check
+        run: pnpm ts-check
