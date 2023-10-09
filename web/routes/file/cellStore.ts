@@ -3,6 +3,8 @@ import { v4 as uuid } from "uuid";
 import type { Writable, Readable } from "svelte/store";
 import { userHomeDir } from "$lib/handlers";
 
+// There's a race condition here for getting the proper home directory. I guess
+// I don't really care right now about that. Oh well.
 let HOME_DIR = "";
 userHomeDir().then((dir) => (HOME_DIR = dir));
 
