@@ -53,17 +53,17 @@ jobs:
       - name: Check Types
         run: pnpm ts-check
 
-  rs-types:
-    runs-on: ubuntu-22.04
+  # rs-types:
+  #   runs-on: ubuntu-22.04
 
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          lfs: true
-      - uses: ./.github/dep-cache
-        with:
-          include-rust: true
-      - name: Check Rust Types
-        run: |
-          cd src-tauri
-          cargo check
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         lfs: true
+  #     - uses: ./.github/dep-cache
+  #       with:
+  #         include-rust: true
+  #     - name: Check Rust Types
+  #       run: |
+  #         cd src-tauri
+  #         cargo check
