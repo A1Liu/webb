@@ -24,6 +24,7 @@ lazy_static = "1.4.0"
 specta = { version = "1.0.5", features = ["uuid"] }
 tauri-specta = { version = "1.0.2", features = ["typescript"] }
 dirs = "5.0.1"
+mlua = { version = "0.9.1", features = ["lua54"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
