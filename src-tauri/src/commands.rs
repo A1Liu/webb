@@ -18,7 +18,7 @@ pub struct RunnableIO {
     pub stderr: Option<Box<dyn AsyncRead>>,
 }
 
-pub trait Runnable: Sized {
+pub trait Runnable: Sized + core::fmt::Debug {
     fn new(input: String) -> (Self, RunnableIO);
 }
 
