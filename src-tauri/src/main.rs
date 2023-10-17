@@ -7,6 +7,7 @@
 ))]
 
 pub mod commands;
+pub mod lua;
 pub mod util;
 
 use commands::{Command, CommandId, CommandOutput};

@@ -8,9 +8,19 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 use std::sync::{atomic::Ordering, Arc};
 use std::time::Duration;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio::process::{Child, Command as OsCommand};
 use uuid::Uuid;
+
+pub struct RunnableIO {
+    pub stdin: Option<Box<dyn AsyncWrite>>,
+    pub stdout: Option<Box<dyn AsyncRead>>,
+    pub stderr: Option<Box<dyn AsyncRead>>,
+}
+
+pub trait Runnable: Sized {
+    fn new(input: String) -> (Self, RunnableIO);
+}
 
 #[derive(Clone, Debug, Deserialize, Type)]
 pub struct CommandConfig {
