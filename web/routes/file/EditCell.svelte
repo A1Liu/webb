@@ -1,6 +1,11 @@
 <script lang="ts" context="module">
   import type { CellInfo, Sheet } from "./cellStore";
-  import { pollCommand, suggestPath, runZsh, type RunnerOutputExt } from "$lib/handlers";
+  import {
+    pollCommand,
+    suggestPath,
+    runZsh,
+    type RunnerOutputExt,
+  } from "$lib/handlers";
 
   function matchKey(
     e: KeyboardEvent,
