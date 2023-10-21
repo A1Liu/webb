@@ -1,4 +1,4 @@
-use super::{RunCtx, RunId, RunStatus, Runnable, RunnableIO, Runner};
+use super::{RunCtx, RunId, RunStatus, Runnable, Runner};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -95,8 +95,6 @@ impl Runnable for ShellCommand {
                 return;
             }
         };
-
-        // let io = RunnableIO::new(child.stdin.take(), child.stdout.take(), child.stderr.take());
 
         if let Some(stdout) = child.stdout.take() {
             ctx.pipe_to_stdout(self.clone(), stdout);

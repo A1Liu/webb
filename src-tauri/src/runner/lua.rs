@@ -1,4 +1,4 @@
-use super::{RunStatus, Runnable, RunnableIO};
+use super::{RunStatus, Runnable};
 use mlua::{Lua, StdLib};
 
 #[derive(Debug)]

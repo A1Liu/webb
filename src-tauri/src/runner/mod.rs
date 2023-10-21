@@ -17,31 +17,6 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio::process::{Child, Command as OsCommand};
 use uuid::Uuid;
 
-// Maybe there's a way to use files instead of handling file piping
-// manually. IDK how you'd do stdout + stderr collation though. Maybe
-// you don't need it in this medium.
-#[derive(Default)]
-pub struct RunnableIO {
-    pub stdin: Option<Box<dyn AsyncWrite + Send>>,
-    pub stdout: Option<Box<dyn AsyncRead + Unpin + Send>>,
-    pub stderr: Option<Box<dyn AsyncRead + Unpin + Send>>,
-}
-
-impl RunnableIO {
-    pub fn new<SIn, SOut, SErr>(sin: Option<SIn>, sout: Option<SOut>, serr: Option<SErr>) -> Self
-    where
-        SIn: AsyncWrite + Send + 'static,
-        SOut: AsyncRead + Unpin + Send + 'static,
-        SErr: AsyncRead + Unpin + Send + 'static,
-    {
-        return Self {
-            stdin: sin.map(|s| -> Box<dyn AsyncWrite + Send> { return Box::new(s) }),
-            stdout: sout.map(|s| -> Box<dyn AsyncRead + Unpin + Send> { return Box::new(s) }),
-            stderr: serr.map(|s| -> Box<dyn AsyncRead + Unpin + Send> { return Box::new(s) }),
-        };
-    }
-}
-
 pub trait Runnable: core::fmt::Debug + Send + Sync {
     fn start(self: Arc<Self>, ctx: RunCtx);
     fn is_done(&self) -> bool;

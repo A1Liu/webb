@@ -10,7 +10,7 @@ pub mod runner;
 pub mod util;
 
 use lazy_static::lazy_static;
-use runner::{PollOutput, RunId, RunnableIO};
+use runner::{PollOutput, RunId};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
