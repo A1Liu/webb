@@ -29,5 +29,5 @@ export function userHomeDir() {
 export type PollOutput = { end: boolean; success: boolean | null; data: RunnerOutputExt[] }
 export type ShellConfig = { command: string; working_directory: string }
 export type RunnerOutputExt = { kind: "Stdout"; value: string } | { kind: "Stderr"; value: string }
-export type PathSuggest = { valid: boolean; closest_path: string }
 export type RunId = string
+export type PathSuggest = { valid: boolean; closest_path: string }

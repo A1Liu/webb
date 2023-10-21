@@ -6,12 +6,10 @@
     unused_variables
 ))]
 
-pub mod commands;
 pub mod lua;
 pub mod runner;
 pub mod util;
 
-use commands::{Command, CommandOutput};
 use lazy_static::lazy_static;
 use runner::{PollOutput, RunId};
 use std::collections::HashMap;
