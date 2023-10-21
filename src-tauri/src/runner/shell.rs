@@ -24,7 +24,6 @@ pub struct ShellCommand {
     command: String,
     working_directory: PathBuf,
     status: RunStatus,
-    kill: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
 }
 
 impl ShellCommand {
@@ -38,20 +37,19 @@ impl ShellCommand {
             command,
             working_directory,
             status: RunStatus::new(),
-            kill: Mutex::new(None),
         });
     }
 
     async fn wait_for_child(
         status: RunStatus,
-        recv_kill: tokio::sync::oneshot::Receiver<()>,
+        mut recv_kill: tokio::sync::mpsc::Receiver<()>,
         mut child: Child,
     ) {
         let exit_status = tokio::select! {
             status_res = child.wait() => {
                 Some(status_res.expect("waiting on child process encountered an error"))
             }
-            _ = recv_kill => {
+            _ = recv_kill.recv() => {
                 match child.kill().await {
                     Ok(()) => {},
                     Err(e) => println!("error killing child: {:?}",e),
@@ -79,7 +77,7 @@ impl ShellCommand {
 }
 
 impl Runnable for ShellCommand {
-    fn start(self: Arc<ShellCommand>, ctx: RunCtx) {
+    fn start(self: Arc<ShellCommand>, mut ctx: RunCtx) {
         let child_res = OsCommand::new("zsh")
             .arg("-c")
             .arg(&self.command)
@@ -98,8 +96,6 @@ impl Runnable for ShellCommand {
             }
         };
 
-        let (send_kill, recv_kill) = tokio::sync::oneshot::channel::<()>();
-
         // let io = RunnableIO::new(child.stdin.take(), child.stdout.take(), child.stderr.take());
 
         if let Some(stdout) = child.stdout.take() {
@@ -109,20 +105,15 @@ impl Runnable for ShellCommand {
             ctx.pipe_to_stderr(self.clone(), stderr);
         }
 
-        *self.kill.lock().unwrap() = Some(send_kill);
-
-        tokio::spawn(Self::wait_for_child(self.status.clone(), recv_kill, child));
+        tokio::spawn(Self::wait_for_child(
+            self.status.clone(),
+            ctx.take_kill_receiver(),
+            child,
+        ));
     }
 
     fn is_done(&self) -> bool {
         return self.status.is_done();
-    }
-
-    fn kill(&self) {
-        match self.kill.lock().unwrap().take() {
-            Some(kill) => kill.send(()).unwrap(),
-            None => return,
-        }
     }
 
     fn is_successful(&self) -> Option<bool> {

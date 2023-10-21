@@ -1,6 +1,6 @@
 //! This is maybe a bad name, but I couldn't come up with anything better.
 
-// pub mod lua;
+pub mod lua;
 pub mod shell;
 
 use serde::__private::from_utf8_lossy;
@@ -44,7 +44,6 @@ impl RunnableIO {
 
 pub trait Runnable: core::fmt::Debug + Send + Sync {
     fn start(self: Arc<Self>, ctx: RunCtx);
-    fn kill(&self);
     fn is_done(&self) -> bool;
     fn is_successful(&self) -> Option<bool>;
 }
@@ -105,9 +104,9 @@ impl RunStatus {
     }
 }
 
-#[derive(Clone)]
 pub struct RunCtx {
     tx: tokio::sync::mpsc::Sender<RunnerOutput>,
+    kill_receiver: Option<tokio::sync::mpsc::Receiver<()>>,
 }
 
 impl RunCtx {
@@ -125,6 +124,10 @@ impl RunCtx {
         pipe: impl Unpin + AsyncReadExt + Send + 'static,
     ) {
         self.pipe_to_channel(runnable, pipe, RunnerOutput::Stderr)
+    }
+
+    pub fn take_kill_receiver(&mut self) -> tokio::sync::mpsc::Receiver<()> {
+        return self.kill_receiver.take().unwrap();
     }
 
     fn pipe_to_channel(
@@ -250,6 +253,7 @@ pub struct Runner {
     // This is silly, but I guess whatever. Make it better later :(
     output: Arc<Mutex<Vec<RunnerOutput>>>,
     channel: tokio::sync::mpsc::Receiver<RunnerOutput>,
+    kill: tokio::sync::mpsc::Sender<()>,
 }
 
 impl std::fmt::Debug for Runner {
@@ -260,7 +264,7 @@ impl std::fmt::Debug for Runner {
 
 impl Drop for Runner {
     fn drop(&mut self) {
-        self.runnable.kill();
+        self.kill();
     }
 }
 
@@ -273,13 +277,18 @@ impl Runner {
         let output = Arc::new(Mutex::new(Vec::new()));
         let id = RunId(Uuid::new_v4());
 
+        let (kill, rx_kill) = tokio::sync::mpsc::channel(8);
         let (tx, rx) = tokio::sync::mpsc::channel(128);
-        runnable.clone().start(RunCtx { tx: tx.clone() });
+        runnable.clone().start(RunCtx {
+            tx: tx.clone(),
+            kill_receiver: Some(rx_kill),
+        });
 
         let sel = Self {
             id,
             output,
             runnable,
+            kill,
             channel: rx,
         };
 
@@ -353,7 +362,8 @@ impl Runner {
     }
 
     pub fn kill(&self) {
-        self.runnable.kill()
+        let kill = self.kill.clone();
+        tokio::spawn(async move { kill.send(()).await.unwrap() });
     }
 
     pub fn is_successful(&self) -> Option<bool> {

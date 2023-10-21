@@ -102,14 +102,14 @@ async fn poll_command(id: RunId, timeout_ms: u32) -> Option<PollOutput> {
     );
 }
 
-// #[tauri::command]
-// #[specta::specta]
-// async fn run_lua(source: String) -> Result<RunId, String> {
-//     println!("running lua");
-//
-//     let (lua_command, io) = runner::lua::LuaCommand::new(source);
-//     return Ok(run_runner(lua_command, io).await);
-// }
+#[tauri::command]
+#[specta::specta]
+async fn run_lua(source: String) -> Result<RunId, String> {
+    println!("running lua");
+
+    let lua_command = runner::lua::LuaCommand::new(source);
+    return Ok(run_runner(lua_command).await);
+}
 
 #[tauri::command]
 #[specta::specta]

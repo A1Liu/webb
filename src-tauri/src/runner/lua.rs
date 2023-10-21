@@ -1,11 +1,24 @@
-use super::{Runnable, RunnableIO};
+use super::{RunStatus, Runnable, RunnableIO};
 use mlua::{Lua, StdLib};
 
 #[derive(Debug)]
-pub struct LuaCommand {}
+pub struct LuaCommand {
+    source: String,
+    status: RunStatus,
+}
 
 impl LuaCommand {
-    pub fn new(source: String) -> (Self, RunnableIO) {
+    pub fn new(source: String) -> Self {
+        return Self {
+            source,
+            status: RunStatus::new(),
+        };
+    }
+}
+
+impl Runnable for LuaCommand {
+    fn start(self: std::sync::Arc<Self>, ctx: super::RunCtx) {
+        let sel_ref = self.clone();
         tokio::spawn(async move {
             let libs = StdLib::TABLE
                 | StdLib::OS
@@ -18,28 +31,19 @@ impl LuaCommand {
             let lua = Lua::new_with(libs, options).expect("wtf");
 
             let _ = lua.sandbox(true).unwrap();
-            let _ = lua.load(source).exec();
+            let _ = lua.load(&sel_ref.source).exec();
 
             // https://github.com/khvzak/mlua/issues/306
         });
 
-        let sel = Self {};
-        let io = RunnableIO::default();
-
-        return (sel, io);
+        todo!()
     }
-}
 
-impl Runnable for LuaCommand {
     fn is_done(&self) -> bool {
-        todo!()
-    }
-
-    fn kill(&self) {
-        todo!()
+        self.status.is_done()
     }
 
     fn is_successful(&self) -> Option<bool> {
-        todo!()
+        self.status.is_successful()
     }
 }
