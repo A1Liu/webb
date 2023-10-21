@@ -169,43 +169,6 @@ impl RunCtx {
     }
 }
 
-pub fn pipe_to_channel(
-    runnable: Arc<dyn Runnable + 'static>,
-    tx: tokio::sync::mpsc::Sender<RunnerOutput>,
-    mut pipe: impl Unpin + AsyncReadExt + Send + 'static,
-    func: fn(Vec<u8>) -> RunnerOutput,
-) {
-    tokio::spawn(async move {
-        let mut bytes = Vec::with_capacity(128);
-
-        loop {
-            if tx.is_closed() {
-                break;
-            }
-
-            let len = match pipe.read_buf(&mut bytes).await {
-                Ok(len) => len,
-                Err(e) => {
-                    println!("e: {:?}", e);
-                    continue;
-                }
-            };
-
-            if len == 0 {
-                if runnable.is_done() {
-                    break;
-                }
-
-                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
-                continue;
-            }
-
-            tx.send(func(bytes.clone())).await.expect("wtf");
-            bytes.clear();
-        }
-    });
-}
-
 #[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Eq, Serialize, Deserialize, Debug, Type)]
 #[repr(transparent)]
 pub struct RunId(Uuid);
