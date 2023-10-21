@@ -1,5 +1,7 @@
 //! This is maybe a bad name, but I couldn't come up with anything better.
 
+pub mod shell;
+
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::collections::HashMap;
@@ -20,6 +22,21 @@ pub struct RunnableIO {
     pub stdin: Option<Box<dyn AsyncWrite>>,
     pub stdout: Option<Box<dyn AsyncRead + Unpin + Send>>,
     pub stderr: Option<Box<dyn AsyncRead + Unpin + Send>>,
+}
+
+impl RunnableIO {
+    pub fn new<SIn, SOut, SErr>(sin: Option<SIn>, sout: Option<SOut>, serr: Option<SErr>) -> Self
+    where
+        SIn: AsyncWrite + 'static,
+        SOut: AsyncRead + Unpin + Send + 'static,
+        SErr: AsyncRead + Unpin + Send + 'static,
+    {
+        return Self {
+            stdin: sin.map(|s| -> Box<dyn AsyncWrite> { return Box::new(s) }),
+            stdout: sout.map(|s| -> Box<dyn AsyncRead + Unpin + Send> { return Box::new(s) }),
+            stderr: serr.map(|s| -> Box<dyn AsyncRead + Unpin + Send> { return Box::new(s) }),
+        };
+    }
 }
 
 pub trait Runnable: core::fmt::Debug + Send + Sync {
