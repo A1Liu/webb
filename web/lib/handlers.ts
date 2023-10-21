@@ -26,9 +26,9 @@ export function userHomeDir() {
     return invoke()<string>("user_home_dir")
 }
 
-export type CommandData = { kind: "Status"; value: CommandStatus } | { kind: "Stdout"; value: string } | { kind: "Stderr"; value: string }
 export type CommandOutput = { end: boolean; status: CommandStatus | null; data: CommandData[] }
-export type CommandStatus = { success: boolean; exit_code: number | null }
+export type CommandData = { kind: "Status"; value: CommandStatus } | { kind: "Stdout"; value: string } | { kind: "Stderr"; value: string }
 export type PathSuggest = { valid: boolean; closest_path: string }
-export type CommandId = string
+export type CommandStatus = { success: boolean; exit_code: number | null }
 export type CommandConfig = { command: string; working_directory: string }
+export type CommandId = string

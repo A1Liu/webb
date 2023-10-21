@@ -8,17 +8,19 @@
 
 pub mod commands;
 pub mod lua;
+pub mod runner;
 pub mod util;
 
-use commands::{Command, CommandId, CommandOutput};
+use commands::{Command, CommandOutput};
 use lazy_static::lazy_static;
+use runner::RunId;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 lazy_static! {
 // TODO: will this be a bottleneck?
-static ref RUNNING_COMMANDS: Mutex<HashMap<CommandId, Arc<Mutex<Command>>>> =
+static ref RUNNING_COMMANDS: Mutex<HashMap<RunId, Arc<Mutex<Command>>>> =
     Mutex::new(HashMap::new());
 }
 
@@ -73,7 +75,7 @@ async fn suggest_path(s: String, from: String) -> PathSuggest {
 
 #[tauri::command]
 #[specta::specta]
-async fn poll_command(id: CommandId, timeout_ms: u32) -> Option<CommandOutput> {
+async fn poll_command(id: RunId, timeout_ms: u32) -> Option<CommandOutput> {
     println!("running poll_command");
 
     let command = {
@@ -91,7 +93,7 @@ async fn poll_command(id: CommandId, timeout_ms: u32) -> Option<CommandOutput> {
 
 #[tauri::command]
 #[specta::specta]
-async fn run_zsh(config: commands::CommandConfig) -> Result<CommandId, String> {
+async fn run_zsh(config: commands::CommandConfig) -> Result<RunId, String> {
     println!("running zsh");
 
     let command = Command::new(config).await?;

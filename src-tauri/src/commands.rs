@@ -12,25 +12,13 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio::process::{Child, Command as OsCommand};
 use uuid::Uuid;
 
-pub struct RunnableIO {
-    pub stdin: Option<Box<dyn AsyncWrite>>,
-    pub stdout: Option<Box<dyn AsyncRead>>,
-    pub stderr: Option<Box<dyn AsyncRead>>,
-}
-
-pub trait Runnable: Sized + core::fmt::Debug {
-    fn new(input: String) -> (Self, RunnableIO);
-}
+use crate::runner::RunId;
 
 #[derive(Clone, Debug, Deserialize, Type)]
 pub struct CommandConfig {
     pub command: String,
     pub working_directory: String,
 }
-
-#[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Eq, Serialize, Deserialize, Debug, Type)]
-#[repr(transparent)]
-pub struct CommandId(Uuid);
 
 #[derive(Serialize, Debug, Clone, Copy, Type)]
 pub struct CommandStatus {
@@ -54,7 +42,7 @@ pub enum CommandData {
 }
 
 pub struct Command {
-    id: CommandId,
+    id: RunId,
     command: String,
 
     working_directory: PathBuf,
@@ -103,7 +91,7 @@ impl Command {
 
         std::mem::drop(stdin);
 
-        let id = CommandId(Uuid::new_v4());
+        let id = RunId(Uuid::new_v4());
         let (send_kill, recv_kill) = tokio::sync::oneshot::channel::<()>();
         let (tx, rx) = tokio::sync::mpsc::channel(128);
 
@@ -270,7 +258,7 @@ impl Command {
         };
     }
 
-    pub fn id(&self) -> CommandId {
+    pub fn id(&self) -> RunId {
         return self.id;
     }
 }
