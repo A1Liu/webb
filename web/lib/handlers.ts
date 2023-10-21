@@ -28,7 +28,7 @@ export function userHomeDir() {
 
 export type CommandStatus = { success: boolean; exit_code: number | null }
 export type CommandOutput = { end: boolean; status: CommandStatus | null; data: CommandData[] }
-export type CommandData = { kind: "Status"; value: CommandStatus } | { kind: "Stdout"; value: string } | { kind: "Stderr"; value: string }
 export type RunId = string
+export type CommandData = { kind: "Status"; value: CommandStatus } | { kind: "Stdout"; value: string } | { kind: "Stderr"; value: string }
 export type PathSuggest = { valid: boolean; closest_path: string }
 export type CommandConfig = { command: string; working_directory: string }
