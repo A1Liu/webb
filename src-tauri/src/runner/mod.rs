@@ -1,6 +1,6 @@
 //! This is maybe a bad name, but I couldn't come up with anything better.
 
-pub mod lua;
+// pub mod lua;
 pub mod shell;
 
 use serde::__private::from_utf8_lossy;
@@ -43,9 +43,7 @@ impl RunnableIO {
 }
 
 pub trait Runnable: core::fmt::Debug + Send + Sync {
-    // TODO: this interface should probably contain a "start" method
-    // fn start(&mut self, ctx: RunCtx) {}
-
+    fn start(self: Arc<Self>, ctx: RunCtx);
     fn kill(&self);
     fn is_done(&self) -> bool;
     fn is_successful(&self) -> Option<bool>;
@@ -113,6 +111,22 @@ pub struct RunCtx {
 }
 
 impl RunCtx {
+    pub fn pipe_to_stdout(
+        &self,
+        runnable: Arc<dyn Runnable + 'static>,
+        pipe: impl Unpin + AsyncReadExt + Send + 'static,
+    ) {
+        self.pipe_to_channel(runnable, pipe, RunnerOutput::Stdout)
+    }
+
+    pub fn pipe_to_stderr(
+        &self,
+        runnable: Arc<dyn Runnable + 'static>,
+        pipe: impl Unpin + AsyncReadExt + Send + 'static,
+    ) {
+        self.pipe_to_channel(runnable, pipe, RunnerOutput::Stderr)
+    }
+
     fn pipe_to_channel(
         &self,
         runnable: Arc<dyn Runnable + 'static>,
@@ -232,7 +246,6 @@ pub struct PollOutput {
 pub struct Runner {
     id: RunId,
     runnable: Arc<dyn Runnable + 'static>,
-    stdin: Mutex<Option<Box<dyn AsyncWrite + Send>>>,
 
     // This is silly, but I guess whatever. Make it better later :(
     output: Arc<Mutex<Vec<RunnerOutput>>>,
@@ -252,41 +265,25 @@ impl Drop for Runner {
 }
 
 impl Runner {
-    pub fn new(runnable: impl Runnable + 'static, io: RunnableIO) -> Self {
+    pub fn new(runnable: impl Runnable + 'static) -> Self {
+        return Self::dyn_new(Arc::new(runnable));
+    }
+
+    fn dyn_new(runnable: Arc<dyn Runnable + 'static>) -> Self {
         let output = Arc::new(Mutex::new(Vec::new()));
         let id = RunId(Uuid::new_v4());
-        let stdin = io.stdin;
 
         let (tx, rx) = tokio::sync::mpsc::channel(128);
+        runnable.clone().start(RunCtx { tx: tx.clone() });
 
         let sel = Self {
             id,
             output,
-            stdin: Mutex::new(stdin),
-            runnable: Arc::new(runnable),
+            runnable,
             channel: rx,
         };
 
-        if let Some(stdout) = io.stdout {
-            pipe_to_channel(
-                sel.runnable.clone(),
-                tx.clone(),
-                stdout,
-                RunnerOutput::Stdout,
-            );
-        }
-
-        if let Some(stderr) = io.stderr {
-            pipe_to_channel(
-                sel.runnable.clone(),
-                tx.clone(),
-                stderr,
-                RunnerOutput::Stderr,
-            );
-        }
-
-        let output_write_ref = sel.output.clone();
-
+        // let output_write_ref = sel.output.clone();
         // tokio::spawn(async move {
         //     let mut rx = rx;
         //     let output = output_write_ref;
@@ -350,18 +347,16 @@ impl Runner {
     pub fn id(&self) -> RunId {
         return self.id;
     }
-}
 
-impl Runnable for Runner {
-    fn is_done(&self) -> bool {
+    pub fn is_done(&self) -> bool {
         self.runnable.is_done()
     }
 
-    fn kill(&self) {
+    pub fn kill(&self) {
         self.runnable.kill()
     }
 
-    fn is_successful(&self) -> Option<bool> {
+    pub fn is_successful(&self) -> Option<bool> {
         self.runnable.is_successful()
     }
 }

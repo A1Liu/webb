@@ -28,36 +28,18 @@ pub struct ShellCommand {
 }
 
 impl ShellCommand {
-    pub async fn new(config: ShellConfig) -> Result<(Self, RunnableIO), String> {
+    pub async fn new(config: ShellConfig) -> Result<Self, String> {
         let command = config.command;
         let working_directory = tokio::fs::canonicalize(config.working_directory)
             .await
             .map_err(|e| "invalid working directory")?;
 
-        let mut child = OsCommand::new("zsh")
-            .arg("-c")
-            .arg(&command)
-            .current_dir(&working_directory)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|_| format!("failed to create command: {}", command))?;
-
-        let (send_kill, recv_kill) = tokio::sync::oneshot::channel::<()>();
-
-        let sel = Self {
+        return Ok(Self {
             command,
             working_directory,
             status: RunStatus::new(),
-            kill: Mutex::new(Some(send_kill)),
-        };
-
-        let io = RunnableIO::new(child.stdin.take(), child.stdout.take(), child.stderr.take());
-
-        tokio::spawn(Self::wait_for_child(sel.status.clone(), recv_kill, child));
-
-        return Ok((sel, io));
+            kill: Mutex::new(None),
+        });
     }
 
     async fn wait_for_child(
@@ -97,17 +79,50 @@ impl ShellCommand {
 }
 
 impl Runnable for ShellCommand {
+    fn start(self: Arc<ShellCommand>, ctx: RunCtx) {
+        let child_res = OsCommand::new("zsh")
+            .arg("-c")
+            .arg(&self.command)
+            .current_dir(&self.working_directory)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn();
+
+        let mut child = match child_res {
+            Ok(c) => c,
+            Err(e) => {
+                println!("failed to create command: {}", &self.command);
+                self.status.failure();
+                return;
+            }
+        };
+
+        let (send_kill, recv_kill) = tokio::sync::oneshot::channel::<()>();
+
+        // let io = RunnableIO::new(child.stdin.take(), child.stdout.take(), child.stderr.take());
+
+        if let Some(stdout) = child.stdout.take() {
+            ctx.pipe_to_stdout(self.clone(), stdout);
+        }
+        if let Some(stderr) = child.stderr.take() {
+            ctx.pipe_to_stderr(self.clone(), stderr);
+        }
+
+        *self.kill.lock().unwrap() = Some(send_kill);
+
+        tokio::spawn(Self::wait_for_child(self.status.clone(), recv_kill, child));
+    }
+
     fn is_done(&self) -> bool {
         return self.status.is_done();
     }
 
     fn kill(&self) {
-        let kill = match self.kill.lock().unwrap().take() {
-            Some(k) => k,
+        match self.kill.lock().unwrap().take() {
+            Some(kill) => kill.send(()).unwrap(),
             None => return,
-        };
-
-        kill.send(()).unwrap();
+        }
     }
 
     fn is_successful(&self) -> Option<bool> {

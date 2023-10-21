@@ -26,8 +26,8 @@ export function userHomeDir() {
     return invoke()<string>("user_home_dir")
 }
 
-export type RunId = string
-export type RunnerOutputExt = { kind: "Stdout"; value: string } | { kind: "Stderr"; value: string }
 export type PathSuggest = { valid: boolean; closest_path: string }
 export type ShellConfig = { command: string; working_directory: string }
+export type RunnerOutputExt = { kind: "Stdout"; value: string } | { kind: "Stderr"; value: string }
+export type RunId = string
 export type PollOutput = { end: boolean; success: boolean | null; data: RunnerOutputExt[] }

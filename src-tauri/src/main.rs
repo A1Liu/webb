@@ -23,8 +23,8 @@ static ref RUNNING_COMMANDS: Mutex<HashMap<RunId, Arc<Mutex<Runner>>>> =
     Mutex::new(HashMap::new());
 }
 
-async fn run_runner(runnable: impl Runnable + 'static, io: RunnableIO) -> RunId {
-    let command = Runner::new(runnable, io);
+async fn run_runner(runnable: impl Runnable + 'static) -> RunId {
+    let command = Runner::new(runnable);
     let uuid = command.id();
     let mut commands = RUNNING_COMMANDS.lock().await;
     if let Some(prev) = commands.insert(uuid, Arc::new(Mutex::new(command))) {
@@ -102,22 +102,22 @@ async fn poll_command(id: RunId, timeout_ms: u32) -> Option<PollOutput> {
     );
 }
 
-#[tauri::command]
-#[specta::specta]
-async fn run_lua(source: String) -> Result<RunId, String> {
-    println!("running zsh");
-
-    let (lua_command, io) = runner::lua::LuaCommand::new(source);
-    return Ok(run_runner(lua_command, io).await);
-}
+// #[tauri::command]
+// #[specta::specta]
+// async fn run_lua(source: String) -> Result<RunId, String> {
+//     println!("running lua");
+//
+//     let (lua_command, io) = runner::lua::LuaCommand::new(source);
+//     return Ok(run_runner(lua_command, io).await);
+// }
 
 #[tauri::command]
 #[specta::specta]
 async fn run_zsh(config: runner::shell::ShellConfig) -> Result<RunId, String> {
     println!("running zsh");
 
-    let (zsh_command, io) = runner::shell::ShellCommand::new(config).await?;
-    return Ok(run_runner(zsh_command, io).await);
+    let zsh_command = runner::shell::ShellCommand::new(config).await?;
+    return Ok(run_runner(zsh_command).await);
 }
 
 fn main() {
