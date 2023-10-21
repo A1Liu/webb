@@ -2,6 +2,7 @@
 
 pub mod shell;
 
+use serde::__private::from_utf8_lossy;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::collections::HashMap;
@@ -19,7 +20,7 @@ use uuid::Uuid;
 // manually. IDK how you'd do stdout + stderr collation though. Maybe
 // you don't need it in this medium.
 pub struct RunnableIO {
-    pub stdin: Option<Box<dyn AsyncWrite>>,
+    pub stdin: Option<Box<dyn AsyncWrite + Send>>,
     pub stdout: Option<Box<dyn AsyncRead + Unpin + Send>>,
     pub stderr: Option<Box<dyn AsyncRead + Unpin + Send>>,
 }
@@ -27,12 +28,12 @@ pub struct RunnableIO {
 impl RunnableIO {
     pub fn new<SIn, SOut, SErr>(sin: Option<SIn>, sout: Option<SOut>, serr: Option<SErr>) -> Self
     where
-        SIn: AsyncWrite + 'static,
+        SIn: AsyncWrite + Send + 'static,
         SOut: AsyncRead + Unpin + Send + 'static,
         SErr: AsyncRead + Unpin + Send + 'static,
     {
         return Self {
-            stdin: sin.map(|s| -> Box<dyn AsyncWrite> { return Box::new(s) }),
+            stdin: sin.map(|s| -> Box<dyn AsyncWrite + Send> { return Box::new(s) }),
             stdout: sout.map(|s| -> Box<dyn AsyncRead + Unpin + Send> { return Box::new(s) }),
             stderr: serr.map(|s| -> Box<dyn AsyncRead + Unpin + Send> { return Box::new(s) }),
         };
@@ -56,21 +57,49 @@ pub enum RunnerOutput {
     Stderr(Vec<u8>),
 }
 
+#[derive(Serialize, Clone, Type)]
+#[serde(tag = "kind", content = "value")]
+pub enum RunnerOutputExt {
+    Stdout(String),
+    Stderr(String),
+}
+
+impl From<RunnerOutput> for RunnerOutputExt {
+    fn from(value: RunnerOutput) -> Self {
+        match value {
+            RunnerOutput::Stdout(s) => {
+                let line = String::from_utf8_lossy(&s).into_owned();
+                return RunnerOutputExt::Stdout(line);
+            }
+            RunnerOutput::Stderr(s) => {
+                let line = String::from_utf8_lossy(&s).into_owned();
+                return RunnerOutputExt::Stderr(line);
+            }
+        }
+    }
+}
+
 #[derive(Serialize, Type)]
 pub struct PollOutput {
     pub end: bool,
     pub success: Option<bool>,
-    pub data: Vec<RunnerOutput>,
+    pub data: Vec<RunnerOutputExt>,
 }
 
 pub struct Runner {
     id: RunId,
     runnable: Arc<dyn Runnable + 'static>,
-    stdin: Option<Box<dyn AsyncWrite>>,
+    stdin: Mutex<Option<Box<dyn AsyncWrite + Send>>>,
 
     // This is silly, but I guess whatever. Make it better later :(
     output: Arc<Mutex<Vec<RunnerOutput>>>,
     channel: tokio::sync::mpsc::Receiver<RunnerOutput>,
+}
+
+impl std::fmt::Debug for Runner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.runnable.fmt(f)
+    }
 }
 
 impl Drop for Runner {
@@ -90,7 +119,7 @@ impl Runner {
         let sel = Self {
             id,
             output,
-            stdin,
+            stdin: Mutex::new(stdin),
             runnable: Arc::new(runnable),
             channel: rx,
         };
@@ -176,9 +205,9 @@ impl Runner {
             },
         };
 
-        let mut data = Vec::new();
+        let mut data = Vec::<RunnerOutputExt>::new();
         match first {
-            Some(item) => data.push(item),
+            Some(item) => data.push(item.into()),
             None => {
                 return PollOutput {
                     data,
@@ -199,7 +228,7 @@ impl Runner {
                     }
                 }
                 Err(Empty) => break,
-                Ok(d) => data.push(d),
+                Ok(d) => data.push(d.into()),
             }
         }
 
@@ -208,5 +237,23 @@ impl Runner {
             end: self.runnable.is_done(),
             success: self.runnable.is_successful(),
         };
+    }
+
+    pub fn id(&self) -> RunId {
+        return self.id;
+    }
+}
+
+impl Runnable for Runner {
+    fn is_done(&self) -> bool {
+        self.runnable.is_done()
+    }
+
+    fn kill(&self) {
+        self.runnable.kill()
+    }
+
+    fn is_successful(&self) -> Option<bool> {
+        self.runnable.is_successful()
     }
 }

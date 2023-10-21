@@ -13,7 +13,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio::process::{Child, Command as OsCommand};
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Type)]
 pub struct ShellConfig {
     pub command: String,
     pub working_directory: String,

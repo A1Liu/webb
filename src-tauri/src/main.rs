@@ -13,14 +13,16 @@ pub mod util;
 
 use commands::{Command, CommandOutput};
 use lazy_static::lazy_static;
-use runner::RunId;
+use runner::{PollOutput, RunId};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use crate::runner::{Runnable, Runner};
+
 lazy_static! {
 // TODO: will this be a bottleneck?
-static ref RUNNING_COMMANDS: Mutex<HashMap<RunId, Arc<Mutex<Command>>>> =
+static ref RUNNING_COMMANDS: Mutex<HashMap<RunId, Arc<Mutex<Runner>>>> =
     Mutex::new(HashMap::new());
 }
 
@@ -75,7 +77,7 @@ async fn suggest_path(s: String, from: String) -> PathSuggest {
 
 #[tauri::command]
 #[specta::specta]
-async fn poll_command(id: RunId, timeout_ms: u32) -> Option<CommandOutput> {
+async fn poll_command(id: RunId, timeout_ms: u32) -> Option<PollOutput> {
     println!("running poll_command");
 
     let command = {
@@ -93,15 +95,16 @@ async fn poll_command(id: RunId, timeout_ms: u32) -> Option<CommandOutput> {
 
 #[tauri::command]
 #[specta::specta]
-async fn run_zsh(config: commands::CommandConfig) -> Result<RunId, String> {
+async fn run_zsh(config: runner::shell::ShellConfig) -> Result<RunId, String> {
     println!("running zsh");
 
-    let command = Command::new(config).await?;
+    let (zsh_command, io) = runner::shell::ShellCommand::new(config).await?;
+    let command = Runner::new(zsh_command, io);
     let uuid = command.id();
 
     let mut commands = RUNNING_COMMANDS.lock().await;
     if let Some(prev) = commands.insert(uuid, Arc::new(Mutex::new(command))) {
-        let mut prev = prev.lock().await;
+        let prev = prev.lock().await;
         prev.kill();
     }
 

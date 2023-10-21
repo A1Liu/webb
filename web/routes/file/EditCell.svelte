@@ -1,15 +1,6 @@
 <script lang="ts" context="module">
   import type { CellInfo, Sheet } from "./cellStore";
-  import { invoke } from "@tauri-apps/api/tauri";
-  import { v4 as uuid } from "uuid";
-  import {
-    pollCommand,
-    suggestPath,
-    type CommandOutput,
-    type CommandStatus,
-    type CommandData,
-    runZsh,
-  } from "$lib/handlers";
+  import { pollCommand, suggestPath, runZsh, type RunnerOutputExt } from "$lib/handlers";
 
   function matchKey(
     e: KeyboardEvent,
@@ -124,8 +115,8 @@
   let commandId: string | null = null;
   let output: {
     uuid: string;
-    status: CommandStatus | null;
-    data: CommandData[];
+    status: boolean | null;
+    data: RunnerOutputExt[];
   } | null = null;
   let moveDown = false;
   let nextDir: string | null = null;
@@ -151,7 +142,7 @@
 
       output = {
         uuid: commandUuid,
-        status: pollOut.status ?? output?.status ?? null,
+        status: pollOut.success ?? output?.status ?? null,
         data: [...(output?.data ?? []), ...pollOut.data],
       };
 
@@ -259,7 +250,7 @@
       <div class="row">
         {#if output.status === null}
           RUNNING
-        {:else if output.status.success}
+        {:else if output.status}
           SUCCESS
         {:else}
           FAILED
