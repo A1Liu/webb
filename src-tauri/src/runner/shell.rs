@@ -1,4 +1,4 @@
-use crate::runner::{RunId, Runnable, RunnableIO, Runner};
+use super::{RunCtx, RunId, RunStatus, Runnable, RunnableIO, Runner};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -23,20 +23,11 @@ pub struct ShellConfig {
 pub struct ShellCommand {
     command: String,
     working_directory: PathBuf,
-
-    // I'd like to not have to ARC everything, but for now, there's a lot of running
-    // tasks that needs shared references to synchronization variables, and this
-    // seems to be the most reasonable way to implement that.
-    done: Arc<AtomicU8>,
-
+    status: RunStatus,
     kill: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
 }
 
 impl ShellCommand {
-    const NOT_DONE: u8 = 0;
-    const SUCCESS: u8 = 1;
-    const FAIL: u8 = 2;
-
     pub async fn new(config: ShellConfig) -> Result<(Self, RunnableIO), String> {
         let command = config.command;
         let working_directory = tokio::fs::canonicalize(config.working_directory)
@@ -58,23 +49,23 @@ impl ShellCommand {
         let sel = Self {
             command,
             working_directory,
-            done: Arc::new(AtomicU8::new(Self::NOT_DONE)),
+            status: RunStatus::new(),
             kill: Mutex::new(Some(send_kill)),
         };
 
         let io = RunnableIO::new(child.stdin.take(), child.stdout.take(), child.stderr.take());
 
-        tokio::spawn(Self::wait_for_child(sel.done.clone(), recv_kill, child));
+        tokio::spawn(Self::wait_for_child(sel.status.clone(), recv_kill, child));
 
         return Ok((sel, io));
     }
 
     async fn wait_for_child(
-        done: Arc<AtomicU8>,
+        status: RunStatus,
         recv_kill: tokio::sync::oneshot::Receiver<()>,
         mut child: Child,
     ) {
-        let status = tokio::select! {
+        let exit_status = tokio::select! {
             status_res = child.wait() => {
                 Some(status_res.expect("waiting on child process encountered an error"))
             }
@@ -86,31 +77,28 @@ impl ShellCommand {
 
                 println!("actually sent kill signal");
 
-                done.store(Self::FAIL, Ordering::SeqCst);
+                status.failure();
 
                 None
             }
         };
 
-        let status = match status {
-            Some(status) => {
-                if status.success() {
-                    Self::SUCCESS
+        match exit_status {
+            Some(exit) => {
+                if exit.success() {
+                    status.success()
                 } else {
-                    Self::FAIL
+                    status.failure()
                 }
             }
             None => return,
-        };
-
-        // TODO: too lazy to think about acq rel order right now
-        done.store(status, Ordering::SeqCst);
+        }
     }
 }
 
 impl Runnable for ShellCommand {
     fn is_done(&self) -> bool {
-        return self.done.load(Ordering::SeqCst) != Self::NOT_DONE;
+        return self.status.is_done();
     }
 
     fn kill(&self) {
@@ -123,11 +111,6 @@ impl Runnable for ShellCommand {
     }
 
     fn is_successful(&self) -> Option<bool> {
-        let done = self.done.load(Ordering::SeqCst);
-        match done {
-            Self::SUCCESS => return Some(true),
-            Self::FAIL => return Some(false),
-            _ => return None,
-        }
+        return self.status.is_successful();
     }
 }

@@ -6,12 +6,11 @@
     unused_variables
 ))]
 
-pub mod lua;
 pub mod runner;
 pub mod util;
 
 use lazy_static::lazy_static;
-use runner::{PollOutput, RunId};
+use runner::{PollOutput, RunId, RunnableIO};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -22,6 +21,18 @@ lazy_static! {
 // TODO: will this be a bottleneck?
 static ref RUNNING_COMMANDS: Mutex<HashMap<RunId, Arc<Mutex<Runner>>>> =
     Mutex::new(HashMap::new());
+}
+
+async fn run_runner(runnable: impl Runnable + 'static, io: RunnableIO) -> RunId {
+    let command = Runner::new(runnable, io);
+    let uuid = command.id();
+    let mut commands = RUNNING_COMMANDS.lock().await;
+    if let Some(prev) = commands.insert(uuid, Arc::new(Mutex::new(command))) {
+        let prev = prev.lock().await;
+        prev.kill();
+    }
+
+    return uuid;
 }
 
 #[derive(Clone, Debug, serde::Serialize, specta::Type)]
@@ -93,20 +104,20 @@ async fn poll_command(id: RunId, timeout_ms: u32) -> Option<PollOutput> {
 
 #[tauri::command]
 #[specta::specta]
+async fn run_lua(source: String) -> Result<RunId, String> {
+    println!("running zsh");
+
+    let (lua_command, io) = runner::lua::LuaCommand::new(source);
+    return Ok(run_runner(lua_command, io).await);
+}
+
+#[tauri::command]
+#[specta::specta]
 async fn run_zsh(config: runner::shell::ShellConfig) -> Result<RunId, String> {
     println!("running zsh");
 
     let (zsh_command, io) = runner::shell::ShellCommand::new(config).await?;
-    let command = Runner::new(zsh_command, io);
-    let uuid = command.id();
-
-    let mut commands = RUNNING_COMMANDS.lock().await;
-    if let Some(prev) = commands.insert(uuid, Arc::new(Mutex::new(command))) {
-        let prev = prev.lock().await;
-        prev.kill();
-    }
-
-    return Ok(uuid);
+    return Ok(run_runner(zsh_command, io).await);
 }
 
 fn main() {

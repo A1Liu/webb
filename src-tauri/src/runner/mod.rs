@@ -1,5 +1,6 @@
 //! This is maybe a bad name, but I couldn't come up with anything better.
 
+pub mod lua;
 pub mod shell;
 
 use serde::__private::from_utf8_lossy;
@@ -8,7 +9,7 @@ use specta::Type;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU8};
 use std::sync::Mutex;
 use std::sync::{atomic::Ordering, Arc};
 use std::time::Duration;
@@ -19,6 +20,7 @@ use uuid::Uuid;
 // Maybe there's a way to use files instead of handling file piping
 // manually. IDK how you'd do stdout + stderr collation though. Maybe
 // you don't need it in this medium.
+#[derive(Default)]
 pub struct RunnableIO {
     pub stdin: Option<Box<dyn AsyncWrite + Send>>,
     pub stdout: Option<Box<dyn AsyncRead + Unpin + Send>>,
@@ -41,14 +43,155 @@ impl RunnableIO {
 }
 
 pub trait Runnable: core::fmt::Debug + Send + Sync {
-    fn is_done(&self) -> bool;
+    // TODO: this interface should probably contain a "start" method
+    // fn start(&mut self, ctx: RunCtx) {}
+
     fn kill(&self);
+    fn is_done(&self) -> bool;
     fn is_successful(&self) -> Option<bool>;
+}
+
+#[derive(Debug, Clone)]
+pub struct RunStatus {
+    // I'd like to not have to ARC everything, but for now, there's a lot of running
+    // tasks that needs shared references to synchronization variables, and this
+    // seems to be the most reasonable way to implement that.
+    status: Arc<AtomicU8>,
+}
+
+impl RunStatus {
+    const NOT_DONE: u8 = 0;
+    const SUCCESS: u8 = 1;
+    const FAIL: u8 = 2;
+
+    pub fn new() -> Self {
+        return Self {
+            status: Arc::new(AtomicU8::new(Self::NOT_DONE)),
+        };
+    }
+    pub fn is_done(&self) -> bool {
+        return self.status.load(Ordering::SeqCst) != Self::NOT_DONE;
+    }
+
+    pub fn is_successful(&self) -> Option<bool> {
+        let done = self.status.load(Ordering::SeqCst);
+        match done {
+            Self::SUCCESS => return Some(true),
+            Self::FAIL => return Some(false),
+            _ => return None,
+        }
+    }
+
+    pub fn failure(&self) {
+        match self.status.compare_exchange(
+            Self::NOT_DONE,
+            Self::FAIL,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(_) => {}
+            Err(v) => panic!("already finished this run"),
+        }
+    }
+
+    pub fn success(&self) {
+        match self.status.compare_exchange(
+            Self::NOT_DONE,
+            Self::SUCCESS,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(_) => {}
+            Err(v) => panic!("already finished this run"),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct RunCtx {
+    tx: tokio::sync::mpsc::Sender<RunnerOutput>,
+}
+
+impl RunCtx {
+    fn pipe_to_channel(
+        &self,
+        runnable: Arc<dyn Runnable + 'static>,
+        mut pipe: impl Unpin + AsyncReadExt + Send + 'static,
+        func: fn(Vec<u8>) -> RunnerOutput,
+    ) {
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            let mut bytes = Vec::with_capacity(128);
+
+            loop {
+                if tx.is_closed() {
+                    break;
+                }
+
+                let len = match pipe.read_buf(&mut bytes).await {
+                    Ok(len) => len,
+                    Err(e) => {
+                        println!("e: {:?}", e);
+                        continue;
+                    }
+                };
+
+                if len == 0 {
+                    if runnable.is_done() {
+                        break;
+                    }
+
+                    tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+                    continue;
+                }
+
+                tx.send(func(bytes.clone())).await.expect("wtf");
+                bytes.clear();
+            }
+        });
+    }
+}
+
+pub fn pipe_to_channel(
+    runnable: Arc<dyn Runnable + 'static>,
+    tx: tokio::sync::mpsc::Sender<RunnerOutput>,
+    mut pipe: impl Unpin + AsyncReadExt + Send + 'static,
+    func: fn(Vec<u8>) -> RunnerOutput,
+) {
+    tokio::spawn(async move {
+        let mut bytes = Vec::with_capacity(128);
+
+        loop {
+            if tx.is_closed() {
+                break;
+            }
+
+            let len = match pipe.read_buf(&mut bytes).await {
+                Ok(len) => len,
+                Err(e) => {
+                    println!("e: {:?}", e);
+                    continue;
+                }
+            };
+
+            if len == 0 {
+                if runnable.is_done() {
+                    break;
+                }
+
+                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+                continue;
+            }
+
+            tx.send(func(bytes.clone())).await.expect("wtf");
+            bytes.clear();
+        }
+    });
 }
 
 #[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Eq, Serialize, Deserialize, Debug, Type)]
 #[repr(transparent)]
-pub struct RunId(pub Uuid);
+pub struct RunId(Uuid);
 
 #[derive(Serialize, Clone, Type)]
 #[serde(tag = "kind", content = "value")]
@@ -125,21 +268,21 @@ impl Runner {
         };
 
         if let Some(stdout) = io.stdout {
-            tokio::spawn(Self::pipe_to_channel(
+            pipe_to_channel(
                 sel.runnable.clone(),
                 tx.clone(),
                 stdout,
                 RunnerOutput::Stdout,
-            ));
+            );
         }
 
         if let Some(stderr) = io.stderr {
-            tokio::spawn(Self::pipe_to_channel(
+            pipe_to_channel(
                 sel.runnable.clone(),
                 tx.clone(),
                 stderr,
                 RunnerOutput::Stderr,
-            ));
+            );
         }
 
         let output_write_ref = sel.output.clone();
@@ -158,41 +301,6 @@ impl Runner {
         // });
 
         return sel;
-    }
-
-    async fn pipe_to_channel(
-        runnable: Arc<dyn Runnable + 'static>,
-        tx: tokio::sync::mpsc::Sender<RunnerOutput>,
-        mut pipe: impl Unpin + AsyncReadExt,
-        func: fn(Vec<u8>) -> RunnerOutput,
-    ) {
-        let mut bytes = Vec::with_capacity(128);
-
-        loop {
-            if tx.is_closed() {
-                break;
-            }
-
-            let len = match pipe.read_buf(&mut bytes).await {
-                Ok(len) => len,
-                Err(e) => {
-                    println!("e: {:?}", e);
-                    continue;
-                }
-            };
-
-            if len == 0 {
-                if runnable.is_done() {
-                    break;
-                }
-
-                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
-                continue;
-            }
-
-            tx.send(func(bytes.clone())).await.expect("wtf");
-            bytes.clear();
-        }
     }
 
     pub async fn poll(&mut self, timeout: Duration) -> PollOutput {
