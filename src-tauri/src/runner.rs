@@ -1,6 +1,5 @@
 //! This is maybe a bad name, but I couldn't come up with anything better.
 
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::collections::HashMap;
@@ -33,9 +32,18 @@ pub trait Runnable: core::fmt::Debug + Send + Sync {
 #[repr(transparent)]
 pub struct RunId(pub Uuid);
 
+#[derive(Serialize, Clone, Type)]
+#[serde(tag = "kind", content = "value")]
 pub enum RunnerOutput {
     Stdout(Vec<u8>),
     Stderr(Vec<u8>),
+}
+
+#[derive(Serialize, Type)]
+pub struct PollOutput {
+    pub end: bool,
+    pub success: Option<bool>,
+    pub data: Vec<RunnerOutput>,
 }
 
 pub struct Runner {
@@ -45,6 +53,7 @@ pub struct Runner {
 
     // This is silly, but I guess whatever. Make it better later :(
     output: Arc<Mutex<Vec<RunnerOutput>>>,
+    channel: tokio::sync::mpsc::Receiver<RunnerOutput>,
 }
 
 impl Drop for Runner {
@@ -59,14 +68,15 @@ impl Runner {
         let id = RunId(Uuid::new_v4());
         let stdin = io.stdin;
 
+        let (tx, rx) = tokio::sync::mpsc::channel(128);
+
         let sel = Self {
             id,
             output,
             stdin,
             runnable: Arc::new(runnable),
+            channel: rx,
         };
-
-        let (tx, rx) = tokio::sync::mpsc::channel(128);
 
         if let Some(stdout) = io.stdout {
             tokio::spawn(Self::pipe_to_channel(
@@ -87,18 +97,19 @@ impl Runner {
         }
 
         let output_write_ref = sel.output.clone();
-        tokio::spawn(async move {
-            let mut rx = rx;
-            let output = output_write_ref;
-            loop {
-                let s = match rx.recv().await {
-                    Some(s) => s,
-                    None => break,
-                };
-                let mut out = output.lock().unwrap();
-                out.push(s);
-            }
-        });
+
+        // tokio::spawn(async move {
+        //     let mut rx = rx;
+        //     let output = output_write_ref;
+        //     loop {
+        //         let s = match rx.recv().await {
+        //             Some(s) => s,
+        //             None => break,
+        //         };
+        //         let mut out = output.lock().unwrap();
+        //         out.push(s);
+        //     }
+        // });
 
         return sel;
     }
@@ -136,5 +147,49 @@ impl Runner {
             tx.send(func(bytes.clone())).await.expect("wtf");
             bytes.clear();
         }
+    }
+
+    pub async fn poll(&mut self, timeout: Duration) -> PollOutput {
+        let first = tokio::select! {
+            s = self.channel.recv() => s,
+            _ = tokio::time::sleep(timeout) => return PollOutput {
+                success: self.runnable.is_successful(),
+                data: Vec::new(),
+                end: self.runnable.is_done(),
+            },
+        };
+
+        let mut data = Vec::new();
+        match first {
+            Some(item) => data.push(item),
+            None => {
+                return PollOutput {
+                    data,
+                    end: self.runnable.is_done(),
+                    success: self.runnable.is_successful(),
+                }
+            }
+        }
+
+        while data.len() < 25 {
+            use tokio::sync::mpsc::error::TryRecvError::*;
+            match self.channel.try_recv() {
+                Err(Disconnected) => {
+                    return PollOutput {
+                        data,
+                        end: self.runnable.is_done(),
+                        success: self.runnable.is_successful(),
+                    }
+                }
+                Err(Empty) => break,
+                Ok(d) => data.push(d),
+            }
+        }
+
+        return PollOutput {
+            data,
+            end: self.runnable.is_done(),
+            success: self.runnable.is_successful(),
+        };
     }
 }

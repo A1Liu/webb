@@ -1,3 +1,4 @@
+use crate::runner::RunId;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -11,8 +12,6 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio::process::{Child, Command as OsCommand};
 use uuid::Uuid;
-
-use crate::runner::RunId;
 
 #[derive(Clone, Debug, Deserialize, Type)]
 pub struct CommandConfig {
