@@ -80,7 +80,7 @@ impl RunStatus {
 }
 
 pub struct RunCtx {
-    tx: tokio::sync::mpsc::Sender<RunnerOutput>,
+    pub output_sender: tokio::sync::mpsc::Sender<RunnerOutput>,
     kill_receiver: Option<tokio::sync::mpsc::Receiver<()>>,
 }
 
@@ -111,7 +111,7 @@ impl RunCtx {
         mut pipe: impl Unpin + AsyncReadExt + Send + 'static,
         func: fn(Vec<u8>) -> RunnerOutput,
     ) {
-        let tx = self.tx.clone();
+        let tx = self.output_sender.clone();
         tokio::spawn(async move {
             let mut bytes = Vec::with_capacity(128);
 
@@ -218,7 +218,7 @@ impl Runner {
         let (kill, rx_kill) = tokio::sync::mpsc::channel(8);
         let (tx, rx) = tokio::sync::mpsc::channel(128);
         runnable.clone().start(RunCtx {
-            tx: tx.clone(),
+            output_sender: tx.clone(),
             kill_receiver: Some(rx_kill),
         });
 

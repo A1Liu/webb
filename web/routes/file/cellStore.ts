@@ -58,7 +58,7 @@ export class Sheet {
     const store = writable({
       id,
       index,
-      directory: directory ?? await HomeDir,
+      directory: directory ?? (await HomeDir),
       contents,
       focus,
       lua,

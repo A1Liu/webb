@@ -1,4 +1,4 @@
-use super::{RunStatus, Runnable};
+use super::{RunStatus, Runnable, RunnerOutput};
 use mlua::{Lua, StdLib};
 
 #[derive(Debug)]
@@ -19,7 +19,11 @@ impl LuaCommand {
 impl Runnable for LuaCommand {
     fn start(self: std::sync::Arc<Self>, ctx: super::RunCtx) {
         let sel_ref = self.clone();
+        let sender = ctx.output_sender.clone();
+
         tokio::spawn(async move {
+            let sel = sel_ref;
+            let status = sel.status.clone();
             let libs = StdLib::TABLE
                 | StdLib::OS
                 | StdLib::STRING
@@ -30,10 +34,25 @@ impl Runnable for LuaCommand {
 
             let lua = Lua::new_with(libs, options).expect("wtf");
 
-            let _ = lua.sandbox(true).unwrap();
-            let _ = lua.load(&sel_ref.source).exec();
+            let print = lua
+                .create_function(move |_, value: String| {
+                    let sender = sender.clone();
+                    tokio::spawn(async move {
+                        sender.send(RunnerOutput::Stderr(value.into_bytes())).await
+                    });
+
+                    return Ok(());
+                })
+                .unwrap();
 
             // https://github.com/khvzak/mlua/issues/306
+            lua.globals().set("print", print).unwrap();
+
+            let _ = lua.sandbox(true).unwrap();
+
+            let _ = lua.load(&sel.source).exec();
+
+            status.success();
         });
     }
 
