@@ -11,7 +11,7 @@
   function matchKey(
     e: IKeyboardEvent,
     key: string,
-    combo: { meta?: true; shift?: true; ctrl?: true } = {}
+    combo: { meta?: true; shift?: true; ctrl?: true } = {},
   ) {
     if (e.code !== key) return false;
     if (e.metaKey !== !!combo.meta) return false;
@@ -42,7 +42,7 @@
             }
 
             return { kind: "cd", nextDir: null };
-          }
+          },
         ),
       };
     }
