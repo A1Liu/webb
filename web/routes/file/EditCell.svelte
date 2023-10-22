@@ -203,9 +203,14 @@
   $: if (editor) {
     editor.onKeyDown(onKeyDown);
 
-    const ed = editor;
-    editor.onDidFocusEditorText(() => {
-      ed.addCommand(KeyMod.CtrlCmd | KeyCode.Enter, submitCommand);
+    // NOTE: we need to use an Action instead of a command because there's some
+    // pretty silly behavior in monaco right now where commands are global to
+    // the entire app, wheras actions can be registered per-editor.
+    editor.addAction({
+      id: "webb-submit-command",
+      label: "Run command",
+      keybindings: [KeyMod.CtrlCmd | KeyCode.Enter],
+      run: submitCommand,
     });
   }
 
