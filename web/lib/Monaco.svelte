@@ -18,12 +18,16 @@
   import * as monaco from "monaco-editor";
   import { onMount } from "svelte";
 
-  let container: HTMLDivElement;
   export let editor: Editor | undefined = undefined;
   export let value: string;
   export let language: string = "shell";
   export let disabled: boolean = false;
 
+  let container: HTMLDivElement;
+
+  // This is a kinda silly way to synchronize the `value` field to the editor,
+  // but it gets the job done; it shouldn't matter much right now, because
+  // the cells are very small.
   $: if (editor && editor.getValue() != value) {
     const position = editor.getPosition();
     editor.setValue(value);
