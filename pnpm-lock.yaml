@@ -11,6 +11,9 @@ dependencies:
   '@types/uuid':
     specifier: ^9.0.2
     version: 9.0.5
+  monaco-editor:
+    specifier: ^0.44.0
+    version: 0.44.0
   normalize.css:
     specifier: ^8.0.1
     version: 8.0.1
@@ -1513,6 +1516,10 @@ packages:
     dependencies:
       minimist: 1.2.8
     dev: true
+
+  /monaco-editor@0.44.0:
+    resolution: {integrity: sha512-5SmjNStN6bSuSE5WPT2ZV+iYn1/yI9sd4Igtk23ChvqB7kDk9lZbB9F5frsuvpB+2njdIeGGFf2G4gbE6rCC9Q==}
+    dev: false
 
   /mri@1.2.0:
     resolution: {integrity: sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA==}
