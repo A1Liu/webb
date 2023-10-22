@@ -5,6 +5,7 @@
     suggestPath,
     runZsh,
     type RunnerOutputExt,
+    runLua,
   } from "$lib/handlers";
 
   function matchKey(
@@ -67,12 +68,16 @@
         };
       }
 
+      const result = cell.lua
+        ? runLua(cell.contents)
+        : runZsh({
+            command: cell.contents,
+            working_directory: cell.directory,
+          });
+
       return {
         cell,
-        result: runZsh({
-          command: cell.contents,
-          working_directory: cell.directory,
-        }).then((s) => ({ kind: "command", commandId: s })),
+        result: result.then((s) => ({ kind: "command", commandId: s })),
       };
     }
   }
@@ -218,37 +223,41 @@
 </script>
 
 <div class="wrapper">
-  {#if !cellInfo}
-    <textarea disabled />
-  {:else}
-    <!--
+  <div class="textRow">
+    <input type="checkbox" bind:checked={$cellInfo.lua} />
+
+    {#if !cellInfo}
+      <textarea disabled />
+    {:else}
+      <!--
       spellcheck=false prevents the OS from doing stupid stuff like making changing
       consecutive dashes into an em-dash.
     -->
-    <textarea
-      spellcheck="false"
-      bind:this={inputRef}
-      bind:value={$cellInfo.contents}
-      on:input={inputHandler}
-      on:keydown={(e) => {
-        keyHandler(e, $cellInfo)?.result.then((result) => {
-          switch (result.kind) {
-            case "command": {
-              const uuid = result.commandId;
-              output = { uuid, status: null, data: [] };
-              commandId = uuid;
-              break;
+      <textarea
+        spellcheck="false"
+        bind:this={inputRef}
+        bind:value={$cellInfo.contents}
+        on:input={inputHandler}
+        on:keydown={(e) => {
+          keyHandler(e, $cellInfo)?.result.then((result) => {
+            switch (result.kind) {
+              case "command": {
+                const uuid = result.commandId;
+                output = { uuid, status: null, data: [] };
+                commandId = uuid;
+                break;
+              }
+              case "cd": {
+                nextDir = result.nextDir;
+                moveDown = true;
+                break;
+              }
             }
-            case "cd": {
-              nextDir = result.nextDir;
-              moveDown = true;
-              break;
-            }
-          }
-        });
-      }}
-    />
-  {/if}
+          });
+        }}
+      />
+    {/if}
+  </div>
 
   {#key output?.uuid}
     {#if output !== null}
@@ -277,6 +286,11 @@
     padding: 0.25rem;
     background-color: rgb(128, 128, 128);
     width: 40rem;
+  }
+
+  .textRow {
+    display: flex;
+    flex-direction: row;
   }
 
   .row {

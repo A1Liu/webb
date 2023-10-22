@@ -14,6 +14,10 @@ export function runZsh(config: ShellConfig) {
     return invoke()<RunId>("run_zsh", { config })
 }
 
+export function runLua(source: string) {
+    return invoke()<RunId>("run_lua", { source })
+}
+
 export function pollCommand(id: RunId, timeoutMs: number) {
     return invoke()<PollOutput | null>("poll_command", { id,timeoutMs })
 }
@@ -29,5 +33,5 @@ export function userHomeDir() {
 export type PathSuggest = { valid: boolean; closest_path: string }
 export type ShellConfig = { command: string; working_directory: string }
 export type RunnerOutputExt = { kind: "Stdout"; value: string } | { kind: "Stderr"; value: string }
-export type RunId = string
 export type PollOutput = { end: boolean; success: boolean | null; data: RunnerOutputExt[] }
+export type RunId = string

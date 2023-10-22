@@ -12,6 +12,7 @@ export interface CellInfo {
   readonly id: string;
   readonly index: number;
   readonly directory: string;
+  lua: boolean;
   contents: string;
   focus: boolean;
 }
@@ -52,6 +53,7 @@ export class Sheet {
     directory,
     contents = "",
     focus = false,
+    lua = false,
   }: Partial<Omit<CellInfo, "index">> = {}): string {
     const index = this.cellLayoutRef.length;
     const store = writable({
@@ -60,6 +62,7 @@ export class Sheet {
       directory: directory ?? HOME_DIR,
       contents,
       focus,
+      lua,
     });
 
     this.cells.set(id, store);

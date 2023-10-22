@@ -120,18 +120,48 @@ async fn run_zsh(config: runner::shell::ShellConfig) -> Result<RunId, String> {
     return Ok(run_runner(zsh_command).await);
 }
 
+macro_rules! generate_handler {
+    ( $($func:ident),+ ) => {{
+        #[cfg(debug_assertions)]
+        tauri_specta::ts::export(
+            specta::collect_types![
+                $( $func ),*
+            ],
+            "../web/lib/handlers.ts",
+        )
+        .unwrap();
+
+        tauri::generate_handler![
+            $( $func ),*
+        ]
+    }};
+}
+
 fn main() {
-    #[cfg(debug_assertions)]
-    tauri_specta::ts::export(
-        specta::collect_types![run_zsh, poll_command, suggest_path, user_home_dir],
-        "../web/lib/handlers.ts",
-    )
-    .unwrap();
+    // #[cfg(debug_assertions)]
+    // tauri_specta::ts::export(
+    //     specta::collect_types![
+    //         // Kinds of commands
+    //         run_zsh,
+    //         run_lua,
+    //         //
+    //         poll_command,
+    //         // Utils
+    //         suggest_path,
+    //         user_home_dir
+    //     ],
+    //     "../web/lib/handlers.ts",
+    // )
+    // .unwrap();
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(generate_handler![
+            // Kinds of commands
             run_zsh,
+            run_lua,
+            //
             poll_command,
+            // Utils
             suggest_path,
             user_home_dir
         ])
