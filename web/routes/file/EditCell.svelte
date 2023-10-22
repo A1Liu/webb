@@ -9,25 +9,17 @@
   } from "$lib/handlers";
 
   function matchKey(
-    e: KeyboardEvent,
+    e: IKeyboardEvent,
     key: string,
-    combo: { meta?: true; shift?: true; ctrl?: true } = {}
+    combo: { meta?: true; shift?: true; ctrl?: true } = {},
   ) {
-    if (e.key !== key) return false;
+    if (e.code !== key) return false;
+    if (e.metaKey !== !!combo.meta) return false;
     if (e.metaKey !== !!combo.meta) return false;
     if (e.shiftKey !== !!combo.shift) return false;
     if (e.ctrlKey !== !!combo.ctrl) return false;
 
     return true;
-  }
-
-  function inputHandler(e: Event) {
-    if (!e.target) return;
-
-    const target = e.target as HTMLTextAreaElement;
-
-    target.style.minHeight = "0px";
-    target.style.minHeight = target.scrollHeight + "px";
   }
 
   interface HandlerOutput {
@@ -37,49 +29,51 @@
       | { kind: "cd"; nextDir: string | null }
     >;
   }
-  function keyHandler(
-    e: KeyboardEvent,
-    cell: CellInfo
-  ): HandlerOutput | undefined {
-    if (!e.target) return undefined;
-    if (e.isComposing || e.keyCode === 229) return undefined;
 
-    if (matchKey(e, "Enter", { shift: true })) return undefined;
-
-    if (
-      matchKey(e, "Enter", { meta: true }) ||
-      (matchKey(e, "Enter") && cell.contents.split("\n").length <= 1)
-    ) {
-      e.preventDefault();
-
-      const trimmed = cell.contents.trim();
-      if (trimmed.startsWith("cd")) {
-        return {
-          cell,
-          result: suggestPath(trimmed.slice(2).trim(), cell.directory).then(
-            ({ valid, closest_path }) => {
-              if (valid) {
-                return { kind: "cd", nextDir: closest_path };
-              }
-
-              return { kind: "cd", nextDir: null };
-            }
-          ),
-        };
-      }
-
-      const result = cell.lua
-        ? runLua(cell.contents)
-        : runZsh({
-            command: cell.contents,
-            working_directory: cell.directory,
-          });
-
+  function submit(cell: CellInfo): HandlerOutput {
+    const trimmed = cell.contents.trim();
+    if (trimmed.startsWith("cd")) {
       return {
         cell,
-        result: result.then((s) => ({ kind: "command", commandId: s })),
+        result: suggestPath(trimmed.slice(2).trim(), cell.directory).then(
+          ({ valid, closest_path }) => {
+            if (valid) {
+              return { kind: "cd", nextDir: closest_path };
+            }
+
+            return { kind: "cd", nextDir: null };
+          },
+        ),
       };
     }
+
+    const result = cell.lua
+      ? runLua(cell.contents)
+      : runZsh({
+          command: cell.contents,
+          working_directory: cell.directory,
+        });
+
+    return {
+      cell,
+      result: result.then((s) => ({ kind: "command", commandId: s })),
+    };
+  }
+
+  function shouldSubmitCommand(e: IKeyboardEvent, cell: CellInfo): boolean {
+    if (!e.target) return false;
+
+    if (matchKey(e, "Enter", { shift: true })) return false;
+
+    if (
+      matchKey(e, "Enter") &&
+      cell.contents.split("\n").length <= 1 &&
+      !cell.lua
+    ) {
+      return true;
+    }
+
+    return false;
   }
 </script>
 
@@ -87,6 +81,9 @@
   import { Terminal } from "xterm";
   import { FitAddon } from "xterm-addon-fit";
   import { onDestroy } from "svelte";
+  import Monaco, { type Editor } from "$lib/Monaco.svelte";
+  import { KeyCode, KeyMod } from "monaco-editor";
+  import type { IKeyboardEvent } from "monaco-editor";
 
   const term = new Terminal({
     disableStdin: true,
@@ -120,7 +117,6 @@
   export let sheet: Sheet;
   export let cellId: string;
 
-  let inputRef: HTMLTextAreaElement | null = null;
   let termRef: any = null;
   let commandId: string | null = null;
   let output: {
@@ -131,6 +127,8 @@
   let moveDown = false;
   let nextDir: string | null = null;
   let newlineBuffered = false;
+
+  let editor: Editor | undefined = undefined;
 
   const listenerDisposerLF = term.onLineFeed(() => {
     if (term.rows < 30) {
@@ -157,7 +155,7 @@
       };
 
       if (pollOut.end) {
-        moveDown = true;
+        moveDown = !$cellInfo.lua;
         break;
       }
     }
@@ -175,8 +173,50 @@
     });
   }
 
-  $: if ($cellInfo.focus && inputRef !== null) {
-    inputRef.focus();
+  function submitCommand() {
+    submit($cellInfo)?.result.then((result) => {
+      switch (result.kind) {
+        case "command": {
+          const uuid = result.commandId;
+          output = { uuid, status: null, data: [] };
+          commandId = uuid;
+          break;
+        }
+        case "cd": {
+          nextDir = result.nextDir;
+          moveDown = true;
+          break;
+        }
+      }
+    });
+  }
+
+  function onKeyDown(evt: IKeyboardEvent) {
+    if (!shouldSubmitCommand(evt, $cellInfo)) return;
+
+    evt.browserEvent.preventDefault();
+
+    submitCommand();
+  }
+
+  $: if (editor) {
+    editor.onKeyDown(onKeyDown);
+
+    // NOTE: we need to use an Action instead of a command because there's some
+    // pretty silly behavior in monaco right now where commands are global to
+    // the entire app, wheras actions can be registered per-editor.
+    //
+    // See: https://github.com/microsoft/monaco-editor/issues/3345
+    editor.addAction({
+      id: "webb-submit-command",
+      label: "Run command",
+      keybindings: [KeyMod.CtrlCmd | KeyCode.Enter],
+      run: submitCommand,
+    });
+  }
+
+  $: if ($cellInfo.focus && editor) {
+    editor.focus();
     $cellInfo.focus = false;
   }
 
@@ -226,37 +266,13 @@
   <div class="textRow">
     <input type="checkbox" bind:checked={$cellInfo.lua} />
 
-    {#if !cellInfo}
-      <textarea disabled />
-    {:else}
-      <!--
-      spellcheck=false prevents the OS from doing stupid stuff like making changing
-      consecutive dashes into an em-dash.
-    -->
-      <textarea
-        spellcheck="false"
-        bind:this={inputRef}
+    <div class="textWrapper">
+      <Monaco
         bind:value={$cellInfo.contents}
-        on:input={inputHandler}
-        on:keydown={(e) => {
-          keyHandler(e, $cellInfo)?.result.then((result) => {
-            switch (result.kind) {
-              case "command": {
-                const uuid = result.commandId;
-                output = { uuid, status: null, data: [] };
-                commandId = uuid;
-                break;
-              }
-              case "cd": {
-                nextDir = result.nextDir;
-                moveDown = true;
-                break;
-              }
-            }
-          });
-        }}
+        bind:editor
+        language={$cellInfo.lua ? "lua" : "shell"}
       />
-    {/if}
+    </div>
   </div>
 
   {#key output?.uuid}
@@ -293,6 +309,10 @@
     flex-direction: row;
   }
 
+  .textWrapper {
+    flex-grow: 1;
+  }
+
   .row {
     display: flex;
     gap: 0.5rem;
@@ -300,15 +320,5 @@
 
   .terminal {
     width: 100%;
-  }
-
-  textarea {
-    font-family: var(--font-mono);
-    width: 100%;
-    border: none;
-    height: 1.15rem;
-    padding: 0px;
-    resize: none;
-    overflow-y: hidden;
   }
 </style>

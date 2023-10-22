@@ -10,8 +10,8 @@
     "preview": "vite preview",
     "ts-check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "ts-check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "lint": "prettier --plugin-search-dir . --check . && eslint .",
-    "format": "prettier --plugin-search-dir . --write .",
+    "lint": "prettier --check . && eslint .",
+    "format": "prettier --write .",
     "prepare": "svelte-kit sync"
   },
   "devDependencies": {
@@ -26,8 +26,8 @@
     "eslint": "^8.28.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-svelte": "^2.30.0",
-    "prettier": "^2.8.0",
-    "prettier-plugin-svelte": "^2.10.1",
+    "prettier": "^3.0.3",
+    "prettier-plugin-svelte": "^3.0.3",
     "svelte": "^4.0.5",
     "svelte-check": "^3.4.3",
     "tslib": "^2.4.1",
@@ -38,6 +38,7 @@
   "dependencies": {
     "@tauri-apps/api": "^1.4.0",
     "@types/uuid": "^9.0.2",
+    "monaco-editor": "^0.44.0",
     "normalize.css": "^8.0.1",
     "uuid": "^9.0.0",
     "xterm": "^5.2.1",
@@ -46,9 +47,6 @@
   "prettier": {
     "plugins": [
       "prettier-plugin-svelte"
-    ],
-    "pluginSearchDirs": [
-      "."
     ],
     "overrides": [
       {
