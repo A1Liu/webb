@@ -1,14 +1,11 @@
 <script lang="ts" context="module">
   import type { CellInfo, Sheet } from "./cellStore";
-  import { invoke } from "@tauri-apps/api/tauri";
-  import { v4 as uuid } from "uuid";
   import {
     pollCommand,
     suggestPath,
-    type CommandOutput,
-    type CommandStatus,
-    type CommandData,
     runZsh,
+    type RunnerOutputExt,
+    runLua,
   } from "$lib/handlers";
 
   function matchKey(
@@ -71,12 +68,16 @@
         };
       }
 
+      const result = cell.lua
+        ? runLua(cell.contents)
+        : runZsh({
+            command: cell.contents,
+            working_directory: cell.directory,
+          });
+
       return {
         cell,
-        result: runZsh({
-          command: cell.contents,
-          working_directory: cell.directory,
-        }).then((s) => ({ kind: "command", commandId: s })),
+        result: result.then((s) => ({ kind: "command", commandId: s })),
       };
     }
   }
@@ -124,8 +125,8 @@
   let commandId: string | null = null;
   let output: {
     uuid: string;
-    status: CommandStatus | null;
-    data: CommandData[];
+    status: boolean | null;
+    data: RunnerOutputExt[];
   } | null = null;
   let moveDown = false;
   let nextDir: string | null = null;
@@ -151,7 +152,7 @@
 
       output = {
         uuid: commandUuid,
-        status: pollOut.status ?? output?.status ?? null,
+        status: pollOut.success ?? output?.status ?? null,
         data: [...(output?.data ?? []), ...pollOut.data],
       };
 
@@ -222,44 +223,48 @@
 </script>
 
 <div class="wrapper">
-  {#if !cellInfo}
-    <textarea disabled />
-  {:else}
-    <!--
+  <div class="textRow">
+    <input type="checkbox" bind:checked={$cellInfo.lua} />
+
+    {#if !cellInfo}
+      <textarea disabled />
+    {:else}
+      <!--
       spellcheck=false prevents the OS from doing stupid stuff like making changing
       consecutive dashes into an em-dash.
     -->
-    <textarea
-      spellcheck="false"
-      bind:this={inputRef}
-      bind:value={$cellInfo.contents}
-      on:input={inputHandler}
-      on:keydown={(e) => {
-        keyHandler(e, $cellInfo)?.result.then((result) => {
-          switch (result.kind) {
-            case "command": {
-              const uuid = result.commandId;
-              output = { uuid, status: null, data: [] };
-              commandId = uuid;
-              break;
+      <textarea
+        spellcheck="false"
+        bind:this={inputRef}
+        bind:value={$cellInfo.contents}
+        on:input={inputHandler}
+        on:keydown={(e) => {
+          keyHandler(e, $cellInfo)?.result.then((result) => {
+            switch (result.kind) {
+              case "command": {
+                const uuid = result.commandId;
+                output = { uuid, status: null, data: [] };
+                commandId = uuid;
+                break;
+              }
+              case "cd": {
+                nextDir = result.nextDir;
+                moveDown = true;
+                break;
+              }
             }
-            case "cd": {
-              nextDir = result.nextDir;
-              moveDown = true;
-              break;
-            }
-          }
-        });
-      }}
-    />
-  {/if}
+          });
+        }}
+      />
+    {/if}
+  </div>
 
   {#key output?.uuid}
     {#if output !== null}
       <div class="row">
         {#if output.status === null}
           RUNNING
-        {:else if output.status.success}
+        {:else if output.status}
           SUCCESS
         {:else}
           FAILED
@@ -281,6 +286,11 @@
     padding: 0.25rem;
     background-color: rgb(128, 128, 128);
     width: 40rem;
+  }
+
+  .textRow {
+    display: flex;
+    flex-direction: row;
   }
 
   .row {

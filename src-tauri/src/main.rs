@@ -6,19 +6,33 @@
     unused_variables
 ))]
 
-pub mod commands;
+pub mod runner;
 pub mod util;
 
-use commands::{Command, CommandId, CommandOutput};
 use lazy_static::lazy_static;
+use runner::{PollOutput, RunId};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use crate::runner::{Runnable, Runner};
+
 lazy_static! {
 // TODO: will this be a bottleneck?
-static ref RUNNING_COMMANDS: Mutex<HashMap<CommandId, Arc<Mutex<Command>>>> =
+static ref RUNNING_COMMANDS: Mutex<HashMap<RunId, Arc<Mutex<Runner>>>> =
     Mutex::new(HashMap::new());
+}
+
+async fn run_runner(runnable: impl Runnable + 'static) -> RunId {
+    let command = Runner::new(runnable);
+    let uuid = command.id();
+    let mut commands = RUNNING_COMMANDS.lock().await;
+    if let Some(prev) = commands.insert(uuid, Arc::new(Mutex::new(command))) {
+        let prev = prev.lock().await;
+        prev.kill();
+    }
+
+    return uuid;
 }
 
 #[derive(Clone, Debug, serde::Serialize, specta::Type)]
@@ -30,7 +44,10 @@ struct PathSuggest {
 #[tauri::command]
 #[specta::specta]
 fn user_home_dir() -> std::path::PathBuf {
-    return dirs::home_dir().unwrap();
+    let a = dirs::home_dir().unwrap();
+    println!("USER HOME DIR: {:?}", a);
+
+    return a;
 }
 
 #[tauri::command]
@@ -72,7 +89,7 @@ async fn suggest_path(s: String, from: String) -> PathSuggest {
 
 #[tauri::command]
 #[specta::specta]
-async fn poll_command(id: CommandId, timeout_ms: u32) -> Option<CommandOutput> {
+async fn poll_command(id: RunId, timeout_ms: u32) -> Option<PollOutput> {
     println!("running poll_command");
 
     let command = {
@@ -90,33 +107,48 @@ async fn poll_command(id: CommandId, timeout_ms: u32) -> Option<CommandOutput> {
 
 #[tauri::command]
 #[specta::specta]
-async fn run_zsh(config: commands::CommandConfig) -> Result<CommandId, String> {
+async fn run_lua(source: String) -> Result<RunId, String> {
+    println!("running lua");
+
+    let lua_command = runner::lua::LuaCommand::new(source);
+    return Ok(run_runner(lua_command).await);
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn run_zsh(config: runner::shell::ShellConfig) -> Result<RunId, String> {
     println!("running zsh");
 
-    let command = Command::new(config).await?;
-    let uuid = command.id();
+    let zsh_command = runner::shell::ShellCommand::new(config).await?;
+    return Ok(run_runner(zsh_command).await);
+}
 
-    let mut commands = RUNNING_COMMANDS.lock().await;
-    if let Some(prev) = commands.insert(uuid, Arc::new(Mutex::new(command))) {
-        let mut prev = prev.lock().await;
-        prev.kill();
-    }
+macro_rules! generate_handler {
+    ( $($func:ident),+ ) => {{
+        #[cfg(debug_assertions)]
+        tauri_specta::ts::export(
+            specta::collect_types![
+                $( $func ),*
+            ],
+            "../web/lib/handlers.ts",
+        )
+        .unwrap();
 
-    return Ok(uuid);
+        tauri::generate_handler![
+            $( $func ),*
+        ]
+    }};
 }
 
 fn main() {
-    #[cfg(debug_assertions)]
-    tauri_specta::ts::export(
-        specta::collect_types![run_zsh, poll_command, suggest_path, user_home_dir],
-        "../web/lib/handlers.ts",
-    )
-    .unwrap();
-
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(generate_handler![
+            // Kinds of commands
             run_zsh,
+            run_lua,
+            //
             poll_command,
+            // Utils
             suggest_path,
             user_home_dir
         ])

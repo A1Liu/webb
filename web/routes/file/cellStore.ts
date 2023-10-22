@@ -5,13 +5,13 @@ import { userHomeDir } from "$lib/handlers";
 
 // There's a race condition here for getting the proper home directory. I guess
 // I don't really care right now about that. Oh well.
-let HOME_DIR = "";
-userHomeDir().then((dir) => (HOME_DIR = dir));
+const HomeDir = userHomeDir();
 
 export interface CellInfo {
   readonly id: string;
   readonly index: number;
   readonly directory: string;
+  lua: boolean;
   contents: string;
   focus: boolean;
 }
@@ -47,19 +47,21 @@ export class Sheet {
     });
   }
 
-  createCell({
+  async createCell({
     id = uuid(),
     directory,
     contents = "",
     focus = false,
-  }: Partial<Omit<CellInfo, "index">> = {}): string {
+    lua = false,
+  }: Partial<Omit<CellInfo, "index">> = {}): Promise<string> {
     const index = this.cellLayoutRef.length;
     const store = writable({
       id,
       index,
-      directory: directory ?? HOME_DIR,
+      directory: directory ?? (await HomeDir),
       contents,
       focus,
+      lua,
     });
 
     this.cells.set(id, store);
@@ -70,7 +72,7 @@ export class Sheet {
     return id;
   }
 
-  moveDownFrom({ id, directory }: MoveDownCommand) {
+  async moveDownFrom({ id, directory }: MoveDownCommand) {
     const index = this.cellLayoutRef.indexOf(id);
     if (index === -1) {
       return;
@@ -78,7 +80,7 @@ export class Sheet {
 
     const targetId = this.cellLayoutRef[index + 1];
     if (!targetId) {
-      this.createCell({ focus: true, directory });
+      await this.createCell({ focus: true, directory });
       return;
     }
 
