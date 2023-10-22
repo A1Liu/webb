@@ -3,9 +3,8 @@
   import {
     pollCommand,
     suggestPath,
-    runZsh,
     type RunnerOutputExt,
-    runLua,
+    runCommand,
   } from "$lib/handlers";
 
   function matchKey(
@@ -47,12 +46,10 @@
       };
     }
 
-    const result = cell.lua
-      ? runLua(cell.contents)
-      : runZsh({
-          command: cell.contents,
-          working_directory: cell.directory,
-        });
+    const result = runCommand({
+      kind: cell.language,
+      source: cell.contents,
+    });
 
     return {
       cell,
@@ -68,7 +65,7 @@
     if (
       matchKey(e, "Enter") &&
       cell.contents.split("\n").length <= 1 &&
-      !cell.lua
+      cell.language.kind === "Shell"
     ) {
       return true;
     }
@@ -155,7 +152,7 @@
       };
 
       if (pollOut.end) {
-        moveDown = !$cellInfo.lua;
+        moveDown = $cellInfo.language.kind === "Shell";
         break;
       }
     }
@@ -264,13 +261,29 @@
 
 <div class="wrapper">
   <div class="textRow">
-    <input type="checkbox" bind:checked={$cellInfo.lua} />
+    <input
+      type="checkbox"
+      checked={$cellInfo.language.kind === "Lua"}
+      on:change={() => {
+        switch ($cellInfo.language.kind) {
+          case "Shell":
+            $cellInfo.language = { kind: "Lua" };
+            break;
+          case "Lua":
+            $cellInfo.language = {
+              kind: "Shell",
+              working_directory: $cellInfo.directory,
+            };
+            break;
+        }
+      }}
+    />
 
     <div class="textWrapper">
       <Monaco
         bind:value={$cellInfo.contents}
         bind:editor
-        language={$cellInfo.lua ? "lua" : "shell"}
+        language={$cellInfo.language.kind.toLowerCase()}
       />
     </div>
   </div>
