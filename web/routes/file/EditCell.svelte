@@ -206,6 +206,8 @@
     // NOTE: we need to use an Action instead of a command because there's some
     // pretty silly behavior in monaco right now where commands are global to
     // the entire app, wheras actions can be registered per-editor.
+    //
+    // See: https://github.com/microsoft/monaco-editor/issues/3345
     editor.addAction({
       id: "webb-submit-command",
       label: "Run command",
