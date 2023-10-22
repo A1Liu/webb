@@ -82,6 +82,7 @@
   import { KeyCode, KeyMod } from "monaco-editor";
   import type { IKeyboardEvent } from "monaco-editor";
 
+  let term: Terminal | null = null;
   const term = new Terminal({
     disableStdin: true,
     convertEol: true,
