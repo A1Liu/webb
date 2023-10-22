@@ -35,8 +35,6 @@ impl Runnable for LuaCommand {
 
             // https://github.com/khvzak/mlua/issues/306
         });
-
-        todo!()
     }
 
     fn is_done(&self) -> bool {

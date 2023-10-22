@@ -44,7 +44,10 @@ struct PathSuggest {
 #[tauri::command]
 #[specta::specta]
 fn user_home_dir() -> std::path::PathBuf {
-    return dirs::home_dir().unwrap();
+    let a = dirs::home_dir().unwrap();
+    println!("USER HOME DIR: {:?}", a);
+
+    return a;
 }
 
 #[tauri::command]
@@ -138,22 +141,6 @@ macro_rules! generate_handler {
 }
 
 fn main() {
-    // #[cfg(debug_assertions)]
-    // tauri_specta::ts::export(
-    //     specta::collect_types![
-    //         // Kinds of commands
-    //         run_zsh,
-    //         run_lua,
-    //         //
-    //         poll_command,
-    //         // Utils
-    //         suggest_path,
-    //         user_home_dir
-    //     ],
-    //     "../web/lib/handlers.ts",
-    // )
-    // .unwrap();
-
     tauri::Builder::default()
         .invoke_handler(generate_handler![
             // Kinds of commands

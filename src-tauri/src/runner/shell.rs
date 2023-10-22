@@ -29,9 +29,15 @@ pub struct ShellCommand {
 impl ShellCommand {
     pub async fn new(config: ShellConfig) -> Result<Self, String> {
         let command = config.command;
-        let working_directory = tokio::fs::canonicalize(config.working_directory)
+        let working_directory = tokio::fs::canonicalize(&config.working_directory)
             .await
-            .map_err(|e| "invalid working directory")?;
+            .map_err(|e| {
+                println!(
+                    "canonicalize error for {:?}: {:?}",
+                    config.working_directory, e
+                );
+                return "invalid working directory";
+            })?;
 
         return Ok(Self {
             command,
