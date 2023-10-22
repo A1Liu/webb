@@ -3,7 +3,6 @@
 pub mod lua;
 pub mod shell;
 
-use serde::__private::from_utf8_lossy;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::collections::HashMap;
@@ -208,10 +207,10 @@ impl Drop for Runner {
 
 impl Runner {
     pub fn new(runnable: impl Runnable + 'static) -> Self {
-        return Self::dyn_new(Arc::new(runnable));
+        return Self::new_boxed(Arc::new(runnable));
     }
 
-    fn dyn_new(runnable: Arc<dyn Runnable + 'static>) -> Self {
+    pub fn new_boxed(runnable: Arc<dyn Runnable + 'static>) -> Self {
         let output = Arc::new(Mutex::new(Vec::new()));
         let id = RunId(Uuid::new_v4());
 
