@@ -61,7 +61,6 @@
   }
 
   function shouldSubmitCommand(e: IKeyboardEvent, cell: CellInfo): boolean {
-    console.log("key handler");
     if (!e.target) return false;
 
     if (matchKey(e, "Enter", { shift: true })) return false;

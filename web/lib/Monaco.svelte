@@ -1,4 +1,15 @@
 <script lang="ts" context="module">
+  import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
+
+  self.MonacoEnvironment = {
+    getWorker: function (_moduleId: any, label: string) {
+      switch (label) {
+        default:
+          return new editorWorker();
+      }
+    },
+  };
+
   export type Editor = Monaco.editor.IStandaloneCodeEditor;
 </script>
 

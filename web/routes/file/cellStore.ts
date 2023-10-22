@@ -78,8 +78,6 @@ export class Sheet {
       return;
     }
 
-    console.log(index);
-
     const targetId = this.cellLayoutRef[index + 1];
     if (!targetId) {
       await this.createCell({ focus: true, directory });
