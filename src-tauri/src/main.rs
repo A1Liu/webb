@@ -108,24 +108,6 @@ async fn poll_command(id: RunId, timeout_ms: u32) -> Option<PollOutput> {
 
 #[tauri::command]
 #[specta::specta]
-async fn run_lua(source: String) -> Result<RunId, String> {
-    println!("running lua");
-
-    let lua_command = Arc::new(runner::lua::LuaCommand::new(source));
-    return Ok(run_runner(lua_command).await);
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn run_zsh(config: runner::shell::ShellConfig) -> Result<RunId, String> {
-    println!("running zsh");
-
-    let zsh_command = Arc::new(runner::shell::ShellCommand::new(config).await?);
-    return Ok(run_runner(zsh_command).await);
-}
-
-#[tauri::command]
-#[specta::specta]
 async fn run_command(config: commands::CellCommand) -> Result<RunId, String> {
     println!("running command: {}", config.get_name());
 
@@ -153,9 +135,6 @@ macro_rules! generate_handler {
 fn main() {
     tauri::Builder::default()
         .invoke_handler(generate_handler![
-            // Kinds of commands
-            run_zsh,
-            run_lua,
             //
             run_command,
             poll_command,
