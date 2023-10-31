@@ -58,7 +58,6 @@ pub struct Runner {
 
     // This is silly, but I guess whatever. Make it better later :(
     output: Arc<Mutex<Vec<RunnerOutput>>>,
-    channel: tokio::sync::mpsc::Receiver<RunnerOutput>,
     kill: tokio::sync::mpsc::Sender<()>,
 }
 
@@ -95,62 +94,39 @@ impl Runner {
             output,
             runnable,
             kill,
-            channel: rx,
         };
 
-        // let output_write_ref = sel.output.clone();
-        // tokio::spawn(async move {
-        //     let mut rx = rx;
-        //     let output = output_write_ref;
-        //     loop {
-        //         let s = match rx.recv().await {
-        //             Some(s) => s,
-        //             None => break,
-        //         };
-        //         let mut out = output.lock().unwrap();
-        //         out.push(s);
-        //     }
-        // });
+        let output_write_ref = sel.output.clone();
+        tokio::spawn(async move {
+            let mut rx = rx;
+            let output = output_write_ref;
+            loop {
+                let s = match rx.recv().await {
+                    Some(s) => s,
+                    None => break,
+                };
+                let mut out = output.lock().unwrap();
+                out.push(s);
+            }
+        });
 
         return sel;
     }
 
-    pub async fn poll(&mut self, timeout: Duration) -> PollOutput {
-        let first = tokio::select! {
-            s = self.channel.recv() => s,
-            _ = tokio::time::sleep(timeout) => return PollOutput {
-                success: self.runnable.is_successful(),
-                data: Vec::new(),
-                end: self.runnable.is_done(),
-            },
-        };
+    pub async fn poll(&self, timeout: Duration) -> PollOutput {
+        let mut output = self.output.lock().unwrap();
 
         let mut data = Vec::<RunnerOutputExt>::new();
-        match first {
-            Some(item) => data.push(item.into()),
-            None => {
-                return PollOutput {
-                    data,
-                    end: self.runnable.is_done(),
-                    success: self.runnable.is_successful(),
-                }
-            }
+        if output.len() == 0 {
+            return PollOutput {
+                data,
+                end: self.runnable.is_done(),
+                success: self.runnable.is_successful(),
+            };
         }
 
-        while data.len() < 25 {
-            use tokio::sync::mpsc::error::TryRecvError::*;
-            match self.channel.try_recv() {
-                Err(Disconnected) => {
-                    return PollOutput {
-                        data,
-                        end: self.runnable.is_done(),
-                        success: self.runnable.is_successful(),
-                    }
-                }
-                Err(Empty) => break,
-                Ok(d) => data.push(d.into()),
-            }
-        }
+        let output = std::mem::replace(&mut *output, Vec::new());
+        data.extend(output.into_iter().map(|a| a.into()));
 
         return PollOutput {
             data,

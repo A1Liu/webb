@@ -98,7 +98,7 @@ async fn poll_command(id: RunId, timeout_ms: u32) -> Option<PollOutput> {
         commands.get(&id)?.clone()
     };
 
-    let mut command = command.lock().await;
+    let command = command.lock().await;
     return Some(
         command
             .poll(std::time::Duration::from_millis(timeout_ms as u64))

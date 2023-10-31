@@ -6,21 +6,46 @@ use std::{
     task::{Poll, Waker},
 };
 use tauri::async_runtime::Mutex;
-use tokio::io::AsyncRead;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 // This is silly. I feel like SOMEONE has got to have wanted to read data from
 // an in-memory buffer that's growing. Right?
 
-// I eventually want to make this a good buffering system, but for now we can stick
-// with something silly.
+// I eventually want to make this a good buffering system, but for now we can
+// stick with something silly.
+
+/*
+pub struct TSBufWriter {
+    buffer: Arc<TSBuffer>,
+}
+
+impl AsyncWrite for TSBufWriter {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, std::io::Error>> {
+        todo!()
+    }
+
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        todo!()
+    }
+
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        todo!()
+    }
+}
 
 pub struct TSBufReader {
     buffer: Arc<TSBuffer>,
     cursor: usize,
-}
-
-pub struct TSBufWriter {
-    buffer: Arc<TSBuffer>,
 }
 
 impl AsyncRead for TSBufReader {
@@ -68,9 +93,10 @@ pub fn create_buffer() -> (TSBufWriter, TSBufReader) {
     return (writer, reader);
 }
 
-struct TSBuffer {
+// TODO: Eventually this should probably be a linked list of append-only fixed-length buffers. For
+// now though, I guess this is what we're doing.
+pub struct TSBuffer {
     closed: AtomicBool,
-    wakers: std::sync::Mutex<Vec<Waker>>,
 
     // TODO: Should build this kind of thing into heaparray. That library can
     // be made actually good if we switch it to using `Box` and `Arc` directly
@@ -79,15 +105,18 @@ struct TSBuffer {
 }
 
 impl TSBuffer {
-    fn new() -> Self {
+    pub fn new() -> Self {
         return Self {
             closed: AtomicBool::new(false),
-            wakers: std::sync::Mutex::new(Vec::new()),
             data: Mutex::new(Vec::new()),
         };
     }
 
-    async fn append(&self, bytes: &[u8]) {
+    pub async fn append(&self, bytes: &[u8]) {
+        if self.closed.load(Ordering::SeqCst) {
+            panic!("OOOOOF");
+        }
+
         if bytes.len() == 0 {
             return;
         }
@@ -100,7 +129,9 @@ impl TSBuffer {
         }
     }
 
-    fn close(&self) {
+    pub fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
     }
 }
+
+*/
