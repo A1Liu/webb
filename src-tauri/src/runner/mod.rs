@@ -54,7 +54,7 @@ pub struct RunId(Uuid);
 
 pub struct Runner {
     id: RunId,
-    runnable: Arc<dyn Runnable + 'static>,
+    runnable: Arc<dyn Runnable>,
 
     // This is silly, but I guess whatever. Make it better later :(
     output: Arc<Mutex<Vec<RunnerOutput>>>,
@@ -74,11 +74,11 @@ impl Drop for Runner {
 }
 
 impl Runner {
-    pub fn new(runnable: impl Runnable + 'static) -> Self {
+    pub fn new(runnable: impl Runnable) -> Self {
         return Self::new_boxed(Arc::new(runnable));
     }
 
-    pub fn new_boxed(runnable: Arc<dyn Runnable + 'static>) -> Self {
+    pub fn new_boxed(runnable: Arc<dyn Runnable>) -> Self {
         let output = Arc::new(Mutex::new(Vec::new()));
         let id = RunId(Uuid::new_v4());
 

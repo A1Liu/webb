@@ -74,7 +74,7 @@ pub enum RunnerOutput {
     Stderr(Vec<u8>),
 }
 
-pub trait Runnable: core::fmt::Debug + Send + Sync {
+pub trait Runnable: core::fmt::Debug + Send + Sync + 'static {
     fn start(self: Arc<Self>, ctx: RunCtx);
     fn is_done(&self) -> bool;
     fn is_successful(&self) -> Option<bool>;
@@ -88,7 +88,7 @@ pub struct RunCtx {
 impl RunCtx {
     pub fn pipe_to_stdout(
         &self,
-        runnable: Arc<dyn Runnable + 'static>,
+        runnable: Arc<dyn Runnable>,
         pipe: impl Unpin + AsyncReadExt + Send + 'static,
     ) {
         self.pipe_to_channel(runnable, pipe, RunnerOutput::Stdout)
@@ -96,7 +96,7 @@ impl RunCtx {
 
     pub fn pipe_to_stderr(
         &self,
-        runnable: Arc<dyn Runnable + 'static>,
+        runnable: Arc<dyn Runnable>,
         pipe: impl Unpin + AsyncReadExt + Send + 'static,
     ) {
         self.pipe_to_channel(runnable, pipe, RunnerOutput::Stderr)
@@ -108,7 +108,7 @@ impl RunCtx {
 
     fn pipe_to_channel(
         &self,
-        runnable: Arc<dyn Runnable + 'static>,
+        runnable: Arc<dyn Runnable>,
         mut pipe: impl Unpin + AsyncReadExt + Send + 'static,
         func: fn(Vec<u8>) -> RunnerOutput,
     ) {
