@@ -4,6 +4,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "dev": "pnpm run --filter ./native dev",
     "format": "pnpm run -r format",
     "ts-check": "pnpm run -r ts-check"
   },
