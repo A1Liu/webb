@@ -6,6 +6,7 @@
     unused_variables
 ))]
 
+pub mod commands;
 pub mod runner;
 pub mod util;
 
@@ -23,8 +24,8 @@ static ref RUNNING_COMMANDS: Mutex<HashMap<RunId, Arc<Mutex<Runner>>>> =
     Mutex::new(HashMap::new());
 }
 
-async fn run_runner(runnable: impl Runnable + 'static) -> RunId {
-    let command = Runner::new(runnable);
+async fn run_runner(runnable: Arc<dyn Runnable + 'static>) -> RunId {
+    let command = Runner::new_boxed(runnable);
     let uuid = command.id();
     let mut commands = RUNNING_COMMANDS.lock().await;
     if let Some(prev) = commands.insert(uuid, Arc::new(Mutex::new(command))) {
@@ -97,7 +98,7 @@ async fn poll_command(id: RunId, timeout_ms: u32) -> Option<PollOutput> {
         commands.get(&id)?.clone()
     };
 
-    let mut command = command.lock().await;
+    let command = command.lock().await;
     return Some(
         command
             .poll(std::time::Duration::from_millis(timeout_ms as u64))
@@ -107,20 +108,11 @@ async fn poll_command(id: RunId, timeout_ms: u32) -> Option<PollOutput> {
 
 #[tauri::command]
 #[specta::specta]
-async fn run_lua(source: String) -> Result<RunId, String> {
-    println!("running lua");
+async fn run_command(config: commands::CellCommand) -> Result<RunId, String> {
+    println!("running command: {}", config.get_name());
 
-    let lua_command = runner::lua::LuaCommand::new(source);
-    return Ok(run_runner(lua_command).await);
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn run_zsh(config: runner::shell::ShellConfig) -> Result<RunId, String> {
-    println!("running zsh");
-
-    let zsh_command = runner::shell::ShellCommand::new(config).await?;
-    return Ok(run_runner(zsh_command).await);
+    let command = config.create_runnable().await;
+    return Ok(run_runner(command).await);
 }
 
 macro_rules! generate_handler {
@@ -143,10 +135,8 @@ macro_rules! generate_handler {
 fn main() {
     tauri::Builder::default()
         .invoke_handler(generate_handler![
-            // Kinds of commands
-            run_zsh,
-            run_lua,
             //
+            run_command,
             poll_command,
             // Utils
             suggest_path,

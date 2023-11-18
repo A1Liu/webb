@@ -16,7 +16,7 @@ use uuid::Uuid;
 #[derive(Deserialize, Debug, Clone, Type)]
 pub struct ShellConfig {
     pub command: String,
-    pub working_directory: String,
+    pub working_directory: PathBuf,
 }
 
 #[derive(Debug)]

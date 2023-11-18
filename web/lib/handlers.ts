@@ -10,12 +10,8 @@ declare global {
 // Function avoids 'window not defined' in SSR
 const invoke = () => window.__TAURI_INVOKE__;
 
-export function runZsh(config: ShellConfig) {
-    return invoke()<RunId>("run_zsh", { config })
-}
-
-export function runLua(source: string) {
-    return invoke()<RunId>("run_lua", { source })
+export function runCommand(config: CellCommand) {
+    return invoke()<RunId>("run_command", { config })
 }
 
 export function pollCommand(id: RunId, timeoutMs: number) {
@@ -30,8 +26,9 @@ export function userHomeDir() {
     return invoke()<string>("user_home_dir")
 }
 
-export type PathSuggest = { valid: boolean; closest_path: string }
-export type ShellConfig = { command: string; working_directory: string }
 export type RunnerOutputExt = { kind: "Stdout"; value: string } | { kind: "Stderr"; value: string }
 export type PollOutput = { end: boolean; success: boolean | null; data: RunnerOutputExt[] }
+export type CellCommand = { kind: CellCommandKind; source: string }
 export type RunId = string
+export type CellCommandKind = { kind: "Shell"; working_directory: string } | { kind: "Lua" }
+export type PathSuggest = { valid: boolean; closest_path: string }

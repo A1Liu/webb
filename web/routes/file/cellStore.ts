@@ -1,7 +1,7 @@
 import { writable, readable } from "svelte/store";
 import { v4 as uuid } from "uuid";
 import type { Writable, Readable } from "svelte/store";
-import { userHomeDir } from "$lib/handlers";
+import { userHomeDir, type CellCommandKind } from "$lib/handlers";
 
 // There's a race condition here for getting the proper home directory. I guess
 // I don't really care right now about that. Oh well.
@@ -11,7 +11,7 @@ export interface CellInfo {
   readonly id: string;
   readonly index: number;
   readonly directory: string;
-  lua: boolean;
+  language: CellCommandKind;
   contents: string;
   focus: boolean;
 }
@@ -49,19 +49,24 @@ export class Sheet {
 
   async createCell({
     id = uuid(),
-    directory,
+    directory: inputDirectory,
     contents = "",
     focus = false,
-    lua = false,
+    language: inputLang,
   }: Partial<Omit<CellInfo, "index">> = {}): Promise<string> {
+    const directory = inputDirectory ?? (await HomeDir);
+    const language: CellCommandKind = inputLang ?? {
+      kind: "Shell",
+      working_directory: directory,
+    };
     const index = this.cellLayoutRef.length;
     const store = writable({
       id,
       index,
-      directory: directory ?? (await HomeDir),
+      directory,
       contents,
+      language,
       focus,
-      lua,
     });
 
     this.cells.set(id, store);

@@ -1,12 +1,6 @@
 <script lang="ts" context="module">
   import type { CellInfo, Sheet } from "./cellStore";
-  import {
-    pollCommand,
-    suggestPath,
-    runZsh,
-    type RunnerOutputExt,
-    runLua,
-  } from "$lib/handlers";
+  import { suggestPath, runCommand } from "$lib/handlers";
 
   function matchKey(
     e: IKeyboardEvent,
@@ -47,12 +41,10 @@
       };
     }
 
-    const result = cell.lua
-      ? runLua(cell.contents)
-      : runZsh({
-          command: cell.contents,
-          working_directory: cell.directory,
-        });
+    const result = runCommand({
+      kind: cell.language,
+      source: cell.contents,
+    });
 
     return {
       cell,
@@ -68,7 +60,7 @@
     if (
       matchKey(e, "Enter") &&
       cell.contents.split("\n").length <= 1 &&
-      !cell.lua
+      cell.language.kind === "Shell"
     ) {
       return true;
     }
@@ -78,92 +70,21 @@
 </script>
 
 <script lang="ts">
-  import { Terminal } from "xterm";
-  import { FitAddon } from "xterm-addon-fit";
-  import { onDestroy } from "svelte";
   import Monaco, { type Editor } from "$lib/Monaco.svelte";
   import { KeyCode, KeyMod } from "monaco-editor";
   import type { IKeyboardEvent } from "monaco-editor";
-
-  const term = new Terminal({
-    disableStdin: true,
-    convertEol: true,
-    rows: 1,
-    theme: {
-      foreground: "#d2d2d2",
-      background: "#2b2b2b",
-      cursor: "#adadad",
-      black: "#000000",
-      red: "#d81e00",
-      green: "#5ea702",
-      yellow: "#cfae00",
-      blue: "#427ab3",
-      magenta: "#89658e",
-      cyan: "#00a7aa",
-      white: "#dbded8",
-      brightBlack: "#686a66",
-      brightRed: "#f54235",
-      brightGreen: "#99e343",
-      brightYellow: "#fdeb61",
-      brightBlue: "#84b0d8",
-      brightMagenta: "#bc94b7",
-      brightCyan: "#37e6e8",
-      brightWhite: "#f1f1f0",
-    },
-  });
-  const fitAddon = new FitAddon();
-  term.loadAddon(fitAddon);
+  import TermDisplay from "$lib/TermDisplay.svelte";
 
   export let sheet: Sheet;
   export let cellId: string;
 
-  let termRef: any = null;
   let commandId: string | null = null;
-  let output: {
-    uuid: string;
-    status: boolean | null;
-    data: RunnerOutputExt[];
-  } | null = null;
   let moveDown = false;
   let nextDir: string | null = null;
-  let newlineBuffered = false;
 
   let editor: Editor | undefined = undefined;
 
-  const listenerDisposerLF = term.onLineFeed(() => {
-    if (term.rows < 30) {
-      term.resize(term.cols, term.rows + 1);
-    }
-  });
-
-  async function invokeCommand(commandUuid: string) {
-    let timeoutMs = 50;
-    while (commandUuid === commandId) {
-      const pollOut = await pollCommand(commandUuid, timeoutMs);
-      if (!pollOut) {
-        timeoutMs *= 2;
-        timeoutMs = Math.min(400, timeoutMs);
-        continue;
-      } else {
-        timeoutMs = 50;
-      }
-
-      output = {
-        uuid: commandUuid,
-        status: pollOut.success ?? output?.status ?? null,
-        data: [...(output?.data ?? []), ...pollOut.data],
-      };
-
-      if (pollOut.end) {
-        moveDown = !$cellInfo.lua;
-        break;
-      }
-    }
-  }
-
   $: cellInfo = sheet.cells.get(cellId)!;
-
-  $: if (commandId !== null) invokeCommand(commandId);
 
   $: if (moveDown) {
     moveDown = false;
@@ -178,7 +99,6 @@
       switch (result.kind) {
         case "command": {
           const uuid = result.commandId;
-          output = { uuid, status: null, data: [] };
           commandId = uuid;
           break;
         }
@@ -219,79 +139,43 @@
     editor.focus();
     $cellInfo.focus = false;
   }
-
-  $: if (termRef !== null && commandId !== null) {
-    newlineBuffered = false;
-    term.reset();
-    term.resize(term.cols, 1);
-    term.open(termRef);
-    fitAddon.fit();
-    term.write("\x1b[?25l");
-  }
-
-  $: if (output !== null && output?.data.length > 0) {
-    const textBlocks = output.data.flatMap((data) => {
-      switch (data.kind) {
-        case "Stderr":
-        case "Stdout":
-          return [data.value];
-        default:
-          return [];
-      }
-    });
-
-    newlineBuffered = textBlocks.reduce((nl, block) => {
-      if (nl) term.write("\n");
-
-      const r = block.endsWith("\n");
-
-      term.write(block.slice(0, block.length - (r ? 1 : 0)));
-
-      return r;
-    }, newlineBuffered);
-
-    output = {
-      status: output.status,
-      uuid: output.uuid,
-      data: [],
-    };
-  }
-
-  onDestroy(() => {
-    listenerDisposerLF.dispose();
-  });
 </script>
 
 <div class="wrapper">
   <div class="textRow">
-    <input type="checkbox" bind:checked={$cellInfo.lua} />
+    <input
+      type="checkbox"
+      checked={$cellInfo.language.kind === "Lua"}
+      on:change={() => {
+        switch ($cellInfo.language.kind) {
+          case "Shell":
+            $cellInfo.language = { kind: "Lua" };
+            break;
+          case "Lua":
+            $cellInfo.language = {
+              kind: "Shell",
+              working_directory: $cellInfo.directory,
+            };
+            break;
+        }
+      }}
+    />
 
     <div class="textWrapper">
       <Monaco
         bind:value={$cellInfo.contents}
         bind:editor
-        language={$cellInfo.lua ? "lua" : "shell"}
+        language={$cellInfo.language.kind.toLowerCase()}
       />
     </div>
   </div>
 
-  {#key output?.uuid}
-    {#if output !== null}
-      <div class="row">
-        {#if output.status === null}
-          RUNNING
-        {:else if output.status}
-          SUCCESS
-        {:else}
-          FAILED
-        {/if}
-      </div>
-
-      {#if output !== null}
-        <div bind:this={termRef} class="terminal" />
-      {/if}
-    {/if}
-  {/key}
+  <TermDisplay
+    {commandId}
+    onCommandDone={() => {
+      moveDown = $cellInfo.language.kind === "Shell";
+    }}
+  />
 </div>
 
 <style>
@@ -311,14 +195,5 @@
 
   .textWrapper {
     flex-grow: 1;
-  }
-
-  .row {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .terminal {
-    width: 100%;
   }
 </style>
