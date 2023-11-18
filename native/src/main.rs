@@ -122,7 +122,7 @@ macro_rules! generate_handler {
             specta::collect_types![
                 $( $func ),*
             ],
-            "../web/lib/handlers.ts",
+            "./components/handlers.ts",
         )
         .unwrap();
 

@@ -10,11 +10,11 @@ const config = {
   kit: {
     adapter: adapter(),
     files: {
-      lib: "web/lib",
-      params: "web/params",
-      routes: "web/routes",
-      appTemplate: "web/app.html",
-      errorTemplate: "web/error.html",
+      lib: "components",
+      params: "params",
+      routes: "routes",
+      appTemplate: "app.html",
+      errorTemplate: "error.html",
     },
   },
 };
