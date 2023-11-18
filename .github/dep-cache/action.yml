@@ -28,7 +28,7 @@ runs:
 
     - name: Install packages
       shell: bash
-      run:
+      run: |
         pnpm install
 
         if ! test -z "`git diff --stat`"; then
