@@ -26,6 +26,17 @@ runs:
         cache-dependency-path: pnpm-lock.yaml
         cache: pnpm
 
+    - name: Install packages
+      run:
+        pnpm install
+
+        if ! test -z "`git diff --stat`"; then
+          echo "Changes were found; please run 'pnpm install' and commit the output."
+          echo
+          git diff --name-only
+          exit 1
+        fi
+
     - name: Install Rust stable
       if: inputs.include-rust == 'true'
       uses: dtolnay/rust-toolchain@stable
