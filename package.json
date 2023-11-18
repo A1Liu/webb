@@ -8,5 +8,6 @@
     "format": "pnpm run -r format",
     "ts-check": "pnpm run -r ts-check"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "devDependencies": {}
 }
