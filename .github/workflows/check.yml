@@ -2,32 +2,6 @@ name: Check
 on: [push]
 
 jobs:
-  deps:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: pnpm/action-setup@v2.4.0
-        with:
-          version: 8
-
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          cache-dependency-path: pnpm-lock.yaml
-          cache: pnpm
-
-      - name: Install dependencies
-        run: |
-          pnpm install
-
-          if ! test -z "`git diff --stat`"; then
-            echo "Changes were found; please run 'pnpm install' and commit the output."
-            echo
-            git diff --name-only
-            exit 1
-          fi
-
   format:
     runs-on: ubuntu-22.04
     steps:
