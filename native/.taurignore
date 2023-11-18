@@ -1,0 +1,7 @@
+/.svelte-kit
+*.ts
+*.svelte
+/static
+/routes
+/node_modules
+/components
