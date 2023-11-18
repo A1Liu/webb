@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "license": "MIT",
   "type": "module",
-  "scripts": {},
+  "scripts": {
+    "format": "pnpm run -r format",
+    "ts-check": "pnpm run -r ts-check"
+  },
   "dependencies": {}
 }

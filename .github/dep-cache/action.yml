@@ -30,43 +30,17 @@ runs:
       if: inputs.include-rust == 'true'
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Check Cache
-      id: cache-check
-      uses: actions/cache/restore@v3
-      with:
-        key: node-dep-cache-${{ runner.os }}-${{ hashFiles('yarn.lock', 'package.json') }}
-        path: |
-          **/node_modules
-          .svelte-kit
-
-    - name: Install dependencies
-      if: steps.cache-check.outputs.cache-hit != 'true'
-      shell: bash
-      run: |
-        # TODO: use pnpm ci when available
-        pnpm install
-        pnpm prepare
-
-    - name: Cache dependencies
-      if: steps.cache-check.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v3
-      with:
-        key: node-dep-cache-${{ runner.os }}-${{ hashFiles('yarn.lock', 'package.json') }}
-        path: |
-          **/node_modules
-          .svelte-kit
-
     - name: Cache Rust dependencies
       id: rust-cache-check
       if: inputs.include-rust == 'true'
       uses: Swatinem/rust-cache@v2
       with:
         cache-all-crates: true
-        key: ${{ hashFiles('src-tauri/tauri.conf.json') }}
+        key: ${{ hashFiles('native/tauri.conf.json') }}
 
     - name: Install Rust dependencies
       if: steps.rust-cache-check.outputs.cache-hit != 'true' && inputs.include-rust == 'true'
       shell: bash
       run: |
-        cd src-tauri
+        cd native
         cargo fetch
