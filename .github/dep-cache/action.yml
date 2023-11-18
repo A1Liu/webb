@@ -27,6 +27,7 @@ runs:
         cache: pnpm
 
     - name: Install packages
+      shell: bash
       run:
         pnpm install
 
