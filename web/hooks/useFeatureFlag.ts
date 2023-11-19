@@ -64,7 +64,7 @@ const useFeatureFlagStore = create<FeatureFlagStore>()(
 
 const client = LDClient.initialize("asdfasdf", {}, { streaming: true });
 
-client.on("change", (f) => {});
+client.on("change", (_f) => {});
 
 interface FeatureFlagResponse<F extends FeatureFlag> {
   flag: F;
