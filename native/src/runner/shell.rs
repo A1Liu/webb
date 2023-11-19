@@ -1,4 +1,4 @@
-use super::{RunCtx, RunId, RunStatus, Runnable, Runner};
+use super::{RunCtx, RunId, RunResult, RunStatus, Runnable, Runner};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -83,7 +83,7 @@ impl ShellCommand {
 }
 
 impl Runnable for ShellCommand {
-    fn start(self: Arc<ShellCommand>, mut ctx: RunCtx) {
+    fn start(self: Arc<ShellCommand>, mut ctx: RunCtx) -> RunResult {
         let child_res = OsCommand::new("zsh")
             .arg("-c")
             .arg(&self.command)
@@ -98,7 +98,7 @@ impl Runnable for ShellCommand {
             Err(e) => {
                 println!("failed to create command: {}", &self.command);
                 self.status.failure();
-                return;
+                return RunResult::Error("Failed to create command".to_string());
             }
         };
 
@@ -114,6 +114,8 @@ impl Runnable for ShellCommand {
             ctx.take_kill_receiver(),
             child,
         ));
+
+        return RunResult::Text("Hello".to_string());
     }
 
     fn is_done(&self) -> bool {

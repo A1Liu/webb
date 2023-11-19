@@ -67,6 +67,12 @@ impl RunStatus {
     }
 }
 
+pub enum RunResult {
+    File(PathBuf),
+    Text(String),
+    Error(String),
+}
+
 #[derive(Serialize, Clone, Type)]
 #[serde(tag = "kind", content = "value")]
 pub enum RunnerOutput {
@@ -75,7 +81,7 @@ pub enum RunnerOutput {
 }
 
 pub trait Runnable: core::fmt::Debug + Send + Sync + 'static {
-    fn start(self: Arc<Self>, ctx: RunCtx);
+    fn start(self: Arc<Self>, ctx: RunCtx) -> RunResult;
     fn is_done(&self) -> bool;
     fn is_successful(&self) -> Option<bool>;
 }
