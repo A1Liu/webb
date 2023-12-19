@@ -7,11 +7,11 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::Mutex;
 
 pub trait Runnable: core::fmt::Debug + Send + Sync + 'static {
-    fn start(self: Arc<Self>, ctx: Arc<RunCtx>) -> RunResult;
+    fn start(self: Arc<Self>, ctx: Arc<RunCtx>) -> RunnableResult;
 }
 
-#[derive(Debug)]
-pub struct RunResult(RunData);
+#[derive(Debug, Clone)]
+pub struct RunnableResult(RunData);
 
 #[derive(Debug)]
 enum RunStatus {
@@ -19,7 +19,7 @@ enum RunStatus {
     Error(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum RunData {
     Text(String),
     File(PathBuf),
@@ -27,12 +27,12 @@ enum RunData {
 
 pub struct RunCtx {
     status: OnceLock<RunStatus>,
-    logs: OnceLock<RunResult>,
+    logs: OnceLock<RunnableResult>,
     kill_recv: tokio::sync::watch::Receiver<bool>,
 }
 
 impl RunCtx {
-    fn create() -> (Self, tokio::sync::watch::Sender<bool>) {
+    fn new() -> (Self, tokio::sync::watch::Sender<bool>) {
         let (kill_send, kill_recv) = tokio::sync::watch::channel(false);
 
         let sel = Self {
@@ -44,33 +44,33 @@ impl RunCtx {
         return (sel, kill_send);
     }
 
-    pub fn fail(&self, error: impl Into<String>) -> RunResult {
+    pub fn fail(&self, error: impl Into<String>) -> RunnableResult {
         self.status
             .set(RunStatus::Error(error.into()))
             .expect("Tried to set status twice".into());
-        return RunResult(RunData::Text(String::new()));
+        return RunnableResult(RunData::Text(String::new()));
     }
 
-    pub fn text(&self, text: String) -> RunResult {
+    pub fn text(&self, text: String) -> RunnableResult {
         self.status
             .set(RunStatus::Success)
             .expect("Tried to set status twice".into());
 
-        return RunResult(RunData::Text(text));
+        return RunnableResult(RunData::Text(text));
     }
 
-    pub fn set_logs(&self, log_output: RunResult) {
+    pub fn set_logs(&self, log_output: RunnableResult) {
         self.logs.set(log_output).expect("failed to set logs");
     }
 
-    pub async fn pipe(&self) -> (impl AsyncWrite, RunResult) {
+    pub async fn pipe(&self) -> (impl AsyncWrite, RunnableResult) {
         let file_path: PathBuf = "/tmp/blah".into();
 
         let out_file = tokio::fs::File::create(&file_path)
             .await
             .expect("Failed to create temporary file for pipe");
 
-        return (out_file, RunResult(RunData::File(file_path)));
+        return (out_file, RunnableResult(RunData::File(file_path)));
     }
 
     /// Wait for the kill signal
@@ -88,7 +88,7 @@ impl RunCtx {
     }
 }
 
-impl RunResult {
+impl RunnableResult {
     // Only for reading files/text
     //
     // For any kind of bi-directionality, you'd need to use
@@ -103,5 +103,40 @@ impl RunResult {
                 panic!("Oops");
             }
         }
+    }
+}
+
+pub struct RunnerResult {
+    ctx: Arc<RunCtx>,
+    kill_send: tokio::sync::watch::Sender<bool>,
+}
+
+pub fn run(runnable: Arc<dyn Runnable>) -> RunnerResult {
+    let (ctx, kill_send) = RunCtx::new();
+    let ctx = Arc::new(ctx);
+
+    runnable.start(ctx.clone());
+
+    return RunnerResult { ctx, kill_send };
+}
+
+impl RunnerResult {
+    pub fn is_done(&self) -> bool {
+        return self.ctx.status.get().is_some();
+    }
+
+    pub fn is_successful(&self) -> bool {
+        match self.ctx.status.get() {
+            Some(RunStatus::Success) => return true,
+            _ => return false,
+        }
+    }
+
+    pub fn logs(&self) -> Option<RunnableResult> {
+        return self.ctx.logs.get().map(|r| r.clone());
+    }
+
+    pub fn kill(&self) {
+        let _ = self.kill_send.send(true);
     }
 }
