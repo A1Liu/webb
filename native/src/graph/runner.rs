@@ -1,8 +1,11 @@
 use std::io::Cursor;
 use std::path::PathBuf;
+use std::process::Stdio;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, OnceLock};
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, BufReader};
+use tokio::process::Command;
+use tokio::process::{Child, Command as OsCommand};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::Mutex;
 
@@ -100,7 +103,24 @@ impl RunnableResult {
                 return Ok(Box::new(Cursor::new(clone)));
             }
             RunData::File(s) => {
-                panic!("Oops");
+                let child_res = OsCommand::new("tail")
+                    .arg("-f")
+                    .arg("-c")
+                    .arg("+1")
+                    .arg(s)
+                    .stdout(Stdio::piped())
+                    .spawn();
+
+                let mut child = match child_res {
+                    Ok(c) => c,
+                    Err(e) => {
+                        return Err("failed to read file".to_string());
+                    }
+                };
+
+                let stdout = child.stdout.take().expect("failed to get output of tail");
+
+                return Ok(Box::new(BufReader::new(stdout)));
             }
         }
     }
