@@ -7,6 +7,7 @@
 ))]
 
 pub mod commands;
+pub mod graph;
 pub mod runner;
 pub mod util;
 
