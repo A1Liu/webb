@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -8,6 +10,7 @@ use tokio::process::Command;
 use tokio::process::{Child, Command as OsCommand};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 pub trait Runnable: core::fmt::Debug + Send + Sync + 'static {
     fn start(self: Arc<Self>, ctx: Arc<RunCtx>) -> RunnableResult;
@@ -16,8 +19,8 @@ pub trait Runnable: core::fmt::Debug + Send + Sync + 'static {
 #[derive(Debug, Clone)]
 pub struct RunnableResult(RunData);
 
-#[derive(Debug)]
-enum RunStatus {
+#[derive(Debug, Clone)]
+pub enum RunStatus {
     Success,
     Error(String),
 }
@@ -28,7 +31,12 @@ enum RunData {
     File(PathBuf),
 }
 
+#[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Eq, Serialize, Deserialize, Debug, Type)]
+#[repr(transparent)]
+pub struct RunId(Uuid);
+
 pub struct RunCtx {
+    pub id: RunId,
     status: OnceLock<RunStatus>,
     logs: OnceLock<RunnableResult>,
     kill_recv: tokio::sync::watch::Receiver<bool>,
@@ -38,7 +46,10 @@ impl RunCtx {
     fn new() -> (Self, tokio::sync::watch::Sender<bool>) {
         let (kill_send, kill_recv) = tokio::sync::watch::channel(false);
 
+        let id = RunId(Uuid::new_v4());
+
         let sel = Self {
+            id,
             status: OnceLock::new(),
             logs: OnceLock::new(),
             kill_recv,
@@ -47,33 +58,27 @@ impl RunCtx {
         return (sel, kill_send);
     }
 
-    pub fn fail(&self, error: impl Into<String>) -> RunnableResult {
+    pub fn set_status(&self, status: RunStatus) {
         self.status
-            .set(RunStatus::Error(error.into()))
+            .set(status)
             .expect("Tried to set status twice".into());
-        return RunnableResult(RunData::Text(String::new()));
+    }
+
+    pub fn error(&self, text: impl Into<String>) -> RunnableResult {
+        let text: String = text.into();
+        self.set_status(RunStatus::Error(text.clone()));
+
+        return RunnableResult(RunData::Text(text));
     }
 
     pub fn text(&self, text: String) -> RunnableResult {
-        self.status
-            .set(RunStatus::Success)
-            .expect("Tried to set status twice".into());
+        self.set_status(RunStatus::Success);
 
         return RunnableResult(RunData::Text(text));
     }
 
     pub fn set_logs(&self, log_output: RunnableResult) {
         self.logs.set(log_output).expect("failed to set logs");
-    }
-
-    pub async fn pipe(&self) -> (impl AsyncWrite, RunnableResult) {
-        let file_path: PathBuf = "/tmp/blah".into();
-
-        let out_file = tokio::fs::File::create(&file_path)
-            .await
-            .expect("Failed to create temporary file for pipe");
-
-        return (out_file, RunnableResult(RunData::File(file_path)));
     }
 
     /// Wait for the kill signal
@@ -88,6 +93,28 @@ impl RunCtx {
             // been dropped, so then we just wait forever
             std::future::pending::<()>().await;
         }
+    }
+}
+
+pub struct RunPipe {
+    path: PathBuf,
+}
+
+impl RunPipe {
+    pub fn new() -> Self {
+        return Self {
+            path: "/tmp/blah".into(),
+        };
+    }
+
+    pub async fn out_file(&self) -> tokio::fs::File {
+        return tokio::fs::File::create(&self.path)
+            .await
+            .expect("Failed to create temporary file for pipe");
+    }
+
+    pub fn runnable_result(&self) -> RunnableResult {
+        return RunnableResult(RunData::File(self.path.clone()));
     }
 }
 
