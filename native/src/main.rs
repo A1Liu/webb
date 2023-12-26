@@ -15,6 +15,7 @@ use lazy_static::lazy_static;
 use runner::{PollOutput, RunId};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tauri::Manager;
 use tokio::sync::Mutex;
 
 use crate::runner::{Runnable, Runner};

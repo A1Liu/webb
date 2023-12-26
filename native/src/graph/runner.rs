@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, OnceLock};
+use strum::Display;
 use tokio::io::{AsyncRead, AsyncWrite, BufReader};
 use tokio::process::Command;
 use tokio::process::{Child, Command as OsCommand};
@@ -34,6 +35,12 @@ enum RunData {
 #[derive(Clone, Copy, PartialOrd, Hash, PartialEq, Eq, Serialize, Deserialize, Debug, Type)]
 #[repr(transparent)]
 pub struct RunId(Uuid);
+
+impl std::fmt::Display for RunId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        return write!(f, "run-{}", self.0);
+    }
+}
 
 pub struct RunCtx {
     pub id: RunId,
@@ -109,6 +116,15 @@ impl RunPipe {
 
     pub async fn out_file(&self) -> tokio::fs::File {
         return tokio::fs::File::create(&self.path)
+            .await
+            .expect("Failed to create temporary file for pipe");
+    }
+
+    pub async fn out_file_append(&self) -> tokio::fs::File {
+        return tokio::fs::File::options()
+            .read(false)
+            .append(true)
+            .open(&self.path)
             .await
             .expect("Failed to create temporary file for pipe");
     }
