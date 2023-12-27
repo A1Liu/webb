@@ -184,6 +184,10 @@ pub fn run(runnable: Arc<dyn Runnable>) -> RunnerResult {
 }
 
 impl RunnerResult {
+    pub fn id(&self) -> RunId {
+        return self.ctx.id;
+    }
+
     pub fn is_done(&self) -> bool {
         return self.ctx.status.get().is_some();
     }
