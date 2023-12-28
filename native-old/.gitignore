@@ -1,0 +1,4 @@
+/.tauri-build
+/target/
+/.svelte-kit
+/package

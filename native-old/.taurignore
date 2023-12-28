@@ -1,13 +1,7 @@
 /.svelte-kit
 *.ts
-*.tsx
 *.svelte
 /static
-/app
-/.next
-/hooks
-/node_modules
-/public
-/util
+/routes
 /node_modules
 /components

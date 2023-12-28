@@ -1,6 +1,6 @@
-use crate::graph::shell::ShellConfig;
-use crate::graph::Runnable;
-use crate::graph::{lua::LuaCommand, shell::ShellCommand};
+use crate::runner::shell::ShellConfig;
+use crate::runner::Runnable;
+use crate::runner::{lua::LuaCommand, shell::ShellCommand};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::collections::HashMap;
