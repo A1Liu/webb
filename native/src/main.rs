@@ -84,7 +84,7 @@ async fn suggest_path(s: String, from: String) -> PathSuggest {
         valid: jumps == 0,
         closest_path,
     };
-    println!("running suggest_path {:#?}", &result);
+    println!("ran suggest_path {:#?}", &result);
     return result;
 }
 
