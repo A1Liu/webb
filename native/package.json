@@ -1,41 +1,26 @@
 {
-  "name": "@a1liu/webb-native",
-  "version": "0.0.1",
-  "license": "MIT",
+  "name": "@a1liu/webb-webapp",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
     "dev": "pnpm tauri dev",
-    "dev:web": "vite dev",
-    "build": "pnpm tauri build",
-    "build:web": "vite build",
-    "preview": "vite preview",
-    "ts-check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "ts-check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "lint": "prettier --check . && eslint .",
+    "dev:web": "next dev",
+    "build:web": "next build",
+    "start:web": "next start",
     "format": "prettier --write .",
-    "prepare": "svelte-kit sync"
+    "lint:web": "next lint"
   },
-  "devDependencies": {
-    "@neoconfetti/svelte": "^1.0.0",
-    "@sveltejs/adapter-auto": "^2.0.0",
-    "@sveltejs/adapter-static": "^1.0.0-next.50",
-    "@sveltejs/kit": "^1.20.4",
-    "@tauri-apps/cli": "^1.4.0",
-    "@types/cookie": "^0.5.1",
-    "@typescript-eslint/eslint-plugin": "^5.45.0",
-    "@typescript-eslint/parser": "^5.45.0",
-    "eslint": "^8.28.0",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-plugin-svelte": "^2.30.0",
-    "prettier": "^3.0.3",
-    "prettier-plugin-svelte": "^3.0.3",
-    "svelte": "^4.0.5",
-    "svelte-check": "^3.4.3",
-    "tslib": "^2.4.1",
-    "typescript": "^5.0.0",
-    "vite": "^4.4.2"
-  },
-  "type": "module",
   "dependencies": {
+    "@floating-ui/react": "^0.26.2",
+    "ahooks": "^3.7.8",
+    "launchdarkly-js-client-sdk": "^3.1.4",
+    "next": "14.0.3",
+    "ramda": "^0.29.1",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-hook-form": "^7.48.2",
+    "zod": "^3.22.4",
+    "zustand": "^4.4.6",
     "@tauri-apps/api": "^1.4.0",
     "@types/uuid": "^9.0.2",
     "monaco-editor": "^0.44.0",
@@ -44,53 +29,18 @@
     "xterm": "^5.2.1",
     "xterm-addon-fit": "^0.7.0"
   },
-  "prettier": {
-    "plugins": [
-      "prettier-plugin-svelte"
-    ],
-    "overrides": [
-      {
-        "files": "*.svelte",
-        "options": {
-          "parser": "svelte"
-        }
-      }
-    ]
-  },
-  "eslintConfig": {
-    "root": true,
-    "extends": [
-      "eslint:recommended",
-      "plugin:@typescript-eslint/recommended",
-      "plugin:svelte/recommended",
-      "prettier"
-    ],
-    "parser": "@typescript-eslint/parser",
-    "plugins": [
-      "@typescript-eslint"
-    ],
-    "parserOptions": {
-      "sourceType": "module",
-      "ecmaVersion": 2020,
-      "extraFileExtensions": [
-        ".svelte"
-      ]
-    },
-    "env": {
-      "browser": true,
-      "es2017": true,
-      "node": true
-    },
-    "overrides": [
-      {
-        "files": [
-          "*.svelte"
-        ],
-        "parser": "svelte-eslint-parser",
-        "parserOptions": {
-          "parser": "@typescript-eslint/parser"
-        }
-      }
-    ]
+  "devDependencies": {
+    "@types/node": "^20",
+    "@tauri-apps/cli": "^1.4.0",
+    "@types/ramda": "^0.29.9",
+    "prettier": "^3.0.3",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.0.1",
+    "eslint": "^8",
+    "eslint-config-next": "14.0.3",
+    "postcss": "^8",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5"
   }
 }

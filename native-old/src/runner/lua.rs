@@ -1,4 +1,4 @@
-use super::{RunStatus, Runnable, RunnerOutput};
+use super::{RunResult, RunStatus, Runnable, RunnerOutput};
 use mlua::{Lua, StdLib};
 
 #[derive(Debug)]
@@ -17,7 +17,7 @@ impl LuaCommand {
 }
 
 impl Runnable for LuaCommand {
-    fn start(self: std::sync::Arc<Self>, ctx: super::RunCtx) {
+    fn start(self: std::sync::Arc<Self>, ctx: super::RunCtx) -> RunResult {
         let sel_ref = self.clone();
         let sender = ctx.output_sender.clone();
 
@@ -54,6 +54,8 @@ impl Runnable for LuaCommand {
 
             status.success();
         });
+
+        return RunResult::Text("Hello".to_string());
     }
 
     fn is_done(&self) -> bool {

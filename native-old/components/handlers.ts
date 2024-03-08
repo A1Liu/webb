@@ -14,6 +14,10 @@ export function runCommand(config: CellCommand) {
     return invoke()<RunId>("run_command", { config })
 }
 
+export function pollCommand(id: RunId, timeoutMs: number) {
+    return invoke()<PollOutput | null>("poll_command", { id,timeoutMs })
+}
+
 export function suggestPath(s: string, from: string) {
     return invoke()<PathSuggest>("suggest_path", { s,from })
 }
@@ -22,7 +26,9 @@ export function userHomeDir() {
     return invoke()<string>("user_home_dir")
 }
 
-export type RunId = string
-export type CellCommand = { kind: CellCommandKind; source: string }
-export type CellCommandKind = { kind: "Shell"; working_directory: string } | { kind: "Lua" }
+export type RunnerOutputExt = { kind: "Stdout"; value: string } | { kind: "Stderr"; value: string }
+export type PollOutput = { end: boolean; success: boolean | null; data: RunnerOutputExt[] }
 export type PathSuggest = { valid: boolean; closest_path: string }
+export type CellCommand = { kind: CellCommandKind; source: string }
+export type RunId = string
+export type CellCommandKind = { kind: "Shell"; working_directory: string } | { kind: "Lua" }

@@ -1,4 +1,4 @@
-use super::{RunCtx, RunId, RunStatus, Runnable, Runner};
+use super::*;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -23,7 +23,6 @@ pub struct ShellConfig {
 pub struct ShellCommand {
     command: String,
     working_directory: PathBuf,
-    status: RunStatus,
 }
 
 impl ShellCommand {
@@ -42,20 +41,16 @@ impl ShellCommand {
         return Ok(Self {
             command,
             working_directory,
-            status: RunStatus::new(),
         });
     }
 
-    async fn wait_for_child(
-        status: RunStatus,
-        mut recv_kill: tokio::sync::mpsc::Receiver<()>,
-        mut child: Child,
-    ) {
+    async fn wait_for_child(ctx: Arc<RunCtx>, mut child: Child) {
+        let kill_ctx = ctx.clone();
         let exit_status = tokio::select! {
             status_res = child.wait() => {
                 Some(status_res.expect("waiting on child process encountered an error"))
             }
-            _ = recv_kill.recv() => {
+            _ = kill_ctx.wait_for_kill_signal() => {
                 match child.kill().await {
                     Ok(()) => {},
                     Err(e) => println!("error killing child: {:?}",e),
@@ -63,7 +58,7 @@ impl ShellCommand {
 
                 println!("actually sent kill signal");
 
-                status.failure();
+                ctx.set_status(RunStatus:: Error("Killed process".to_string()));
 
                 None
             }
@@ -72,9 +67,9 @@ impl ShellCommand {
         match exit_status {
             Some(exit) => {
                 if exit.success() {
-                    status.success()
+                    ctx.set_status(RunStatus::Success);
                 } else {
-                    status.failure()
+                    ctx.set_status(RunStatus::Error("process failed".to_string()));
                 }
             }
             None => return,
@@ -83,44 +78,33 @@ impl ShellCommand {
 }
 
 impl Runnable for ShellCommand {
-    fn start(self: Arc<ShellCommand>, mut ctx: RunCtx) {
-        let child_res = OsCommand::new("zsh")
-            .arg("-c")
-            .arg(&self.command)
-            .current_dir(&self.working_directory)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn();
+    fn start(self: Arc<ShellCommand>, ctx: Arc<RunCtx>) -> RunnableResult {
+        let stdout = RunPipe::new();
+        let stderr = RunPipe::new();
+        let run_result = stdout.runnable_result();
 
-        let mut child = match child_res {
-            Ok(c) => c,
-            Err(e) => {
-                println!("failed to create command: {}", &self.command);
-                self.status.failure();
-                return;
-            }
-        };
+        tokio::spawn(async move {
+            let child_res = OsCommand::new("zsh")
+                .arg("-c")
+                .arg(&self.command)
+                .current_dir(&self.working_directory)
+                .stdin(Stdio::piped())
+                .stdout(stdout.out_file().await.into_std().await)
+                .stderr(stderr.out_file().await.into_std().await)
+                .spawn();
 
-        if let Some(stdout) = child.stdout.take() {
-            ctx.pipe_to_stdout(self.clone(), stdout);
-        }
-        if let Some(stderr) = child.stderr.take() {
-            ctx.pipe_to_stderr(self.clone(), stderr);
-        }
+            let child = match child_res {
+                Ok(c) => c,
+                Err(e) => {
+                    println!("failed to create command: {}", &self.command);
+                    ctx.set_status(RunStatus::Error("Failed to create command".into()));
+                    return;
+                }
+            };
 
-        tokio::spawn(Self::wait_for_child(
-            self.status.clone(),
-            ctx.take_kill_receiver(),
-            child,
-        ));
-    }
+            tokio::spawn(Self::wait_for_child(ctx, child));
+        });
 
-    fn is_done(&self) -> bool {
-        return self.status.is_done();
-    }
-
-    fn is_successful(&self) -> Option<bool> {
-        return self.status.is_successful();
+        return run_result;
     }
 }

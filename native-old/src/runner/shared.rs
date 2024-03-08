@@ -9,6 +9,7 @@ use std::sync::{atomic::Ordering, Arc};
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio::process::{Child, Command as OsCommand};
+use tokio::sync::mpsc::Receiver;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -67,6 +68,35 @@ impl RunStatus {
     }
 }
 
+pub enum RunResult {
+    File(PathBuf),
+    Text(String),
+    Error(String),
+}
+
+impl RunResult {
+    // Only for reading files/text
+    //
+    // For any kind of bi-directionality, you'd need to use
+    // a different API
+    pub fn read_result(&self) -> Result<Receiver<Vec<u8>>, String> {
+        match self {
+            Self::Error(e) => return Err(e.clone()),
+            Self::Text(s) => {
+                let (tx, rx) = tokio::sync::mpsc::channel(2);
+                let clone = s.clone().into_bytes();
+
+                tokio::spawn(async move { tx.send(clone).await });
+
+                return Ok(rx);
+            }
+            Self::File(s) => {
+                panic!("Oops");
+            }
+        }
+    }
+}
+
 #[derive(Serialize, Clone, Type)]
 #[serde(tag = "kind", content = "value")]
 pub enum RunnerOutput {
@@ -75,7 +105,7 @@ pub enum RunnerOutput {
 }
 
 pub trait Runnable: core::fmt::Debug + Send + Sync + 'static {
-    fn start(self: Arc<Self>, ctx: RunCtx);
+    fn start(self: Arc<Self>, ctx: RunCtx) -> RunResult;
     fn is_done(&self) -> bool;
     fn is_successful(&self) -> Option<bool>;
 }

@@ -58,6 +58,7 @@ pub struct Runner {
 
     // This is silly, but I guess whatever. Make it better later :(
     output: Arc<Mutex<Vec<RunnerOutput>>>,
+    run_result: RunResult,
     kill: tokio::sync::mpsc::Sender<()>,
 }
 
@@ -84,7 +85,7 @@ impl Runner {
 
         let (kill, rx_kill) = tokio::sync::mpsc::channel(8);
         let (tx, rx) = tokio::sync::mpsc::channel(128);
-        runnable.clone().start(RunCtx {
+        let run_result = runnable.clone().start(RunCtx {
             output_sender: tx.clone(),
             kill_receiver: Some(rx_kill),
         });
@@ -92,6 +93,7 @@ impl Runner {
         let sel = Self {
             id,
             output,
+            run_result,
             runnable,
             kill,
         };

@@ -8,28 +8,30 @@
 
 pub mod commands;
 pub mod graph;
+pub mod runner;
 pub mod util;
 
-use graph::{run, RunCtx};
 use lazy_static::lazy_static;
+use runner::{PollOutput, RunId};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::Manager;
 use tokio::sync::Mutex;
 
-use crate::graph::{RunId, Runnable};
+use crate::runner::{Runnable, Runner};
 
 lazy_static! {
 // TODO: will this be a bottleneck?
-static ref RUNNING_COMMANDS: Mutex<HashMap<RunId, graph::RunnerResult>> =
+static ref RUNNING_COMMANDS: Mutex<HashMap<RunId, Arc<Mutex<Runner>>>> =
     Mutex::new(HashMap::new());
 }
 
-async fn run_runner(runnable: Arc<dyn Runnable>) -> RunId {
-    let command = graph::run(runnable);
+async fn run_runner(runnable: Arc<dyn Runnable + 'static>) -> RunId {
+    let command = Runner::new_boxed(runnable);
     let uuid = command.id();
     let mut commands = RUNNING_COMMANDS.lock().await;
-    if let Some(prev) = commands.insert(uuid, command) {
+    if let Some(prev) = commands.insert(uuid, Arc::new(Mutex::new(command))) {
+        let prev = prev.lock().await;
         prev.kill();
     }
 
@@ -84,8 +86,26 @@ async fn suggest_path(s: String, from: String) -> PathSuggest {
         valid: jumps == 0,
         closest_path,
     };
-    println!("ran suggest_path {:#?}", &result);
+    println!("running suggest_path {:#?}", &result);
     return result;
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn poll_command(id: RunId, timeout_ms: u32) -> Option<PollOutput> {
+    println!("running poll_command");
+
+    let command = {
+        let commands = RUNNING_COMMANDS.lock().await;
+        commands.get(&id)?.clone()
+    };
+
+    let command = command.lock().await;
+    return Some(
+        command
+            .poll(std::time::Duration::from_millis(timeout_ms as u64))
+            .await,
+    );
 }
 
 #[tauri::command]
@@ -119,6 +139,7 @@ fn main() {
         .invoke_handler(generate_handler![
             //
             run_command,
+            poll_command,
             // Utils
             suggest_path,
             user_home_dir
