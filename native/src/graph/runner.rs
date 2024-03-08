@@ -3,7 +3,7 @@ use specta::Type;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, OnceLock};
 use strum::Display;
 use tokio::io::{AsyncRead, AsyncWrite, BufReader};
@@ -46,23 +46,28 @@ pub struct RunCtx {
     pub id: RunId,
     status: OnceLock<RunStatus>,
     logs: OnceLock<RunnableResult>,
-    kill_recv: tokio::sync::watch::Receiver<bool>,
+
+    // Watch does work for this :((
+    kill_channel: tokio::sync::broadcast::Sender<bool>,
+    kill_sent: AtomicBool,
 }
 
 impl RunCtx {
-    fn new() -> (Self, tokio::sync::watch::Sender<bool>) {
-        let (kill_send, kill_recv) = tokio::sync::watch::channel(false);
+    fn new() -> (Arc<Self>, tokio::sync::broadcast::Sender<bool>) {
+        let (kill_channel, _) = tokio::sync::broadcast::channel(1);
 
         let id = RunId(Uuid::new_v4());
+        let kill_send = kill_channel.clone();
 
         let sel = Self {
             id,
             status: OnceLock::new(),
             logs: OnceLock::new(),
-            kill_recv,
+            kill_channel,
+            kill_sent: AtomicBool::new(false),
         };
 
-        return (sel, kill_send);
+        return (Arc::new(sel), kill_send);
     }
 
     pub fn set_status(&self, status: RunStatus) {
@@ -90,10 +95,8 @@ impl RunCtx {
 
     /// Wait for the kill signal
     pub async fn wait_for_kill_signal(&self) {
-        let mut kill_signal = self.kill_recv.clone();
-        if *kill_signal.borrow_and_update() {
-            return;
-        }
+        let kill_signal = self.kill_channel.subscribe();
+        kill_signal.try_recv()
 
         if let Err(_) = kill_signal.changed().await {
             // If there's an error, then the senders have all
@@ -171,16 +174,20 @@ impl RunnableResult {
 
 pub struct RunnerResult {
     ctx: Arc<RunCtx>,
-    kill_send: tokio::sync::watch::Sender<bool>,
+    kill_send: tokio::sync::broadcast::Sender<bool>,
+    pub result: RunnableResult,
 }
 
 pub fn run(runnable: Arc<dyn Runnable>) -> RunnerResult {
     let (ctx, kill_send) = RunCtx::new();
-    let ctx = Arc::new(ctx);
 
-    runnable.start(ctx.clone());
+    let result = runnable.start(ctx.clone());
 
-    return RunnerResult { ctx, kill_send };
+    return RunnerResult {
+        ctx,
+        kill_send,
+        result,
+    };
 }
 
 impl RunnerResult {
