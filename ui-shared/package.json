@@ -2,9 +2,12 @@
   "name": "@a1liu/webb-ui-shared",
   "version": "0.1.0",
   "private": true,
-  "scripts": {},
+  "scripts": {
+    "format": "prettier --write ."
+  },
   "exports": {
     ".": "./src/peer.ts",
+    "./util": "./src/util.ts",
     "./peer": "./src/peer.ts"
   },
   "dependencies": {

@@ -1,33 +1,27 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { DataConnection, Peer } from "peerjs";
-import { create } from "zustand";
-import { getId } from "@a1liu/webb-ui-shared";
+import { getId } from "@a1liu/webb-ui-shared/util";
+import type { NetworkLayer, PeerConnection } from "@a1liu/webb-ui-shared/peer";
 
 export const dynamic = "force-static";
 
 declare global {
   interface Window {
-    peer?: Peer;
+    peer?: NetworkLayer;
   }
 }
 
-const usePeerContext = create<{ peer: Peer }>((_get, _set) => {
-  let peer: Peer | null = null;
-  return {
-    get peer(): Peer {
-      if (peer === null) {
-        const peerNew = new Peer(getId());
-        peer = peerNew;
-        window.peer = peerNew;
-        return peerNew;
-      }
-
-      return peer;
-    },
-  };
-});
+let NetworkLayerGlobal: Promise<NetworkLayer> | null = null;
+async function getNetworkLayerGlobal(): Promise<NetworkLayer> {
+  if (NetworkLayerGlobal === null) {
+    const pkg = import("@a1liu/webb-ui-shared/peer");
+    const globalNL = pkg.then((pkg) => new pkg.NetworkLayer(getId()));
+    NetworkLayerGlobal = globalNL;
+    return globalNL;
+  }
+  return NetworkLayerGlobal;
+}
 
 interface PeerContext {
   send: (s: string) => void;
@@ -37,40 +31,30 @@ function usePeer(
   target: string,
   opts: { onData: (data: unknown) => void },
 ): PeerContext {
-  const connectionRef = useRef<DataConnection>();
+  const connectionRef = useRef<PeerConnection>();
   const dataListenerRef = useRef<(data: unknown) => void>(opts.onData);
-  const ctx = usePeerContext();
 
   dataListenerRef.current = opts.onData;
 
   useEffect(() => {
-    ctx.peer;
-    return () => connectionRef.current?.close();
-  }, [ctx, target]);
+    let connPrivate: PeerConnection | null = null;
+    async function connect() {
+      const layer = await getNetworkLayerGlobal();
+      const conn = await layer.connect(target);
+      connPrivate = conn;
+      connectionRef.current = conn;
+    }
+
+    connect();
+
+    return () => connPrivate?.close();
+  }, [target]);
 
   return {
     send: (s) => {
-      const conn = (() => {
-        if (connectionRef.current === undefined) {
-          const conn = ctx.peer.connect(target);
-          connectionRef.current = conn;
-
-          conn.on("open", () => {
-            console.log("open");
-
-            conn.on("data", (data) => {
-              console.log("data", data);
-              dataListenerRef.current(data);
-            });
-          });
-
-          return conn;
-        }
-
-        return connectionRef.current;
-      })();
-
-      conn.send(s);
+      if (connectionRef.current === undefined) {
+        return;
+      }
     },
   };
 }
