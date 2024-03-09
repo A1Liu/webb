@@ -95,14 +95,14 @@ impl RunCtx {
 
     /// Wait for the kill signal
     pub async fn wait_for_kill_signal(&self) {
-        let kill_signal = self.kill_channel.subscribe();
-        kill_signal.try_recv()
+        // let kill_signal = self.kill_channel.subscribe();
+        // kill_signal.try_recv()
 
-        if let Err(_) = kill_signal.changed().await {
-            // If there's an error, then the senders have all
-            // been dropped, so then we just wait forever
-            std::future::pending::<()>().await;
-        }
+        // if let Err(_) = kill_signal.changed().await {
+        //     // If there's an error, then the senders have all
+        //     // been dropped, so then we just wait forever
+        //     std::future::pending::<()>().await;
+        // }
     }
 }
 
