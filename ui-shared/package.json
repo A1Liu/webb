@@ -1,0 +1,18 @@
+{
+  "name": "@a1liu/webb-ui-shared",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {},
+  "type": "module",
+  "exports": {
+    ".": "./src/peer.js",
+    "./peer": "./src/peer.js"
+  },
+  "dependencies": {
+    "peerjs": "^1.5.2",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}

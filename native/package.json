@@ -1,5 +1,5 @@
 {
-  "name": "@a1liu/webb-webapp",
+  "name": "@a1liu/webb-native",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,34 +12,36 @@
   },
   "dependencies": {
     "@floating-ui/react": "^0.26.2",
+    "@tauri-apps/api": "^1.4.0",
+    "@types/uuid": "^9.0.2",
+    "@a1liu/webb-ui-shared": "workspace:*",
     "ahooks": "^3.7.8",
     "launchdarkly-js-client-sdk": "^3.1.4",
+    "monaco-editor": "^0.44.0",
     "next": "14.0.3",
+    "normalize.css": "^8.0.1",
+    "peerjs": "^1.5.2",
     "ramda": "^0.29.1",
     "react": "^18",
     "react-dom": "^18",
     "react-hook-form": "^7.48.2",
-    "zod": "^3.22.4",
-    "zustand": "^4.4.6",
-    "@tauri-apps/api": "^1.4.0",
-    "@types/uuid": "^9.0.2",
-    "monaco-editor": "^0.44.0",
-    "normalize.css": "^8.0.1",
     "uuid": "^9.0.0",
     "xterm": "^5.2.1",
-    "xterm-addon-fit": "^0.7.0"
+    "xterm-addon-fit": "^0.7.0",
+    "zod": "^3.22.4",
+    "zustand": "^4.4.6"
   },
   "devDependencies": {
-    "@types/node": "^20",
     "@tauri-apps/cli": "^1.4.0",
+    "@types/node": "^20",
     "@types/ramda": "^0.29.9",
-    "prettier": "^3.0.3",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
     "eslint-config-next": "14.0.3",
     "postcss": "^8",
+    "prettier": "^3.0.3",
     "tailwindcss": "^3.3.0",
     "typescript": "^5"
   }
