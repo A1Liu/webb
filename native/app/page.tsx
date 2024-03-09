@@ -46,6 +46,7 @@ function usePeer(
   return {
     send: (s) => {
       if (connectionRef.current === undefined) {
+        console.log('');
         return;
       }
 

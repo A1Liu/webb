@@ -1,29 +1,60 @@
-import { v4 as uuid, stringify } from "uuid";
+import {
+  v4 as uuid,
+  stringify as stringifyUuid,
+  parse as parseUuid,
+} from "uuid";
 import { Peer } from "peerjs";
 import type { DataConnection } from "peerjs";
+import { memoize } from "./util";
 
 export class NetworkLayer {
-  private _peerPromise: Promise<Peer> | null = null;
+  private readonly _peerGetter = memoize<Promise<Peer>>(async () => {
+    const peerjs = await import("peerjs");
+    const peer = new peerjs.Peer(this.id, { debug: 2 });
+
+    return new Promise<Peer>((res) => {
+      peer.on("open", () => {
+        console.log("peer opened");
+
+        res(peer);
+
+        peer.on("connection", (conn) => {
+          conn.on("open", () => {
+            console.log("conn");
+            const peerConn = new PeerConnection(conn);
+            const listener = this.connectionListeners.shift();
+
+            if (listener) {
+              listener(peerConn);
+            } else {
+              this.unhandledConnections.push(peerConn);
+            }
+          });
+        });
+      });
+    });
+  });
+
+  private readonly connectionListeners: ((res: PeerConnection) => unknown)[] =
+    [];
+  private readonly unhandledConnections: PeerConnection[] = [];
 
   constructor(readonly id: string) {}
 
   private get peer(): Promise<Peer> {
-    if (this._peerPromise === null) {
-      const peerjs = import("peerjs");
-      const promise = peerjs.then((pjs) => {
-        const peer = new pjs.Peer(this.id, { debug: 2 });
+    return this._peerGetter();
+  }
 
-        return new Promise<Peer>((res) => {
-          peer.on("open", () => {
-            res(peer);
-          });
-        });
-      });
-      this._peerPromise = promise;
-      return promise;
+  async listen(): Promise<PeerConnection> {
+    this.peer;
+    const unhandled = this.unhandledConnections.shift();
+    if (unhandled) {
+      return unhandled;
     }
 
-    return this._peerPromise;
+    return new Promise<PeerConnection>((res) => {
+      this.connectionListeners.push(res);
+    });
   }
 
   async connect(peerId: string): Promise<PeerConnection> {
@@ -32,7 +63,7 @@ export class NetworkLayer {
     console.log("try connect");
 
     const conn = peer.connect(peerId, {
-      // serialization: "raw",
+      serialization: "raw",
     });
 
     return new Promise((res) => {
@@ -75,7 +106,7 @@ export class PeerConnection {
       this._handleChunk(evt);
     });
     this.connection.on("error", (evt) => {
-      console.log("error", evt);
+      console.log("error", JSON.stringify(evt));
     });
   }
 
@@ -138,7 +169,8 @@ enum ChunkType {
 // 4 byte chunk length
 // 16 byte channel uuid
 export class ChunkHeader {
-  readonly rawBytes: Uint8Array;
+  private readonly rawBytes: Uint8Array;
+
   constructor(_header: string | Uint8Array | ArrayBuffer) {
     this.rawBytes = ChunkHeader.narrowHeader(_header);
   }
@@ -158,7 +190,7 @@ export class ChunkHeader {
   }
 
   get uuid(): string {
-    return stringify(this.rawBytes.slice(16, 32));
+    return stringifyUuid(this.rawBytes.slice(16, 32));
   }
 
   get flags(): ChunkType {
@@ -185,8 +217,62 @@ export class ChunkHeader {
     return sum;
   }
 
+  get chunkIndex(): number {
+    let sum = 0;
+    for (const rawByte of this.rawBytes.slice(8, 12)) {
+      sum += rawByte;
+      sum *= 256;
+    }
+
+    return sum;
+  }
+
   stringKey() {
     return stringEncodeHeader(this.rawBytes);
+  }
+
+  static writeHeaderToChunk(header: ChunkHeader, chunk: Uint8Array) {
+    let checksum = header.checksum;
+    for (let i = 0; i < 4; i++) {
+      chunk[i] = checksum & 0xff;
+      checksum >>= 8;
+    }
+
+    switch (header.flags) {
+      case ChunkType.Contents:
+        chunk[4] = 0;
+        break;
+      case ChunkType.ContentsEnd:
+        chunk[4] = 1;
+        break;
+      case ChunkType.Ack:
+        chunk[4] = 2;
+        break;
+
+      case ChunkType.Unknown:
+      default:
+        chunk[4] = 0xff;
+        break;
+    }
+    chunk[5] = 0;
+    chunk[6] = 0;
+    chunk[7] = 0;
+
+    let chunkIndex = header.chunkIndex;
+    for (let i = 8; i < 12; i++) {
+      chunk[i] = chunkIndex & 0xff;
+      chunkIndex >>= 8;
+    }
+
+    chunk[12] = 0;
+    chunk[13] = 0;
+    chunk[14] = 0;
+    chunk[15] = 0;
+
+    const parsedHeader = parseUuid(header.uuid);
+    for (let i = 0; i < 16; i++) {
+      chunk[i + 16] = parsedHeader[i];
+    }
   }
 
   toString() {
