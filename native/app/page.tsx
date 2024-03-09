@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { getId } from "@a1liu/webb-ui-shared/util";
-import type { NetworkLayer, PeerConnection } from "@a1liu/webb-ui-shared/peer";
+import { getId, memoize } from "@a1liu/webb-ui-shared/util";
+import { NetworkLayer, PeerConnection } from "@a1liu/webb-ui-shared/peer";
 
 export const dynamic = "force-static";
 
@@ -12,16 +12,9 @@ declare global {
   }
 }
 
-let NetworkLayerGlobal: Promise<NetworkLayer> | null = null;
-async function getNetworkLayerGlobal(): Promise<NetworkLayer> {
-  if (NetworkLayerGlobal === null) {
-    const pkg = import("@a1liu/webb-ui-shared/peer");
-    const globalNL = pkg.then((pkg) => new pkg.NetworkLayer(getId()));
-    NetworkLayerGlobal = globalNL;
-    return globalNL;
-  }
-  return NetworkLayerGlobal;
-}
+const getNetworkLayerGlobal = memoize(() => {
+  return new NetworkLayer(getId());
+});
 
 interface PeerContext {
   send: (s: string) => void;
@@ -39,7 +32,7 @@ function usePeer(
   useEffect(() => {
     let connPrivate: PeerConnection | null = null;
     async function connect() {
-      const layer = await getNetworkLayerGlobal();
+      const layer = getNetworkLayerGlobal();
       const conn = await layer.connect(target);
       connPrivate = conn;
       connectionRef.current = conn;
@@ -55,6 +48,8 @@ function usePeer(
       if (connectionRef.current === undefined) {
         return;
       }
+
+      connectionRef.current._sendRawChunk(new TextEncoder().encode(s));
     },
   };
 }

@@ -1,7 +1,9 @@
 # Webb App
+
 The web-app for Webb.
 
 ### Tech Choices
+
 - Zustand
 - Zod
 - Floating ui

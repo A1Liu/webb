@@ -4,6 +4,22 @@ export function timeout(ms: number): Promise<void> {
   return new Promise((res) => setTimeout(res, ms));
 }
 
+export function memoize<T>(_maker: () => T): () => T {
+  let maker: (() => T) | undefined = _maker;
+  let slot: T;
+
+  return () => {
+    if (maker) {
+      const result = maker();
+      maker = undefined;
+      slot = result;
+      return result;
+    }
+
+    return slot;
+  };
+}
+
 export function getId(): string {
   const id = window.localStorage.getItem("peerjs-id");
   if (id === null) {

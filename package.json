@@ -9,5 +9,7 @@
     "ts-check": "pnpm run -r ts-check"
   },
   "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {
+    "prettier": "^3.0.3"
+  }
 }
