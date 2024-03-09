@@ -3,16 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {},
-  "type": "module",
   "exports": {
-    ".": "./src/peer.js",
-    "./peer": "./src/peer.js"
+    ".": "./src/peer.ts",
+    "./peer": "./src/peer.ts"
   },
   "dependencies": {
     "peerjs": "^1.5.2",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@types/uuid": "^9.0.2",
     "typescript": "^5"
   }
 }

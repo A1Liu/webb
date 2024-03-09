@@ -1,10 +1,6 @@
 import { v4 as uuid } from "uuid";
 
-/**
- *
- * @return {string} The ID to use
- */
-export function getId() {
+export function getId(): string {
   const id = window.localStorage.getItem("peerjs-id");
   if (id === null) {
     const newId = uuid();
