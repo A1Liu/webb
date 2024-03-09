@@ -10,6 +10,7 @@
   },
   "dependencies": {},
   "devDependencies": {
+    "typescript": "^5",
     "prettier": "^3.0.3"
   }
 }
