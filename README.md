@@ -2,8 +2,9 @@
 Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WPBVU) and Plan 9.
 
 ## Resources
-- https://visidata.org
-- https://www.libreoffice.org/discover/calc
+- Visidata - https://visidata.org
+- LibreOffice plugins - https://www.libreoffice.org/discover/calc
+- WebRTC considerations - https://bloggeek.me/webrtc-rtcpeerconnection-one-per-stream/
 
 ### IO
 - Virtual Camera with CoreMediaIO - https://developer.apple.com/documentation/coremediaio
@@ -14,6 +15,7 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
 - Biometric auth - https://stackoverflow.blog/2022/11/16/biometric-authentication-for-web-devs/
 - Authenticator rs - https://github.com/mozilla/authenticator-rs/
 - https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/Platform_vs_Cross-Platform.html
+- MacOS/iOS LocalAuthentication - https://lib.rs/crates/localauthentication-rs
 
 - Model is:
   - UserProfile - Person
