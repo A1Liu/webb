@@ -5,7 +5,13 @@ import {
 } from "uuid";
 import { Peer } from "peerjs";
 import type { DataConnection } from "peerjs";
-import { assertUnreachable, memoize } from "./util";
+import {
+  assertUnreachable,
+  future,
+  memoize,
+  UnwrappedPromise,
+  unwrapPromise,
+} from "./util";
 
 // Implements QUIC-style multiplexing over Peerjs/WebRTC
 
@@ -42,15 +48,16 @@ class Channel<T> {
 export class NetworkLayer {
   readonly inboundConnectionChannel = new Channel<PeerConnection>();
 
-  private readonly _peerGetter = memoize<Promise<Peer>>(async () => {
-    const peerjs = await import("peerjs");
-    const peer = new peerjs.Peer(this.id, { debug: 2 });
+  private readonly _peerGetter = memoize<UnwrappedPromise<Peer>>(
+    unwrapPromise<Peer>(async () => {
+      const peerjs = await import("peerjs");
+      const peer = new peerjs.Peer(this.id, { debug: 2 });
+      const fut = future<Peer>();
 
-    return new Promise<Peer>((res) => {
       peer.on("open", () => {
         console.log("peer opened");
 
-        res(peer);
+        fut.resolve(peer);
 
         peer.on("connection", (conn) => {
           conn.on("open", () => {
@@ -60,22 +67,24 @@ export class NetworkLayer {
           });
         });
       });
-    });
-  });
+
+      return fut.promise;
+    }),
+  );
 
   constructor(readonly id: string) {}
 
-  private get peer(): Promise<Peer> {
-    return this._peerGetter();
+  get peer(): Peer | undefined {
+    return this._peerGetter().value;
   }
 
   async listen(): Promise<PeerConnection> {
-    this.peer;
+    this._peerGetter();
     return this.inboundConnectionChannel.pop();
   }
 
   async connect(peerId: string): Promise<PeerConnection> {
-    const peer = await this.peer;
+    const peer = await this._peerGetter().promise;
 
     console.log("try connect");
 

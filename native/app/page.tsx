@@ -51,6 +51,8 @@ function usePeer(
   };
 }
 
+const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
+
 export default function Home() {
   const [text, setText] = React.useState("asdf");
 
@@ -79,20 +81,35 @@ export default function Home() {
         value={text}
         onChange={(evt) => setText(evt.target.value)}
       />
-      <button
-        onClick={() => {
-          connect();
-        }}
-      >
-        Connect
-      </button>
-      <button
-        onClick={() => {
-          send(text);
-        }}
-      >
-        Submit
-      </button>
+      <div className="flex gap-2">
+        <button
+          className={buttonClass}
+          onClick={async () => {
+            const peer = getNetworkLayerGlobal().peer;
+            if (!peer?.disconnected) return;
+            peer.reconnect();
+          }}
+        >
+          Reconnect
+        </button>
+
+        <button
+          className={buttonClass}
+          onClick={() => {
+            connect();
+          }}
+        >
+          Connect
+        </button>
+        <button
+          className={buttonClass}
+          onClick={() => {
+            send(text);
+          }}
+        >
+          Submit
+        </button>
+      </div>
     </main>
   );
 }

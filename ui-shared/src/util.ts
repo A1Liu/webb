@@ -24,6 +24,49 @@ export function memoize<T>(_maker: () => T): () => T {
   };
 }
 
+export function future<T>(): {
+  promise: Promise<T>;
+  resolve: (t: T) => unknown;
+  reject: (err: Error) => unknown;
+} {
+  let resolve: (t: T) => unknown = () => {};
+  let reject: (err: Error) => unknown = () => {};
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return {
+    promise,
+    resolve,
+    reject,
+  };
+}
+
+export interface UnwrappedPromise<T> {
+  value?: T;
+  promise: Promise<T>;
+}
+
+export function unwrapPromise<T>(
+  promiseMaker: () => Promise<T>,
+): () => UnwrappedPromise<T> {
+  return (): UnwrappedPromise<T> => {
+    const promise = promiseMaker();
+    let slot: T | undefined = undefined;
+    promise?.then((value) => {
+      slot = value;
+    });
+
+    return {
+      get value(): T | undefined {
+        return slot;
+      },
+      promise: promise!,
+    };
+  };
+}
+
 export function getId(): string {
   const id = window.localStorage.getItem("peerjs-id");
   if (id === null) {
