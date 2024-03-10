@@ -24,47 +24,45 @@ export function memoize<T>(_maker: () => T): () => T {
   };
 }
 
-export function future<T>(): {
-  promise: Promise<T>;
-  resolve: (t: T) => unknown;
-  reject: (err: Error) => unknown;
-} {
-  let resolve: (t: T) => unknown = () => {};
-  let reject: (err: Error) => unknown = () => {};
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-
-  return {
-    promise,
-    resolve,
-    reject,
-  };
-}
-
 export interface UnwrappedPromise<T> {
   value?: T;
   promise: Promise<T>;
 }
 
-export function unwrapPromise<T>(
-  promiseMaker: () => Promise<T>,
-): () => UnwrappedPromise<T> {
-  return (): UnwrappedPromise<T> => {
-    const promise = promiseMaker();
-    let slot: T | undefined = undefined;
-    promise?.then((value) => {
-      slot = value;
+export class Future<T> {
+  readonly promise: Promise<T>;
+  readonly resolve: (t: T) => unknown;
+  readonly reject: (err: Error) => unknown;
+  private _valueSlot: T | undefined;
+
+  constructor() {
+    let resolve: (t: T) => unknown = () => {};
+    let reject: (err: Error) => unknown = () => {};
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
     });
 
+    promise.then((value) => (this._valueSlot = value));
+
+    this.promise = promise;
+    this.resolve = resolve;
+    this.reject = reject;
+  }
+
+  get value(): T | undefined {
+    return this._valueSlot;
+  }
+
+  get unwrapped() {
+    const fut = this;
     return {
+      promise: fut.promise,
       get value(): T | undefined {
-        return slot;
+        return fut._valueSlot;
       },
-      promise: promise!,
     };
-  };
+  }
 }
 
 export function getId(): string {
