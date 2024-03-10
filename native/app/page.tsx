@@ -17,6 +17,7 @@ const getNetworkLayerGlobal = memoize(() => {
 });
 
 interface PeerContext {
+  connect: () => Promise<void>;
   send: (s: string) => void;
 }
 
@@ -29,37 +30,32 @@ function usePeer(
 
   dataListenerRef.current = opts.onData;
 
-  useEffect(() => {
-    let connPrivate: PeerConnection | null = null;
-    async function connect() {
+  return {
+    connect: async () => {
       const layer = getNetworkLayerGlobal();
       const conn = await layer.connect(target);
-      connPrivate = conn;
+
+      if (connectionRef.current !== undefined) {
+        connectionRef.current.close();
+      }
+
       connectionRef.current = conn;
-    }
-
-    connect();
-
-    return () => connPrivate?.close();
-  }, [target]);
-
-  return {
+    },
     send: (s) => {
       if (connectionRef.current === undefined) {
-        console.log('');
         return;
       }
 
-      connectionRef.current._sendRawChunk(new TextEncoder().encode(s));
+      connectionRef.current._sendRawPacket(new TextEncoder().encode(s));
     },
   };
 }
 
 export default function Home() {
-  const [text, setText] = React.useState("");
+  const [text, setText] = React.useState("asdf");
 
   const [resp, setResp] = React.useState("");
-  const { send } = usePeer("aliu-web-id", {
+  const { send, connect } = usePeer("aliu-web-id", {
     onData: (data) => {
       setResp((prev) => prev + String(data));
     },
@@ -83,6 +79,13 @@ export default function Home() {
         value={text}
         onChange={(evt) => setText(evt.target.value)}
       />
+      <button
+        onClick={() => {
+          connect();
+        }}
+      >
+        Connect
+      </button>
       <button
         onClick={() => {
           send(text);

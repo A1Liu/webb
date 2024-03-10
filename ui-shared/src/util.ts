@@ -1,5 +1,9 @@
 import { v4 as uuid } from "uuid";
 
+export function assertUnreachable(_: never): void {
+  console.error("unreachable code executed");
+}
+
 export function timeout(ms: number): Promise<void> {
   return new Promise((res) => setTimeout(res, ms));
 }
