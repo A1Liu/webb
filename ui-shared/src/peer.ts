@@ -1,43 +1,14 @@
-import {
-  stringify as stringifyUuid,
-  parse as parseUuid,
-  NIL as uuidNIL,
-} from "uuid";
+import { NIL as uuidNIL } from "uuid";
 import { Peer } from "peerjs";
 import type { DataConnection } from "peerjs";
-import { assertUnreachable, Future, memoize } from "./util";
+import { assertUnreachable, Channel, Future, memoize } from "./util";
+import {
+  Packet,
+  ChunkType,
+  decodeAndWriteStringHeader,
+} from "./network/packet";
 
 // Implements QUIC-style multiplexing over Peerjs/WebRTC
-
-class Channel<T> {
-  private readonly listeners: ((t: T) => unknown)[] = [];
-  private readonly queue: T[] = [];
-
-  constructor() {}
-
-  push(t: T) {
-    const listener = this.listeners.shift();
-    if (listener) {
-      listener(t);
-      return;
-    }
-
-    this.queue.push(t);
-  }
-
-  async pop(): Promise<T> {
-    if (this.queue.length > 0) {
-      // Need to do it this way because the `T` type could allow `undefined`
-      // as a value type. shifting first and checking the output would potentially
-      // cause those values to disappear.
-      return this.queue.shift()!;
-    }
-
-    return new Promise((res) => {
-      this.listeners.push(res);
-    });
-  }
-}
 
 export class NetworkLayer {
   readonly inboundConnectionChannel = new Channel<PeerConnection>();
@@ -101,11 +72,11 @@ const MIN_INFLIGHT_CHUNK_ALLOWANCES = 8;
 export class PeerConnection {
   // Un-acked chunks, that we're holding on to in case we need to re-send them
   // Keys are the whole header (not just the channel ID)
-  readonly unackedOutboundChunks = new Map<string, ArrayBuffer>();
+  readonly unackedOutboundChunks = new Map<string, Packet>();
 
   // Un-acked chunks which have significance to the protocol itself (e.g. Ack chunks)
   // Keys are the whole header (not just the channel ID)
-  readonly unackedProtocolOutboundChunks = new Map<string, ArrayBuffer>();
+  readonly unackedProtocolOutboundChunks = new Map<string, Packet>();
 
   // Acks which we still need to send out
   readonly ackQueue: string[] = [];
@@ -140,14 +111,13 @@ export class PeerConnection {
   }
 
   _handleInboundChunk(chunk: ArrayBuffer) {
-    const header = new ChunkHeader(chunk);
-    const packet = new Uint8Array(chunk, 32);
+    const packet = new Packet(chunk);
 
-    const kind = header.chunkType;
+    const kind = packet.chunkType;
     switch (kind) {
       case ChunkType.Ack: {
         console.log("recv ack");
-        this._handleInboundAck(header, packet);
+        this._handleInboundAck(packet);
         break;
       }
 
@@ -156,9 +126,9 @@ export class PeerConnection {
       case ChunkType.Unknown: {
         console.log("recv contents");
 
-        const key = header.stringKey();
+        const key = packet.stringKey;
         this._pushAck(key);
-        console.log({ header, packet });
+        console.log({ packet });
         break;
       }
 
@@ -167,37 +137,28 @@ export class PeerConnection {
     }
   }
 
-  _handleInboundAck(header: ChunkHeader, packet: Uint8Array) {
-    if (packet.length % 32 !== 0) {
-      console.log(
-        `packet length wasn't divisble by header size 32: size=${packet.length}`,
-      );
-      return;
-    }
-
-    let offset = 0;
+  _handleInboundAck(packet: Packet) {
     let isAckAck = true;
-    while (offset < packet.length) {
-      const headerBytes = packet.subarray(offset, offset + 32);
-      const header = new ChunkHeader(headerBytes);
-
-      const key = header.stringKey();
+    for (const [, ackPacket] of packet.dataAsPacketHeaders()) {
+      const key = ackPacket.stringKey;
       if (this.unackedOutboundChunks.delete(key)) {
         isAckAck = false;
-      } else if (this.unackedProtocolOutboundChunks.delete(key)) {
-      } else {
-        console.log(
-          "received ack for packet header that we don't recognize",
-          key,
-        );
+        continue;
       }
 
-      offset += 32;
+      if (this.unackedProtocolOutboundChunks.delete(key)) {
+        continue;
+      }
+
+      console.log(
+        "received ack for packet header that we don't recognize",
+        key,
+      );
     }
 
     console.log("  ack processed:", { isAckAck });
     if (!isAckAck) {
-      const key = header.stringKey();
+      const key = packet.stringKey;
       this._pushAck(key);
     }
   }
@@ -214,221 +175,53 @@ export class PeerConnection {
     const acks = this.ackQueue.splice(0);
     console.log("send acks", acks);
 
-    const arrayLength = acks.length * 32 + 32;
-    const chunk = new Uint8Array(arrayLength);
-
-    ChunkHeader.writeHeaderToChunk(
-      {
-        uuid: uuidNIL,
-        chunkType: ChunkType.Ack,
-
-        // TODO: these fields
-        checksum: 0,
-        chunkIndex: 0,
-      },
-      chunk,
-    );
+    const packet = new Packet(acks.length * 32);
 
     let isAckAck = true;
-    for (let index = 0; index < acks.length; index++) {
+    for (const [index, ackPacket] of packet.dataAsPacketHeaders()) {
       const ack = acks[index];
-      const offset = index * 32 + 32;
+      decodeAndWriteStringHeader(ack, ackPacket.header);
 
-      const slice = chunk.subarray(offset, offset + 32);
-      decodeAndWriteStringHeader(ack, slice);
-      if (new ChunkHeader(slice).chunkType !== ChunkType.Ack) isAckAck = false;
+      if (ackPacket.chunkType !== ChunkType.Ack) isAckAck = false;
     }
 
-    const key = stringEncodeHeader(chunk.subarray(0, 32));
+    packet.writeHeaderFields({
+      uuid: uuidNIL,
+      chunkType: ChunkType.Ack,
+
+      // TODO: these fields
+      chunkIndex: 0,
+    });
+
+    const key = packet.stringKey;
     console.log("sending acks", { isAckAck, key });
 
     if (!isAckAck) {
-      this.unackedProtocolOutboundChunks.set(key, chunk);
+      this.unackedProtocolOutboundChunks.set(key, packet);
     }
 
-    this.connection.send(chunk);
+    this.connection.send(packet.rawBytes);
   }
 
-  _sendRawPacket(chunk: ArrayBuffer) {
-    const packet = new Uint8Array(chunk.byteLength + 32);
-    ChunkHeader.writeHeaderToChunk(
-      {
-        uuid: uuidNIL,
-        chunkType: ChunkType.Contents,
+  sendPacket(uuid: string, packetData: ArrayBuffer) {
+    const packet = new Packet(packetData.byteLength);
+    packet.data.set(new Uint8Array(packetData));
 
-        // TODO
-        checksum: 0,
-        chunkIndex: 0,
-      },
-      packet,
-    );
-    packet.set(new Uint8Array(chunk), 32);
+    packet.writeHeaderFields({
+      uuid,
+      chunkType: ChunkType.Contents,
 
-    this.unackedOutboundChunks.set(
-      stringEncodeHeader(packet.subarray(0, 32)),
-      packet,
-    );
+      // TODO
+      chunkIndex: 0,
+    });
 
-    this.connection.send(packet);
+    this.unackedOutboundChunks.set(packet.stringKey, packet);
+
+    this.connection.send(packet.rawBytes);
   }
 
   close() {
     this._isClosed = true;
     this.connection.close();
-  }
-}
-
-enum ChunkType {
-  Unknown = "Unknown",
-
-  Contents = "Contents",
-  ContentsEnd = "ContentsEnd",
-  Ack = "Ack",
-
-  // TODO: handle drops
-  // DroppedAck,
-}
-
-// 32 byte headers:
-// 4 byte checksum of entire remainder of the chunk, excluding the checksum itself
-// 4 byte flags encodes:
-// - First byte: Type of packet
-//    - 0x00 - Intentionally unused
-//    - 0x01 - Content chunk
-//    - 0x02 - Content chunk end
-//    - 0x03 - Ack chunk
-//    - 0x04 - Dropped Ack chunk (there's no listener on the other side)
-// - Remaining flag bytes: undefined
-// 4 byte chunk index for this side of the channel
-// 4 byte chunk length
-// 16 byte channel uuid
-export class ChunkHeader {
-  private readonly rawBytes: Uint8Array;
-
-  constructor(_header: string | Uint8Array | ArrayBuffer) {
-    this.rawBytes = ChunkHeader.narrowHeader(_header);
-  }
-
-  static narrowHeader(header: string | Uint8Array | ArrayBuffer): Uint8Array {
-    if (typeof header === "string") {
-      const array = new Uint8Array(32);
-      decodeAndWriteStringHeader(header, array);
-      return array;
-    }
-
-    if (header instanceof ArrayBuffer) {
-      return new Uint8Array(header, 0, 32);
-    }
-
-    return header;
-  }
-
-  get uuid(): string {
-    return stringifyUuid(this.rawBytes.subarray(16, 32));
-  }
-
-  get chunkType(): ChunkType {
-    switch (this.rawBytes[4]) {
-      case 1:
-        return ChunkType.Contents;
-      case 2:
-        return ChunkType.ContentsEnd;
-      case 3:
-        return ChunkType.Ack;
-
-      case 0:
-      default:
-        return ChunkType.Unknown;
-    }
-  }
-
-  get checksum(): number {
-    let sum = 0;
-    for (const rawByte of this.rawBytes.subarray(0, 4)) {
-      sum += rawByte;
-      sum *= 256;
-    }
-
-    return sum;
-  }
-
-  get chunkIndex(): number {
-    let sum = 0;
-    for (const rawByte of this.rawBytes.subarray(8, 12)) {
-      sum += rawByte;
-      sum *= 256;
-    }
-
-    return sum;
-  }
-
-  stringKey() {
-    return stringEncodeHeader(this.rawBytes);
-  }
-
-  static writeHeaderToChunk(
-    header: Omit<ChunkHeader, "stringKey">,
-    chunk: Uint8Array,
-  ) {
-    let checksum = header.checksum;
-    for (let i = 0; i < 4; i++) {
-      chunk[i] = checksum & 0xff;
-      checksum >>= 8;
-    }
-
-    switch (header.chunkType) {
-      case ChunkType.Contents:
-        chunk[4] = 1;
-        break;
-      case ChunkType.ContentsEnd:
-        chunk[4] = 2;
-        break;
-      case ChunkType.Ack:
-        chunk[4] = 3;
-        break;
-
-      case ChunkType.Unknown:
-      default:
-        chunk[4] = 0xff;
-        break;
-    }
-    chunk[5] = 0;
-    chunk[6] = 0;
-    chunk[7] = 0;
-
-    let chunkIndex = header.chunkIndex;
-    for (let i = 8; i < 12; i++) {
-      chunk[i] = chunkIndex & 0xff;
-      chunkIndex >>= 8;
-    }
-
-    chunk[12] = 0;
-    chunk[13] = 0;
-    chunk[14] = 0;
-    chunk[15] = 0;
-
-    const parsedHeader = parseUuid(header.uuid);
-    for (let i = 0; i < 16; i++) {
-      chunk[i + 16] = parsedHeader[i];
-    }
-  }
-
-  toString() {
-    return `ChunkHeader(uuid=${this.uuid},flags=${this.chunkType},checksum=${this.checksum})`;
-  }
-}
-
-function stringEncodeHeader(header: Uint8Array): string {
-  let output = "";
-  for (const word of header) {
-    output += word.toString(16);
-  }
-
-  return output;
-}
-
-function decodeAndWriteStringHeader(header: string, output: Uint8Array) {
-  for (let offset = 0; offset < header.length; offset++) {
-    output[offset] = Number.parseInt(header.substring(offset, offset + 1));
   }
 }
