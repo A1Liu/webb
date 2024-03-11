@@ -5,7 +5,20 @@ import { assertUnreachable, Channel, Future, memoize } from "../util";
 import { Packet, ChunkType, decodeAndWriteStringHeader } from "./packet";
 
 // Implements QUIC-style multiplexing over Peerjs/WebRTC
+//
+// TODO:
+// - Recovery from connection breaking, IP changing
+// - Recovery from restarting, etc
+// - Resending dropped packets
+// - Connection closing
+// - Back pressure
+// - Race conditions with opening connections at the same time
+// - Global congestion control
+// - Ensuring packet order
+// - Channel scheduling, resource allocation
+// - Chunking data, splitting messages into pieces and rejoining them
 
+// Does the job of self registration and listening for/sending out connections
 export class NetworkLayer {
   readonly inboundConnectionChannel = new Channel<PeerConnection>();
 
@@ -65,14 +78,12 @@ export class NetworkLayer {
 const MIN_INFLIGHT_CHUNK_ALLOWANCES = 8;
 // const MAX_INFLIGHT_CHUNK_ALLOWANCES = 64;
 
+// Connection between another peer
+// Does job of sending data out, receiving data, congestion control?
 export class PeerConnection {
   // Un-acked chunks, that we're holding on to in case we need to re-send them
   // Keys are the whole header (not just the channel ID)
   readonly unackedOutboundChunks = new Map<string, Packet>();
-
-  // Un-acked chunks which have significance to the protocol itself (e.g. Ack chunks)
-  // Keys are the whole header (not just the channel ID)
-  readonly unackedProtocolOutboundChunks = new Map<string, Packet>();
 
   // Acks which we still need to send out
   readonly ackQueue: string[] = [];
@@ -155,11 +166,7 @@ export class PeerConnection {
     for (const [, ackPacket] of packet.dataAsPacketHeaders()) {
       const key = ackPacket.stringKey;
       if (this.unackedOutboundChunks.delete(key)) {
-        isAckAck = false;
-        continue;
-      }
-
-      if (this.unackedProtocolOutboundChunks.delete(key)) {
+        isAckAck = isAckAck && ackPacket.chunkType === ChunkType.Ack;
         continue;
       }
 
@@ -210,22 +217,28 @@ export class PeerConnection {
     console.debug("sending acks", { isAckAck, key });
 
     if (!isAckAck) {
-      this.unackedProtocolOutboundChunks.set(key, packet);
+      this.unackedOutboundChunks.set(key, packet);
     }
 
     this.connection.send(packet.rawBytes);
   }
 
-  sendPacket(uuid: string, packetData: Uint8Array) {
+  sendPacket({
+    uuid,
+    chunkIndex,
+    packetData,
+  }: {
+    uuid: string;
+    chunkIndex: number;
+    packetData: Uint8Array;
+  }) {
     const packet = new Packet(packetData.byteLength);
     packet.data.set(packetData);
 
     packet.writeHeaderFields({
       uuid,
       chunkType: ChunkType.Contents,
-
-      // TODO
-      chunkIndex: 0,
+      chunkIndex,
     });
 
     this.unackedOutboundChunks.set(packet.stringKey, packet);
@@ -239,7 +252,10 @@ export class PeerConnection {
   }
 }
 
+// Does TCP things i guess, except for congestion control
 export class NetworkChannel extends Channel<Uint8Array> {
+  outgoingChunkIndex = 0;
+
   constructor(
     readonly uuid: string,
     private readonly connection: PeerConnection,
@@ -252,6 +268,7 @@ export class NetworkChannel extends Channel<Uint8Array> {
   }
 
   async send(packetData: Uint8Array) {
-    this.connection.sendPacket(this.uuid, packetData);
+    const chunkIndex = this.outgoingChunkIndex++;
+    this.connection.sendPacket({ uuid: this.uuid, chunkIndex, packetData });
   }
 }

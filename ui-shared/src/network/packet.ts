@@ -11,6 +11,19 @@ export enum ChunkType {
   // DroppedAck,
 }
 
+const ChunkTypeToByteValue: Record<ChunkType, number> = {
+  [ChunkType.Unknown]: 0xff,
+  [ChunkType.Contents]: 1,
+  [ChunkType.ContentsEnd]: 2,
+  [ChunkType.Ack]: 3,
+};
+
+const ByteValueToChunkType: Record<number, ChunkType> = {
+  [1]: ChunkType.Contents,
+  [2]: ChunkType.ContentsEnd,
+  [3]: ChunkType.Ack,
+};
+
 interface PacketHeader {
   uuid: string;
   chunkType: ChunkType;
@@ -56,18 +69,8 @@ export class Packet implements PacketHeader {
   }
 
   get chunkType(): ChunkType {
-    switch (this.header[4]) {
-      case 1:
-        return ChunkType.Contents;
-      case 2:
-        return ChunkType.ContentsEnd;
-      case 3:
-        return ChunkType.Ack;
-
-      case 0:
-      default:
-        return ChunkType.Unknown;
-    }
+    const byteVal = this.header[4];
+    return ByteValueToChunkType[byteVal] ?? ChunkType.Unknown;
   }
 
   get checksum(): number {
@@ -109,29 +112,18 @@ export class Packet implements PacketHeader {
     //   checksum >>= 8;
     // }
 
-    switch (header.chunkType) {
-      case ChunkType.Contents:
-        chunk[4] = 1;
-        break;
-      case ChunkType.ContentsEnd:
-        chunk[4] = 2;
-        break;
-      case ChunkType.Ack:
-        chunk[4] = 3;
-        break;
+    const chunkTypeByte =
+      ChunkTypeToByteValue[header.chunkType] ??
+      ChunkTypeToByteValue[ChunkType.Unknown];
 
-      case ChunkType.Unknown:
-      default:
-        chunk[4] = 0xff;
-        break;
-    }
+    chunk[4] = chunkTypeByte;
     chunk[5] = 0;
     chunk[6] = 0;
     chunk[7] = 0;
 
     let chunkIndex = header.chunkIndex;
     for (let i = 8; i < 12; i++) {
-      chunk[i] = chunkIndex & 0xff;
+      chunk[i] = chunkIndex & 0xFF;
       chunkIndex >>= 8;
     }
 
