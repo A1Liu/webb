@@ -2,11 +2,7 @@ import { NIL as uuidNIL } from "uuid";
 import { Peer } from "peerjs";
 import type { DataConnection } from "peerjs";
 import { assertUnreachable, Channel, Future, memoize } from "../util";
-import {
-  Packet,
-  ChunkType,
-  decodeAndWriteStringHeader,
-} from "./packet";
+import { Packet, ChunkType, decodeAndWriteStringHeader } from "./packet";
 
 // Implements QUIC-style multiplexing over Peerjs/WebRTC
 
@@ -20,15 +16,15 @@ export class NetworkLayer {
       const peer = new peerjs.Peer(this.id, { debug: 2 });
 
       peer.on("open", () => {
-        console.log("peer opened");
+        console.debug("peer opened");
 
         fut.resolve(peer);
 
         peer.on("connection", (conn) => {
           conn.on("open", () => {
-            console.log("conn");
+            console.debug("conn");
             const peerConn = new PeerConnection(conn);
-            this.inboundConnectionChannel.push(peerConn);
+            this.inboundConnectionChannel.send(peerConn);
           });
         });
       });
@@ -49,13 +45,13 @@ export class NetworkLayer {
   }
 
   async connect(peerId: string): Promise<PeerConnection> {
-    console.log("try connect");
+    console.debug("try connect");
 
     const fut = new Future<PeerConnection>();
     const peer = await this._peerGetter().promise;
     const conn = peer.connect(peerId, { serialization: "raw" });
     conn.on("open", () => {
-      console.log("conn");
+      console.debug("conn");
       fut.resolve(new PeerConnection(conn));
     });
 
@@ -84,6 +80,8 @@ export class PeerConnection {
   // TEMP
   readonly inboundPackets = new Channel<Uint8Array>();
 
+  readonly channels = new Map<string, NetworkChannel>();
+
   private _isClosed = false;
 
   inflightChunkAllowances: number = MIN_INFLIGHT_CHUNK_ALLOWANCES;
@@ -91,44 +89,59 @@ export class PeerConnection {
   constructor(readonly connection: DataConnection) {
     this.connection.on("data", (evt) => {
       if (!(evt instanceof ArrayBuffer)) {
-        console.log(typeof evt, "wtf");
+        console.debug(typeof evt, "wtf");
         return;
       }
 
       this._handleInboundChunk(evt);
     });
     this.connection.on("error", (evt) => {
-      console.log("error", JSON.stringify(evt));
+      console.debug("error", JSON.stringify(evt));
     });
+
+    this.channels.set(uuidNIL, new NetworkChannel(uuidNIL, this));
   }
 
   get isClosed() {
     return this._isClosed;
   }
 
-  async listen(): Promise<Uint8Array> {
-    return this.inboundPackets.pop();
+  get defaultChannel(): NetworkChannel {
+    return this.channels.get(uuidNIL)!;
   }
 
-  _handleInboundChunk(chunk: ArrayBuffer) {
+  async _handleInboundChunk(chunk: ArrayBuffer) {
     const packet = new Packet(chunk);
 
     const kind = packet.chunkType;
     switch (kind) {
       case ChunkType.Ack: {
-        console.log("recv ack");
+        console.debug("recv ack");
         this._handleInboundAck(packet);
         break;
       }
 
       case ChunkType.Contents:
-      case ChunkType.ContentsEnd:
-      case ChunkType.Unknown: {
-        console.log("recv contents");
-
+      case ChunkType.ContentsEnd: {
         const key = packet.stringKey;
+        console.debug("recv contents", { key });
+
+        const channel = this.channels.get(packet.uuid);
+        if (!channel) {
+          this._pushAck(key);
+          console.debug("unrecognized channel, dropping packet", { key });
+          break;
+        }
+
+        await channel.receiveFromNetwork(packet);
         this._pushAck(key);
-        console.log({ packet });
+        break;
+      }
+      case ChunkType.Unknown: {
+        const key = packet.stringKey;
+        console.debug("recv unknown", { key });
+
+        this._pushAck(key);
         break;
       }
 
@@ -150,13 +163,13 @@ export class PeerConnection {
         continue;
       }
 
-      console.log(
+      console.debug(
         "received ack for packet header that we don't recognize",
         key,
       );
     }
 
-    console.log("  ack processed:", { isAckAck });
+    console.debug("  ack processed:", { isAckAck });
     if (!isAckAck) {
       const key = packet.stringKey;
       this._pushAck(key);
@@ -173,7 +186,7 @@ export class PeerConnection {
 
   _sendAcks() {
     const acks = this.ackQueue.splice(0);
-    console.log("send acks", acks);
+    console.debug("send acks", acks);
 
     const packet = new Packet(acks.length * 32);
 
@@ -194,7 +207,7 @@ export class PeerConnection {
     });
 
     const key = packet.stringKey;
-    console.log("sending acks", { isAckAck, key });
+    console.debug("sending acks", { isAckAck, key });
 
     if (!isAckAck) {
       this.unackedProtocolOutboundChunks.set(key, packet);
@@ -203,9 +216,9 @@ export class PeerConnection {
     this.connection.send(packet.rawBytes);
   }
 
-  sendPacket(uuid: string, packetData: ArrayBuffer) {
+  sendPacket(uuid: string, packetData: Uint8Array) {
     const packet = new Packet(packetData.byteLength);
-    packet.data.set(new Uint8Array(packetData));
+    packet.data.set(packetData);
 
     packet.writeHeaderFields({
       uuid,
@@ -223,5 +236,22 @@ export class PeerConnection {
   close() {
     this._isClosed = true;
     this.connection.close();
+  }
+}
+
+export class NetworkChannel extends Channel<Uint8Array> {
+  constructor(
+    readonly uuid: string,
+    private readonly connection: PeerConnection,
+  ) {
+    super();
+  }
+
+  async receiveFromNetwork(packet: Packet) {
+    await super.send(packet.data);
+  }
+
+  async send(packetData: Uint8Array) {
+    this.connection.sendPacket(this.uuid, packetData);
   }
 }

@@ -82,7 +82,7 @@ export class Channel<T> {
 
   constructor() {}
 
-  push(t: T) {
+  async send(t: T) {
     const listener = this.listeners.shift();
     if (listener) {
       listener(t);

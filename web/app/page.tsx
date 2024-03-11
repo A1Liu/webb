@@ -11,7 +11,14 @@ export default function Home() {
   useEffect(() => {
     networkLayer
       .listen()
-      .then(async (conn) => {})
+      .then(async (conn) => {
+        const channel = conn.defaultChannel;
+        while (true) {
+          const data = await channel.pop();
+          const text = new TextDecoder().decode(data);
+          console.log("received text", { text });
+        }
+      })
       .catch((err) => {
         console.log("ehlp", err);
       });
