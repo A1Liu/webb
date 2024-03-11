@@ -1,12 +1,12 @@
 import { NIL as uuidNIL } from "uuid";
 import { Peer } from "peerjs";
 import type { DataConnection } from "peerjs";
-import { assertUnreachable, Channel, Future, memoize } from "./util";
+import { assertUnreachable, Channel, Future, memoize } from "../util";
 import {
   Packet,
   ChunkType,
   decodeAndWriteStringHeader,
-} from "./network/packet";
+} from "./packet";
 
 // Implements QUIC-style multiplexing over Peerjs/WebRTC
 

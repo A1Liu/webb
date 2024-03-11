@@ -8,7 +8,7 @@
   "exports": {
     ".": "./src/peer.ts",
     "./util": "./src/util.ts",
-    "./peer": "./src/peer.ts"
+    "./network": "./src/network/index.ts"
   },
   "dependencies": {
     "peerjs": "^1.5.2",

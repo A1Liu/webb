@@ -1,6 +1,6 @@
 "use client";
 
-import { NetworkLayer } from "@a1liu/webb-ui-shared/peer";
+import { NetworkLayer } from "@a1liu/webb-ui-shared/network";
 import { useEffect } from "react";
 
 export const dynamic = "force-static";
