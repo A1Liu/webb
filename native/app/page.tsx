@@ -1,6 +1,6 @@
 "use client";
 
-import uuid from "uuid";
+import { NIL as uuidNIL } from "uuid";
 import React, { useEffect, useRef } from "react";
 import { getId, memoize } from "@a1liu/webb-ui-shared/util";
 import { NetworkLayer, PeerConnection } from "@a1liu/webb-ui-shared/network";
@@ -47,7 +47,7 @@ function usePeer(
         return;
       }
 
-      connectionRef.current.sendPacket(uuid.NIL, new TextEncoder().encode(s));
+      connectionRef.current.sendPacket(uuidNIL, new TextEncoder().encode(s));
     },
   };
 }

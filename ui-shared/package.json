@@ -6,7 +6,6 @@
     "format": "prettier --write ."
   },
   "exports": {
-    ".": "./src/peer.ts",
     "./util": "./src/util.ts",
     "./network": "./src/network/index.ts"
   },
