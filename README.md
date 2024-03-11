@@ -8,6 +8,8 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
 - WebRTC Leaks (public IP leak via STUN server)
   - https://www.security.org/vpn/webrtc-leak/
   - https://nordvpn.com/blog/webrtc/
+- iOS setup - https://dev.to/adimac93/tauri-mobile-for-ios-4dp6
+
 
 ### IO
 - Virtual Camera with CoreMediaIO - https://developer.apple.com/documentation/coremediaio
