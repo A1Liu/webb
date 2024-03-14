@@ -24,3 +24,5 @@ yarn.lock
 
 # Ignore generated files
 /components/handlers.ts
+
+gen/**/*.json

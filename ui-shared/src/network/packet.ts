@@ -123,7 +123,7 @@ export class Packet implements PacketHeader {
 
     let chunkIndex = header.chunkIndex;
     for (let i = 8; i < 12; i++) {
-      chunk[i] = chunkIndex & 0xFF;
+      chunk[i] = chunkIndex & 0xff;
       chunkIndex >>= 8;
     }
 
