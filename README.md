@@ -35,6 +35,7 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
 
 ## Debugging iOS
 - Had to search for `node tauri ios` in the generated files and change that to `pnpm tauri ios`
+  - TODO: add an issue + repro in Tauri repo
 - Kept failing with various "provisioning profile" errors. Turns out, you need to
   choose the right device to target in the top bar of the xcode IDE. Once I did that,
   the UI automatically figured out everything else. That was 3 hours of investigation.
