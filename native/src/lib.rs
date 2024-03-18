@@ -10,6 +10,7 @@ pub type SetupHook = Box<dyn FnOnce(&mut App) -> Result<(), Box<dyn std::error::
 #[derive(Default)]
 pub struct AppBuilder {
     setup: Option<SetupHook>,
+    pub builder: tauri::Builder<tauri::Wry>,
 }
 
 impl AppBuilder {
@@ -28,7 +29,7 @@ impl AppBuilder {
 
     pub fn run(self) {
         let setup = self.setup;
-        tauri::Builder::default()
+        self.builder
             .setup(move |app| {
                 if let Some(setup) = setup {
                     (setup)(app)?;

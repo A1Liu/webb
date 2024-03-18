@@ -34,9 +34,17 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
 
 
 ## Debugging iOS
+- Some initial stuff - https://dev.to/adimac93/tauri-mobile-for-ios-4dp6
 - Had to search for `node tauri ios` in the generated files and change that to `pnpm tauri ios`
   - TODO: add an issue + repro in Tauri repo
 - Kept failing with various "provisioning profile" errors. Turns out, you need to
   choose the right device to target in the top bar of the xcode IDE. Once I did that,
   the UI automatically figured out everything else. That was 3 hours of investigation.
+- Got `error sending request for url (http://192.IP_ADDRESS:3000/): error trying to connect: tcp connect error: No route to host (os error 65)` - need to make sure the web server is running on `0.0.0.0`
+  so that it's available to other devices on the wifi network
 
+
+## Secure P2P Connection
+- NWConnection - https://developer.apple.com/documentation/network/nwconnection
+- https://www.browserstack.com/blog/building-secure-native-apps-with-self-signed-ssl-certificates-using-certificate-pinning/
+- https://stackoverflow.com/questions/54452129/how-to-create-ios-nwconnection-for-tls-with-self-signed-cert

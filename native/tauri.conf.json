@@ -5,7 +5,7 @@
   "build": {
     "beforeBuildCommand": "pnpm build:web",
     "beforeDevCommand": "pnpm dev:web",
-    "devUrl": "http://localhost:3000"
+    "devUrl": "http://localhost:4110"
   },
   "identifier": "webb",
   "bundle": {
