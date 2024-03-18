@@ -2,6 +2,7 @@
   "name": "@a1liu/webb-native",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "pnpm tauri dev",
     "dev:ios": "pnpm tauri ios dev",
@@ -27,6 +28,7 @@
     "react": "^18",
     "react-dom": "^18",
     "react-hook-form": "^7.48.2",
+    "react-hot-toast": "^2.4.1",
     "uuid": "^9.0.0",
     "xterm": "^5.2.1",
     "xterm-addon-fit": "^0.7.0",

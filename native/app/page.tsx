@@ -1,8 +1,13 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
+import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
+import { toast } from "react-hot-toast";
+
+/*
 import { getId, memoize } from "@a1liu/webb-ui-shared/util";
 import { NetworkLayer, PeerConnection } from "@a1liu/webb-ui-shared/network";
+import  { useRef } from "react";
 
 export const dynamic = "force-static";
 
@@ -51,64 +56,44 @@ function usePeer(
     },
   };
 }
+ */
 
 const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 export default function Home() {
-  const [text, setText] = React.useState("asdf");
-
-  const [resp, setResp] = React.useState("");
-  const { send, connect } = usePeer("aliu-web-id", {
-    onData: (data) => {
-      setResp((prev) => prev + String(data));
-    },
-  });
-
   useEffect(() => {
-    // navigator.mediaDevices.getUserMedia({ audio: true }).then((e) => {
-    // });
+    toast("Init");
   }, []);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      Hello World
-      <div className="bg-white h-16 w-full">
-        <pre>
-          <code className="text-black">{resp}</code>
-        </pre>
-      </div>
-      <input
-        className="text-black"
-        value={text}
-        onChange={(evt) => setText(evt.target.value)}
-      />
       <div className="flex gap-2">
         <button
           className={buttonClass}
-          onClick={async () => {
-            const peer = getNetworkLayerGlobal().peer;
-            if (!peer?.disconnected) return;
-            peer.reconnect();
-          }}
+          onClick={() => window.location.reload()}
         >
-          Reconnect
+          Refresh
         </button>
 
         <button
           className={buttonClass}
-          onClick={() => {
-            connect();
+          onTouchStart={async () => {
+            // `windowed: true` actually sets the webview to transparent
+            // instead of opening a separate view for the camera
+            // make sure your user interface is ready to show what is underneath with a transparent element
+            const result = await scan({
+              windowed: false,
+              formats: [Format.QRCode],
+            });
+
+            toast(result.content);
           }}
         >
-          Connect
+          scan
         </button>
-        <button
-          className={buttonClass}
-          onClick={() => {
-            send(text);
-          }}
-        >
-          Submit
+
+        <button className={buttonClass} onClick={() => toast("hello")}>
+          hi
         </button>
       </div>
     </main>
