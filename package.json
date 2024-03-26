@@ -11,6 +11,7 @@
   "dependencies": {},
   "devDependencies": {
     "typescript": "^5",
-    "prettier": "^3.0.3"
+    "prettier": "^3.0.3",
+    "@tauri-apps/cli": "2.0.0-beta.11"
   }
 }

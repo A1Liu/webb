@@ -2,3 +2,4 @@ packages:
   - "./native"
   - "./web"
   - "./ui-shared"
+  - "./networking"
