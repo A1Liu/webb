@@ -1,12 +1,19 @@
-"use client"
-
+import { GlobalWrapper } from "@/components/globals";
+import clsx from "clsx";
+import { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
 export const dynamic = "force-static";
 
 const inter = Inter({ subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#000000" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
+};
 
 export default function RootLayout({
   children,
@@ -15,10 +22,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        {children}
-
-        <Toaster position="bottom-left" />
+      <body className={clsx(inter.className)}>
+        <GlobalWrapper>{children}</GlobalWrapper>
       </body>
     </html>
   );

@@ -1,10 +1,10 @@
 "use client";
-
 import React from "react";
 import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
 import { useGlobals } from "@/components/globals";
+import Link from "next/link";
 
 export const dynamic = "force-static";
 
@@ -65,15 +65,14 @@ function usePeer(
 const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 export default function Home() {
-  const { inBackgroundFlow, cb } = useGlobals();
+  const { cb } = useGlobals();
 
   return (
     <main
-      className={clsx(
-        "flex min-h-screen flex-col items-center justify-between p-24",
-        inBackgroundFlow && "bg-transparent",
-      )}
+      className={clsx("flex h-full flex-col items-center gap-4 py-24 px-8")}
     >
+      <h4>Home</h4>
+
       <div className="flex gap-2">
         <button
           className={buttonClass}
@@ -81,6 +80,10 @@ export default function Home() {
         >
           Refresh
         </button>
+
+        <Link href={"/my-qr-code"}>
+          <button className={buttonClass}>My QR Code</button>
+        </Link>
 
         <button
           className={buttonClass}
@@ -90,6 +93,7 @@ export default function Home() {
               // instead of opening a separate view for the camera
               // make sure your user interface is ready to show what is underneath with a transparent element
               const result = await scan({
+                cameraDirection: "back",
                 windowed: true,
                 formats: [Format.QRCode],
               });
