@@ -4,10 +4,9 @@ import React, { useEffect } from "react";
 import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
-
-// TODO: I have no fucking clue what is causing this to need to include the `.js`
-// suffix.
 import { useGlobals } from "@/components/globals";
+
+export const dynamic = "force-static";
 
 /*
 import { getId, memoize } from "@a1liu/webb-ui-shared/util";
@@ -75,7 +74,7 @@ export default function Home() {
     <main
       className={clsx(
         "flex min-h-screen flex-col items-center justify-between p-24",
-        inBackgroundFlow && "bg-transparent"
+        inBackgroundFlow && "bg-transparent",
       )}
     >
       <div className="flex gap-2">
