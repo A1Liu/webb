@@ -72,7 +72,12 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
         <meta name="theme-color" content="#39ff14" />
       </Head>
 
-      <div className={clsx("h-full w-full", kind === AppStateKind.BackgroundFlow && "hidden")}>
+      <div
+        className={clsx(
+          "h-full w-full",
+          kind === AppStateKind.BackgroundFlow && "hidden",
+        )}
+      >
         {children}
       </div>
 

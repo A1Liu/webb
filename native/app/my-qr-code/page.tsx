@@ -24,7 +24,9 @@ export default function Home() {
   }, []);
 
   return (
-    <main className={clsx("flex h-full flex-col items-center gap-4 py-24 px-8")}>
+    <main
+      className={clsx("flex h-full flex-col items-center gap-4 py-24 px-8")}
+    >
       <h4>QR Code</h4>
 
       <div className="flex gap-2">
