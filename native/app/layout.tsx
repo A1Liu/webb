@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
+export const dynamic = "force-static";
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
