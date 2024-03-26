@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop-capability",
+  "windows": ["main"],
+  "platforms": ["macOS"],
+  "permissions": ["webview:default", "webview:allow-internal-toggle-devtools"]
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
@@ -66,9 +66,6 @@ const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 export default function Home() {
   const { inBackgroundFlow, cb } = useGlobals();
-  useEffect(() => {
-    toast("Init");
-  }, []);
 
   return (
     <main
