@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
 import { toast } from "react-hot-toast";
+import clsx from "clsx";
 
 /*
 import { getId, memoize } from "@a1liu/webb-ui-shared/util";
@@ -61,12 +62,18 @@ function usePeer(
 const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 export default function Home() {
+  const [hidden, setHidden] = useState(false);
   useEffect(() => {
     toast("Init");
   }, []);
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
+    <main
+      className={clsx(
+        "flex min-h-screen flex-col items-center justify-between p-24",
+        hidden && "bg-transparent",
+      )}
+    >
       <div className="flex gap-2">
         <button
           className={buttonClass}
@@ -78,13 +85,17 @@ export default function Home() {
         <button
           className={buttonClass}
           onTouchStart={async () => {
+            setHidden(true);
+
             // `windowed: true` actually sets the webview to transparent
             // instead of opening a separate view for the camera
             // make sure your user interface is ready to show what is underneath with a transparent element
             const result = await scan({
-              windowed: false,
+              windowed: true,
               formats: [Format.QRCode],
             });
+
+            setHidden(false);
 
             toast(result.content);
           }}
