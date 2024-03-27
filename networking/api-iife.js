@@ -1,0 +1,1 @@
+if("__TAURI__"in window){var __TAURI_PLUGIN_NETWORKING__=function(n){"use strict";return"function"==typeof SuppressedError&&SuppressedError,n.scan=async function(){await async function(n,_={},r){return window.__TAURI_INTERNALS__.invoke(n,_,r)}("plugin:webb-networking|scan",{})},n}({});Object.defineProperty(window.__TAURI__,"networking",{value:__TAURI_PLUGIN_NETWORKING__})}

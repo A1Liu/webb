@@ -1,0 +1,6 @@
+"$schema" = "schemas/schema.json"
+
+[[permission]]
+identifier = "allow-all"
+description = "Enables everything"
+commands.allow = ["scan"]
