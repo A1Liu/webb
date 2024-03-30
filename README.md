@@ -32,6 +32,11 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
   - Device with claim to UserProfile is actually used by UserProfile - Someone tries to spoof a user to gain access to devices on their network
   - Device is authenticated as member of network - Work laptop with spyware tries to snoop into other computers on the network
 
+## Networking
+- Oh gawd
+- I guess get something working on desktop first?????
+- Then... try to get plugin system working? We can see how hard it is first
+- Then iOS i guess, either native or tauri
 
 ## Debugging iOS
 - Some initial stuff - https://dev.to/adimac93/tauri-mobile-for-ios-4dp6
