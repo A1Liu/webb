@@ -5,6 +5,8 @@ mod mobile;
 #[cfg(mobile)]
 pub use mobile::*;
 
+mod networking;
+
 pub type SetupHook = Box<dyn FnOnce(&mut App) -> Result<(), Box<dyn std::error::Error>> + Send>;
 
 #[derive(Default)]
