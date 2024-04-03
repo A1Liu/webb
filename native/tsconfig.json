@@ -1,6 +1,20 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
+    // Fucking... what???!?!?!
+    // If you put "node" here then importing Next.js works but importing a
+    // typescript file doesn't when it's in a separate module. When you put
+    // "nodenext", the importing works but Next.js imports don't work. Like,
+    // I KNOW why this doesn't work, but what the FUCK kind of person considers
+    // this acceptable.
+    //
+    // Like, could you not just make nodenext work with the "paths" config?!?
+    // That would still fit with backwards compatibility while not being ass
+    // to use.
+    //
+    // Sincerely frustrated,
+    //
+    // Albert Liu, Apr 03, 2024 Wed 00:23
     "moduleResolution": "node",
     "plugins": [
       {

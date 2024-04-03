@@ -5,13 +5,9 @@ import { toast } from "react-hot-toast";
 import clsx from "clsx";
 import { useGlobals } from "@/components/globals";
 import Link from "next/link";
-
-export const dynamic = "force-static";
-
-/*
+import { useRef } from "react";
 import { getId, memoize } from "@a1liu/webb-ui-shared/util";
 import { NetworkLayer, PeerConnection } from "@a1liu/webb-ui-shared/network";
-import  { useRef } from "react";
 
 export const dynamic = "force-static";
 
@@ -55,12 +51,11 @@ function usePeer(
         return;
       }
 
-      const channel = connectionRef.current.defaultChannel;
-      channel.send(new TextEncoder().encode(s));
+      const channel = connectionRef.current;
+      channel.send(s);
     },
   };
 }
- */
 
 const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 

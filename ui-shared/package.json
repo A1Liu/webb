@@ -3,11 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "build": "tsc"
   },
   "exports": {
-    "./util": "./src/util.ts",
-    "./network": "./src/network/index.ts"
+    "./util": "./dist/util.js",
+    "./network": "./dist/network/index.js"
+  },
+  "typesVersions": {
+    "*": {
+      "util": ["dist/util.d.ts"],
+      "network": ["dist/network/index.d.ts"]
+    }
   },
   "dependencies": {
     "peerjs": "^1.5.2",
