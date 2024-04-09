@@ -28,10 +28,10 @@ interface PeerContext {
 
 function usePeer(
   target: string,
-  opts: { onData: (data: unknown) => void },
+  opts: { onData: (data: string) => void }
 ): PeerContext {
   const connectionRef = useRef<PeerConnection>();
-  const dataListenerRef = useRef<(data: unknown) => void>(opts.onData);
+  const dataListenerRef = useRef<(data: string) => void>(opts.onData);
 
   dataListenerRef.current = opts.onData;
 
@@ -61,6 +61,11 @@ const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 export default function Home() {
   const { cb } = useGlobals();
+  const { connect, send } = usePeer("aliu-web-id", {
+    onData: (data) => {
+      toast(`data=${data}`);
+    },
+  });
 
   return (
     <main
@@ -98,6 +103,14 @@ export default function Home() {
           }}
         >
           scan
+        </button>
+
+        <button className={buttonClass} onClick={() => connect()}>
+          connect
+        </button>
+
+        <button className={buttonClass} onClick={() => send("hello")}>
+          send hi
         </button>
 
         <button className={buttonClass} onClick={() => toast("hello")}>

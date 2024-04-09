@@ -19,7 +19,7 @@ export class NetworkLayer {
 
         peer.on("connection", (conn) => {
           conn.on("open", () => {
-            console.debug("conn");
+            console.debug("aliu conn listen opened");
             const peerConn = new PeerConnection(conn);
             this.inboundConnectionChannel.send(peerConn);
           });
@@ -48,7 +48,7 @@ export class NetworkLayer {
     const peer = await this._peerGetter().promise;
     const conn = peer.connect(peerId, { serialization: "raw" });
     conn.on("open", () => {
-      console.debug("conn");
+      console.debug("aliu conn started");
       fut.resolve(new PeerConnection(conn));
     });
 
