@@ -12,8 +12,12 @@
   },
   "typesVersions": {
     "*": {
-      "util": ["dist/util.d.ts"],
-      "network": ["dist/network/index.d.ts"]
+      "util": [
+        "dist/util.d.ts"
+      ],
+      "network": [
+        "dist/network/index.d.ts"
+      ]
     }
   },
   "dependencies": {
