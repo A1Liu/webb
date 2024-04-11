@@ -1,21 +1,29 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
 import Link from "next/link";
-import { usePeer } from "@/components/hooks/usePeer";
+import { IncomingPeers } from "@/components/hooks/usePeer";
+import { toCanvas } from "qrcode";
+import { getId } from "@a1liu/webb-ui-shared/util";
 
 export const dynamic = "force-static";
 
 const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 export default function Home() {
-  const { connect, send } = usePeer("aliu-web-id", {
-    onData: (data) => {
-      toast(`data=${data}`);
-    },
-  });
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    toCanvas(canvasRef.current, getId()).catch((error) => {
+      toast.error(`QR Code error: ${String(error)}`, {
+        duration: 30_000,
+      });
+    });
+  }, []);
 
   return (
     <main
@@ -35,18 +43,14 @@ export default function Home() {
           <button className={buttonClass}>QR</button>
         </Link>
 
-        <button className={buttonClass} onClick={() => connect()}>
-          connect
-        </button>
-
-        <button className={buttonClass} onClick={() => send("hello")}>
-          send hi
-        </button>
-
         <button className={buttonClass} onClick={() => toast("hello")}>
           hi
         </button>
       </div>
+
+      <canvas ref={canvasRef}></canvas>
+
+      <IncomingPeers />
     </main>
   );
 }

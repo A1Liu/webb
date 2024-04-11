@@ -78,6 +78,10 @@ export class PeerConnection {
     });
   }
 
+  get name() {
+    return this.connection.label;
+  }
+
   async send(data: string) {
     await this.connection.send(data);
   }

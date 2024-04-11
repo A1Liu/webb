@@ -5,6 +5,7 @@ import { toast } from "react-hot-toast";
 import clsx from "clsx";
 import { toCanvas } from "qrcode";
 import Link from "next/link";
+import { getId } from "@a1liu/webb-ui-shared/util";
 
 export const dynamic = "force-static";
 
@@ -16,7 +17,7 @@ export default function Home() {
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    toCanvas(canvasRef.current, "asdf").catch((error) => {
+    toCanvas(canvasRef.current, getId()).catch((error) => {
       toast.error(`QR Code error: ${String(error)}`, {
         duration: 30_000,
       });

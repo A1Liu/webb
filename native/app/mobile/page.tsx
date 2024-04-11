@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
@@ -13,8 +13,9 @@ export const dynamic = "force-static";
 const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 export default function Home() {
+  const [target, setTarget] = useState("");
   const { cb } = useGlobals();
-  const { connect, send } = usePeer("aliu-web-id", {
+  const { connect, send } = usePeer({
     onData: (data) => {
       toast(`data=${data}`);
     },
@@ -24,7 +25,9 @@ export default function Home() {
     <main
       className={clsx("flex h-full flex-col items-center gap-4 py-24 px-8")}
     >
-      <h4>Home</h4>
+      <h4>Mobile</h4>
+
+      <h6>Target: {target}</h6>
 
       <div className="flex gap-2 flex-wrap">
         <button
@@ -52,13 +55,18 @@ export default function Home() {
               });
 
               toast(result.content);
+              setTarget(result.content);
             });
           }}
         >
           scan
         </button>
 
-        <button className={buttonClass} onClick={() => connect()}>
+        <button
+          className={buttonClass}
+          disabled={!target}
+          onClick={() => connect(target)}
+        >
           connect
         </button>
 
