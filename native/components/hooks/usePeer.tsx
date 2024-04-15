@@ -22,6 +22,10 @@ export function usePeer(opts: { onData: (data: string) => void }): PeerContext {
   dataListenerRef.current = opts.onData;
 
   useEffect(() => {
+    getNetworkLayerGlobal().peer;
+  }, []);
+
+  useEffect(() => {
     let run = true;
     async function runner() {
       while (run) {

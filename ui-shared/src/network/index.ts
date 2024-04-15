@@ -3,6 +3,12 @@ import type { DataConnection } from "peerjs";
 import { Future, memoize } from "../util";
 import { Channel } from "../channel";
 
+// TODO: Figure out what to do here long term. For now, this is the shit implementation.
+//
+// Ideally, this should be run via QUIC on IPv6 with self-signed certificates
+// tied directly to device+user IDs. For now... I guess this is fine.
+
+// make new peerjs peer+conn frequently
 export class NetworkLayer {
   readonly inboundConnectionChannel = new Channel<PeerConnection>();
 
@@ -13,17 +19,26 @@ export class NetworkLayer {
       const peer = new peerjs.Peer(this.id, { debug: 2 });
 
       peer.on("open", () => {
-        console.debug("peer opened");
+        console.log("peer opened");
 
         fut.resolve(peer);
 
         peer.on("connection", (conn) => {
           conn.on("open", () => {
-            console.debug("aliu conn listen opened");
+            console.log("PeerConn from listen");
             const peerConn = new PeerConnection(conn);
             this.inboundConnectionChannel.send(peerConn);
           });
         });
+      });
+      peer.on("error", (e) => {
+        console.error("peer error", JSON.stringify(e));
+      });
+      peer.on("disconnected", () => {
+        console.log("Peer disconnect");
+      });
+      peer.on("close", () => {
+        console.error("peer close");
       });
     });
 
@@ -48,7 +63,7 @@ export class NetworkLayer {
     const peer = await this._peerGetter().promise;
     const conn = peer.connect(peerId, { serialization: "raw" });
     conn.on("open", () => {
-      console.debug("aliu conn started");
+      console.log("PeerConn started");
       fut.resolve(new PeerConnection(conn));
     });
 
@@ -57,11 +72,12 @@ export class NetworkLayer {
 }
 
 export class PeerConnection {
-  readonly inboundPackets = new Channel<string>();
+  private readonly inboundPackets = new Channel<string>(Infinity);
+  private readonly outboundPackets = new Channel<string>(Infinity);
 
   private _isClosed = false;
 
-  constructor(readonly connection: DataConnection) {
+  constructor(private connection: DataConnection) {
     this.connection.on("data", (data) => {
       if (!(typeof data === "string")) {
         console.debug(data, "wtf");
@@ -71,10 +87,14 @@ export class PeerConnection {
       this.inboundPackets.send(data);
     });
     this.connection.on("error", (evt) => {
-      console.debug("error", JSON.stringify(evt));
+      console.error("conn error", JSON.stringify(evt));
     });
     this.connection.on("close", () => {
       this._isClosed = true;
+      console.log("conn closed");
+    });
+    this.connection.on("iceStateChanged", (evt) => {
+      console.log("ice state changed", JSON.stringify(evt));
     });
   }
 
@@ -83,6 +103,11 @@ export class PeerConnection {
   }
 
   async send(data: string) {
+    if (this._isClosed) {
+      await this.outboundPackets.send(data);
+      return;
+    }
+
     await this.connection.send(data);
   }
 

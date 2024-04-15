@@ -10,6 +10,20 @@ import Head from "next/head";
 import { get, set, del } from "idb-keyval";
 import { useEffect } from "react";
 
+// TODO: replace with real logging, e.g. pino
+if (typeof window !== "undefined") {
+  const { error, log } = console;
+
+  console.log = (...args: unknown[]) => {
+    toast(args.map(String).join(" "));
+    log(...args);
+  };
+  console.error = (...args: unknown[]) => {
+    toast.error(args.map(String).join(" "));
+    error(...args);
+  };
+}
+
 // Custom storage object
 const storage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
@@ -58,7 +72,7 @@ interface WebbGlobals {
   cb: {
     runBackgroundFlow: (
       flow: (props: BackgroundFlowProps) => Promise<void>,
-      opts?: BackgroundFlowOptions,
+      opts?: BackgroundFlowOptions
     ) => Promise<void>;
     setOtherDeviceId: (val: string) => void;
   };
@@ -71,12 +85,12 @@ const useGlobals = create<WebbGlobals>()(
     (set, get) => {
       function setPersistedData(
         createState: (
-          state: Partial<PersistedAppState>,
-        ) => Partial<PersistedAppState>,
+          state: Partial<PersistedAppState>
+        ) => Partial<PersistedAppState>
       ): void {
         set((prev) => ({
           persistedState: createState(
-            typeof prev.persistedState === "symbol" ? {} : prev.persistedState,
+            typeof prev.persistedState === "symbol" ? {} : prev.persistedState
           ),
         }));
       }
@@ -117,19 +131,19 @@ const useGlobals = create<WebbGlobals>()(
       storage: createJSONStorage(() => storage),
       skipHydration: true,
       partialize: ({ persistedState }) => ({ persistedState }),
-    },
-  ),
+    }
+  )
 );
 
 export function usePersistedState<S>(
-  pick: (s: Partial<PersistedAppState>) => S,
+  pick: (s: Partial<PersistedAppState>) => S
 ): S;
 export function usePersistedState(): Partial<PersistedAppState>;
 export function usePersistedState<S>(
-  pick: (s: Partial<PersistedAppState>) => S = (s) => s as S,
+  pick: (s: Partial<PersistedAppState>) => S = (s) => s as S
 ): S {
   return useGlobals((s) =>
-    pick(typeof s.persistedState === "symbol" ? {} : s.persistedState),
+    pick(typeof s.persistedState === "symbol" ? {} : s.persistedState)
   );
 }
 
@@ -163,7 +177,7 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
       <div
         className={clsx(
           "h-full w-full",
-          kind === AppStateKind.BackgroundFlow && "hidden",
+          kind === AppStateKind.BackgroundFlow && "hidden"
         )}
       >
         {children}
