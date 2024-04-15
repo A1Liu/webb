@@ -60,13 +60,13 @@ export function usePeer(opts: { onData: (data: string) => void }): PeerContext {
         toast.error(String(e));
       }
     },
-    send: (s) => {
+    send: async (s) => {
       if (connectionRef.current === undefined) {
         return;
       }
 
       const channel = connectionRef.current;
-      channel.send(s);
+      await channel.send(s);
     },
   };
 }

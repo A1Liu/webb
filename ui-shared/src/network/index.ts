@@ -99,11 +99,10 @@ export class NetworkLayer {
       const dataChannels = this.dataChannels.get(peerId);
       dataChannels?.delete(conn);
 
-      this.peer.then((peer) => {
-        if (!peer.destroyed) {
-          peer.destroy();
-        }
-      });
+      const peer = this._peerGetter().value;
+      if (peer && !peer.destroyed) {
+        peer.destroy();
+      }
     });
     conn.on("iceStateChanged", (evt) => {
       console.log("ice state changed", JSON.stringify(evt));
