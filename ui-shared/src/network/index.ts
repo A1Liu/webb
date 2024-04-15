@@ -13,7 +13,12 @@ import { Channel } from "../channel";
 const getPeerjsCode = memoize(() => import("peerjs"));
 
 export class NetworkLayer {
+  private readonly dataChannels = new Map<string, Set<DataConnection>>();
+
   readonly inboundConnectionChannel = new Channel<PeerConnection>();
+  readonly connections = new Map<string, PeerConnection>();
+
+  constructor(readonly id: string) {}
 
   static getPeer(network: NetworkLayer): UnwrappedPromise<Peer> {
     const fut = new Future<Peer>();
@@ -29,13 +34,7 @@ export class NetworkLayer {
         peer.on("connection", (conn) => {
           conn.on("open", () => {
             console.log("PeerConn from listen");
-            const inbound = new Channel<string>();
-            const outbound = new Channel<string>();
-            const peerConn = new PeerConnection(conn.peer, {
-              inbound,
-              outbound,
-            });
-            NetworkLayer.initConnection(conn, { inbound, outbound });
+            const peerConn = network.addPeer(conn);
             network.inboundConnectionChannel.send(peerConn);
           });
         });
@@ -54,44 +53,55 @@ export class NetworkLayer {
     return fut.unwrapped;
   }
 
-  static initConnection(
-    connection: DataConnection,
-    opts: {
-      inbound: Channel<string>;
-      outbound: Channel<string>;
-    }
-  ) {
-    connection.on("data", (data) => {
+  private addPeer(conn: DataConnection): PeerConnection {
+    const peerChannels = this.dataChannels.get(conn.peer) ?? new Set();
+    this.dataChannels.set(conn.peer, peerChannels);
+
+    peerChannels.add(conn);
+
+    const inbound = new Channel<string>();
+    const outbound = new Channel<string>();
+
+    const peerConn =
+      this.connections.get(conn.peer) ??
+      new PeerConnection(conn.peer, {
+        inbound,
+        outbound,
+      });
+    this.connections.set(conn.peer, peerConn);
+
+    conn.on("data", (data) => {
       if (!(typeof data === "string")) {
         console.debug(data, "wtf");
         return;
       }
 
-      opts.inbound.send(data);
+      inbound.send(data);
     });
-    connection.on("error", (evt) => {
+    conn.on("error", (evt) => {
       console.error("conn error", JSON.stringify(evt));
     });
-    connection.on("close", () => {
+    conn.on("close", () => {
       console.log("conn closed");
+      this.dataChannels.get(conn.peer)?.delete(conn);
     });
-    connection.on("iceStateChanged", (evt) => {
+    conn.on("iceStateChanged", (evt) => {
       console.log("ice state changed", JSON.stringify(evt));
     });
 
     (async () => {
       while (true) {
-        const data = await opts.outbound.pop();
-        connection.send(data);
+        const data = await outbound.pop();
+        conn.send(data);
       }
     })();
+
+    return peerConn;
   }
 
   private _peerGetter = memoize(() => {
     return NetworkLayer.getPeer(this);
   });
-
-  constructor(readonly id: string) {}
 
   get peer(): Promise<Peer> {
     return this._peerGetter().promise;
@@ -111,10 +121,7 @@ export class NetworkLayer {
     conn.on("open", () => {
       console.log("PeerConn started");
 
-      const inbound = new Channel<string>();
-      const outbound = new Channel<string>();
-      const peerConn = new PeerConnection(peerId, { inbound, outbound });
-      NetworkLayer.initConnection(conn, { inbound, outbound });
+      const peerConn = this.addPeer(conn);
       fut.resolve(peerConn);
     });
 
@@ -123,7 +130,7 @@ export class NetworkLayer {
 }
 
 export class PeerConnection {
-  private readonly inboundPackets: Channel<string>;
+  readonly inboundPackets: Channel<string>;
   private readonly outboundPackets: Channel<string>;
 
   constructor(
