@@ -23,8 +23,8 @@ export default function Home() {
           Refresh
         </button>
 
-        <Link href={"/mobile"}>
-          <button className={buttonClass}>Mobile</button>
+        <Link href={"/settings"}>
+          <button className={buttonClass}>Settings</button>
         </Link>
 
         <Link href={"/desktop"}>

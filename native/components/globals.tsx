@@ -9,6 +9,7 @@ import clsx from "clsx";
 import Head from "next/head";
 import { get, set, del } from "idb-keyval";
 import { useEffect } from "react";
+import { doPlatformInit } from "./hooks/usePlatform";
 
 // TODO: replace with real logging, e.g. pino
 if (typeof window !== "undefined") {
@@ -166,6 +167,8 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
     // Manually call rehydrate on startup to work around SSR nonsense
     // in Next.js
     useGlobals.persist.rehydrate();
+
+    doPlatformInit();
   }, []);
 
   return (
