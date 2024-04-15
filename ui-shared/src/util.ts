@@ -27,6 +27,7 @@ export function memoize<T>(
   func.memoizedValue = undefined as undefined | T;
   func.clear = () => {
     maker = _maker;
+    func.memoizedValue = undefined;
   };
 
   return func;
