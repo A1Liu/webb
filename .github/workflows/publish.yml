@@ -9,6 +9,7 @@ concurrency:
 
 jobs:
   publish-app:
+    if: false
     permissions:
       contents: write
     strategy:
