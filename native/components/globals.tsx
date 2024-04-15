@@ -30,13 +30,13 @@ const storage: StateStorage = {
     return (await get(name)) || null;
   },
   setItem: async (name: string, value: string): Promise<void> => {
-    console.log("IDB set", { name, value });
+    console.debug("IDB set", { name, value });
     const id = toast.loading(`IDB set ${name}...`);
     await set(name, value);
     toast(`IDB set ${name} - DONE`, { id });
   },
   removeItem: async (name: string): Promise<void> => {
-    console.log("IDB remove", { name });
+    console.debug("IDB remove", { name });
     const id = toast.loading(`IDB del ${name}...`);
     await del(name);
     toast(`IDB del ${name} - DONE`, { id });

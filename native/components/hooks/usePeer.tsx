@@ -48,14 +48,12 @@ export function usePeer(opts: { onData: (data: string) => void }): PeerContext {
 
   return {
     connect: async (target) => {
+      if (connectionRef.current) return;
+
       try {
         const layer = getNetworkLayerGlobal();
         const conn = await layer.connect(target);
         toast("connected!");
-
-        if (connectionRef.current !== undefined) {
-          connectionRef.current.close();
-        }
 
         connectionRef.current = conn;
       } catch (e) {

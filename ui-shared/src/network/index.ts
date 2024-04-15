@@ -29,7 +29,13 @@ export class NetworkLayer {
         peer.on("connection", (conn) => {
           conn.on("open", () => {
             console.log("PeerConn from listen");
-            const peerConn = new PeerConnection(conn);
+            const inbound = new Channel<string>();
+            const outbound = new Channel<string>();
+            const peerConn = new PeerConnection(conn.peer, {
+              inbound,
+              outbound,
+            });
+            NetworkLayer.initConnection(conn, { inbound, outbound });
             network.inboundConnectionChannel.send(peerConn);
           });
         });
@@ -46,6 +52,39 @@ export class NetworkLayer {
     });
 
     return fut.unwrapped;
+  }
+
+  static initConnection(
+    connection: DataConnection,
+    opts: {
+      inbound: Channel<string>;
+      outbound: Channel<string>;
+    }
+  ) {
+    connection.on("data", (data) => {
+      if (!(typeof data === "string")) {
+        console.debug(data, "wtf");
+        return;
+      }
+
+      opts.inbound.send(data);
+    });
+    connection.on("error", (evt) => {
+      console.error("conn error", JSON.stringify(evt));
+    });
+    connection.on("close", () => {
+      console.log("conn closed");
+    });
+    connection.on("iceStateChanged", (evt) => {
+      console.log("ice state changed", JSON.stringify(evt));
+    });
+
+    (async () => {
+      while (true) {
+        const data = await opts.outbound.pop();
+        connection.send(data);
+      }
+    })();
   }
 
   private _peerGetter = memoize(() => {
@@ -71,7 +110,12 @@ export class NetworkLayer {
     const conn = peer.connect(peerId, { serialization: "raw" });
     conn.on("open", () => {
       console.log("PeerConn started");
-      fut.resolve(new PeerConnection(conn));
+
+      const inbound = new Channel<string>();
+      const outbound = new Channel<string>();
+      const peerConn = new PeerConnection(peerId, { inbound, outbound });
+      NetworkLayer.initConnection(conn, { inbound, outbound });
+      fut.resolve(peerConn);
     });
 
     return fut.promise;
@@ -79,56 +123,25 @@ export class NetworkLayer {
 }
 
 export class PeerConnection {
-  private readonly inboundPackets = new Channel<string>(Infinity);
-  private readonly outboundPackets = new Channel<string>(Infinity);
+  private readonly inboundPackets: Channel<string>;
+  private readonly outboundPackets: Channel<string>;
 
-  private _isClosed = false;
-
-  constructor(private connection: DataConnection) {
-    this.connection.on("data", (data) => {
-      if (!(typeof data === "string")) {
-        console.debug(data, "wtf");
-        return;
-      }
-
-      this.inboundPackets.send(data);
-    });
-    this.connection.on("error", (evt) => {
-      console.error("conn error", JSON.stringify(evt));
-    });
-    this.connection.on("close", () => {
-      this._isClosed = true;
-      console.log("conn closed");
-    });
-    this.connection.on("iceStateChanged", (evt) => {
-      console.log("ice state changed", JSON.stringify(evt));
-    });
-  }
-
-  get name() {
-    return this.connection.label;
+  constructor(
+    readonly name: string,
+    opts: {
+      inbound: Channel<string>;
+      outbound: Channel<string>;
+    }
+  ) {
+    this.inboundPackets = opts.inbound;
+    this.outboundPackets = opts.outbound;
   }
 
   async send(data: string) {
-    if (this._isClosed) {
-      await this.outboundPackets.send(data);
-      return;
-    }
-
-    await this.connection.send(data);
+    await this.outboundPackets.send(data);
   }
 
   async recv() {
     return await this.inboundPackets.pop();
-  }
-
-  get isClosed() {
-    return this._isClosed;
-  }
-
-  close() {
-    // Hopefully flush is OK
-    this.connection.close({ flush: true });
-    this._isClosed = true;
   }
 }
