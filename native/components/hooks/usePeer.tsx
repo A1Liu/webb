@@ -84,6 +84,10 @@ const usePeers = create<ChannelInfo>((set) => {
       if (init) return;
       init = true;
 
+      set((prev) => ({
+        peers: [...prev.peers, ...getNetworkLayerGlobal().connections.values()],
+      }));
+
       while (true) {
         const peer = await getNetworkLayerGlobal().listen();
         set((prev) => ({
