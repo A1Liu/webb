@@ -26,8 +26,8 @@ jobs:
           include-rust: true
 
       - uses: tauri-apps/tauri-action@v0
-        working-directory: ./native
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          projectPath: ./native
           releaseId: 114434131
