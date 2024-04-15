@@ -54,19 +54,21 @@ export class NetworkLayer {
   }
 
   private addPeer(conn: DataConnection): PeerConnection {
-    const peerChannels = this.dataChannels.get(conn.peer) ?? new Set();
-    this.dataChannels.set(conn.peer, peerChannels);
+    const peerId = conn.peer;
+    const peerChannels = this.dataChannels.get(peerId) ?? new Set();
+    this.dataChannels.set(peerId, peerChannels);
 
     peerChannels.add(conn);
 
-    const inbound = new Channel<string>();
-    const outbound = new Channel<string>();
-
     const peerConn =
-      this.connections.get(conn.peer) ??
-      new PeerConnection(conn.peer, {
-        inbound,
-        outbound,
+      this.connections.get(peerId) ??
+      new PeerConnection(peerId, new Channel<string>(), async (data) => {
+        const channels = this.dataChannels.get(peerId);
+        if (!channels) return;
+        for (const channel of channels) {
+          await channel.send(data);
+          break;
+        }
       });
     this.connections.set(conn.peer, peerConn);
 
@@ -76,25 +78,19 @@ export class NetworkLayer {
         return;
       }
 
-      inbound.send(data);
+      peerConn.inboundPackets.send(data);
     });
     conn.on("error", (evt) => {
       console.error("conn error", JSON.stringify(evt));
     });
     conn.on("close", () => {
       console.log("conn closed");
-      this.dataChannels.get(conn.peer)?.delete(conn);
+      const dataChannels = this.dataChannels.get(conn.peer);
+      dataChannels?.delete(conn);
     });
     conn.on("iceStateChanged", (evt) => {
       console.log("ice state changed", JSON.stringify(evt));
     });
-
-    (async () => {
-      while (true) {
-        const data = await outbound.pop();
-        conn.send(data);
-      }
-    })();
 
     return peerConn;
   }
@@ -130,22 +126,14 @@ export class NetworkLayer {
 }
 
 export class PeerConnection {
-  readonly inboundPackets: Channel<string>;
-  private readonly outboundPackets: Channel<string>;
-
   constructor(
     readonly name: string,
-    opts: {
-      inbound: Channel<string>;
-      outbound: Channel<string>;
-    }
-  ) {
-    this.inboundPackets = opts.inbound;
-    this.outboundPackets = opts.outbound;
-  }
+    readonly inboundPackets: Channel<string>,
+    readonly sendOut: (data: string) => Promise<void>
+  ) {}
 
   async send(data: string) {
-    await this.outboundPackets.send(data);
+    await this.sendOut(data);
   }
 
   async recv() {
