@@ -137,7 +137,7 @@ export function IncomingPeers() {
   return (
     <div className="flex flex-col gap-2">
       {peers.map((peer) => (
-        <IncomingPeer peer={peer} />
+        <IncomingPeer key={peer.name} peer={peer} />
       ))}
     </div>
   );

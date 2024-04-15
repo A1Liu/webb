@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
-import { useGlobals } from "@/components/globals";
+import { useModifyGlobals, usePersistedState } from "@/components/globals";
 import Link from "next/link";
 import { usePeer } from "@/components/hooks/usePeer";
 
@@ -13,8 +13,8 @@ export const dynamic = "force-static";
 const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 export default function Home() {
-  const [target, setTarget] = useState("");
-  const { cb } = useGlobals();
+  const { otherDeviceId } = usePersistedState();
+  const cb = useModifyGlobals();
   const { connect, send } = usePeer({
     onData: (data) => {
       toast(`data=${data}`);
@@ -27,7 +27,7 @@ export default function Home() {
     >
       <h4>Mobile</h4>
 
-      <h6>Target: {target}</h6>
+      <h6>Target: {otherDeviceId}</h6>
 
       <div className="flex gap-2 flex-wrap">
         <button
@@ -55,7 +55,7 @@ export default function Home() {
               });
 
               toast(result.content);
-              setTarget(result.content);
+              cb.setOtherDeviceId(result.content);
             });
           }}
         >
@@ -64,8 +64,8 @@ export default function Home() {
 
         <button
           className={buttonClass}
-          disabled={!target}
-          onClick={() => connect(target)}
+          disabled={!otherDeviceId}
+          onClick={() => connect(otherDeviceId ?? "")}
         >
           connect
         </button>
