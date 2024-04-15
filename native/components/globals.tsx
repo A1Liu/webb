@@ -11,7 +11,7 @@ import { get, set, del } from "idb-keyval";
 import { useEffect } from "react";
 import { doPlatformInit } from "./hooks/usePlatform";
 import { registerGlobal } from "./constants";
-import { NetworkLayer } from "@a1liu/webb-ui-shared/network";
+import { NetworkLayer, PeerData } from "@a1liu/webb-ui-shared/network";
 import { getId, memoize } from "@a1liu/webb-ui-shared/util";
 
 export const getNetworkLayerGlobal = registerGlobal("networkLayer", () => {
@@ -59,10 +59,6 @@ export enum AppStateKind {
 type AppState =
   | { kind: AppStateKind.Page; backgroundFlowId?: undefined }
   | { kind: AppStateKind.BackgroundFlow; backgroundFlowId: string };
-
-interface PeerData {
-  readonly id: string;
-}
 
 interface PersistedAppState {
   otherDeviceId: string;
@@ -168,7 +164,7 @@ const useGlobals = create<WebbGlobals>()(
 const initNetworkLayer = memoize(async () => {
   while (true) {
     const peer = await getNetworkLayerGlobal().listen();
-    useGlobals.getState().cb.addPeer({ id: peer.name });
+    useGlobals.getState().cb.addPeer(peer);
   }
 });
 

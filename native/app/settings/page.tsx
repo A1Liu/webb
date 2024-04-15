@@ -50,10 +50,6 @@ export default function Home() {
           Refresh
         </button>
 
-        <Link href={"/my-qr-code"}>
-          <button className={buttonClass}>QR</button>
-        </Link>
-
         {isMobile ? (
           <button
             className={buttonClass}

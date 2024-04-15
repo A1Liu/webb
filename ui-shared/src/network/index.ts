@@ -1,6 +1,6 @@
 import { Peer } from "peerjs";
 import { DataConnection } from "peerjs";
-import { Future, memoize, UnwrappedPromise } from "../util";
+import { Future, memoize, timeout, UnwrappedPromise } from "../util";
 import { Channel } from "../channel";
 
 // TODO: Figure out what to do here long term. For now, this is the shit implementation.
@@ -12,15 +12,20 @@ import { Channel } from "../channel";
 
 const getPeerjsCode = memoize(() => import("peerjs"));
 
+export interface PeerData {
+  id: string;
+}
+
 export class NetworkLayer {
   private readonly dataChannels = new Map<string, Set<DataConnection>>();
 
-  readonly inboundPeerChannel = new Channel<PeerConnection>();
+  readonly inboundPeerChannel = new Channel<PeerData>(Infinity);
   readonly connections = new Map<string, PeerConnection>();
 
   constructor(readonly id: string) {}
 
   static getPeer(network: NetworkLayer): UnwrappedPromise<Peer> {
+    console.log("getting peer");
     const fut = new Future<Peer>();
 
     getPeerjsCode().then((peerjs) => {
@@ -46,11 +51,11 @@ export class NetworkLayer {
       });
       peer.on("disconnected", () => {
         console.log("Peer disconnect");
-        network._peerGetter.clear();
+        network.reset();
       });
       peer.on("close", () => {
         console.error("Peer close");
-        network._peerGetter.clear();
+        network.reset();
       });
     });
 
@@ -61,11 +66,9 @@ export class NetworkLayer {
     const existingPeerConn = this.connections.get(peerId);
     if (existingPeerConn) return existingPeerConn;
 
-    const peerConn = new PeerConnection(peerId, new Channel<string>(), (data) =>
-      this.sendData({ id: peerId, data })
-    );
+    const peerConn = new PeerConnection(peerId, new Channel<string>(Infinity));
     this.connections.set(peerId, peerConn);
-    this.inboundPeerChannel.send(peerConn);
+    this.inboundPeerChannel.send({ id: peerId });
 
     return peerConn;
   }
@@ -96,10 +99,7 @@ export class NetworkLayer {
       const dataChannels = this.dataChannels.get(peerId);
       dataChannels?.delete(conn);
 
-      const peer = this._peerGetter().value;
-      if (peer && !peer.destroyed) {
-        peer.destroy();
-      }
+      this.reset();
     });
     conn.on("iceStateChanged", (evt) => {
       console.log("ice state changed", JSON.stringify(evt));
@@ -118,7 +118,8 @@ export class NetworkLayer {
     }
 
     const fut = new Future<DataConnection>();
-    const peer = await this._peerGetter().promise;
+    const peerFut = this._peerGetter();
+    const peer = peerFut.value ?? (await peerFut.promise);
     const conn = peer.connect(peerId, { serialization: "raw" });
     conn.on("open", () => {
       console.log("PeerConn started");
@@ -133,18 +134,35 @@ export class NetworkLayer {
     return NetworkLayer.getPeer(this);
   });
 
+  reset() {
+    const peer = this._peerGetter.memoizedValue?.value;
+    if (peer && !peer.destroyed) {
+      peer.destroy();
+    }
+
+    this._peerGetter.clear();
+
+    // We should always re-connect ASAP so that subsequent messages don't get
+    // dropped. However, we don't want to connect immediately, because other
+    // event handlers might still need to fire (and they'll call this method).
+    //
+    // This timeout prevents errors from causing an infinite loop when e.g.
+    // a peer disconnects.
+    timeout(1000).then(() => this._peerGetter());
+  }
+
   get peer(): Promise<Peer> {
     return this._peerGetter().promise;
   }
 
-  async listen(): Promise<PeerConnection> {
+  async listen(): Promise<PeerData> {
     this._peerGetter();
     return this.inboundPeerChannel.pop();
   }
 
   async recv(id: string): Promise<string> {
     const peerConn = this.getPeer(id);
-    return await peerConn.recv();
+    return await peerConn.inboundPackets.pop();
   }
 
   async sendData({ id, data }: { data: string; id: string }) {
@@ -170,17 +188,5 @@ export class NetworkLayer {
 }
 
 export class PeerConnection {
-  constructor(
-    readonly name: string,
-    readonly inboundPackets: Channel<string>,
-    readonly sendOut: (data: string) => Promise<void>
-  ) {}
-
-  async send(data: string) {
-    await this.sendOut(data);
-  }
-
-  async recv() {
-    return await this.inboundPackets.pop();
-  }
+  constructor(readonly id: string, readonly inboundPackets: Channel<string>) {}
 }

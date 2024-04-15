@@ -8,21 +8,23 @@ export function timeout(ms: number): Promise<void> {
   return new Promise((res) => setTimeout(res, ms));
 }
 
-export function memoize<T>(_maker: () => T): { (): T; clear: () => void } {
+export function memoize<T>(
+  _maker: () => T
+): { (): T; clear: () => void; memoizedValue?: T } {
   let maker: (() => T) | undefined = _maker;
-  let slot: T;
 
   const func = () => {
     if (maker) {
       const result = maker();
       maker = undefined;
-      slot = result;
+      func.memoizedValue = result;
       return result;
     }
 
-    return slot;
+    return func.memoizedValue as T;
   };
 
+  func.memoizedValue = undefined as undefined | T;
   func.clear = () => {
     maker = _maker;
   };
