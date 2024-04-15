@@ -70,7 +70,11 @@ export default function Home() {
           connect
         </button>
 
-        <button className={buttonClass} onClick={() => send("hello")}>
+        <button
+          className={buttonClass}
+          disabled={!otherDeviceId}
+          onClick={() => send("hello")}
+        >
           send hi
         </button>
 

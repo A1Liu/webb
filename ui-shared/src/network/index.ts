@@ -93,9 +93,11 @@ export class NetworkLayer {
     });
     conn.on("error", (evt) => {
       console.error("conn error", JSON.stringify(evt));
+      conn.close();
     });
     conn.on("close", () => {
       console.log("conn closed");
+
       const dataChannels = this.dataChannels.get(peerId);
       dataChannels?.delete(conn);
 
@@ -106,6 +108,9 @@ export class NetworkLayer {
     });
     conn.on("iceStateChanged", (evt) => {
       console.log("ice state changed", JSON.stringify(evt));
+      if (evt === "disconnected") {
+        conn.close();
+      }
     });
   }
 
