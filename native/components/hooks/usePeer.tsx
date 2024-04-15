@@ -109,7 +109,7 @@ function IncomingPeer({ peer }: { peer: PeerConnection }) {
     };
   }, [peer]);
   return (
-    <div className="flex gap-2 p-3">
+    <div className="flex items-center gap-2 p-3">
       <p>Peer {peer.name}</p>
 
       <button
