@@ -188,5 +188,8 @@ export class NetworkLayer {
 }
 
 export class PeerConnection {
-  constructor(readonly id: string, readonly inboundPackets: Channel<string>) {}
+  constructor(
+    readonly id: string,
+    readonly inboundPackets: Channel<string>,
+  ) {}
 }

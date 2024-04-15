@@ -47,7 +47,7 @@ export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
 
       <h4 className="text-center">{title}</h4>
 
-      <div className={"flex flex-col gap-4 px-8"}>{children}</div>
+      <div className={"flex flex-col gap-4 px-2 w-full"}>{children}</div>
     </main>
   );
 }

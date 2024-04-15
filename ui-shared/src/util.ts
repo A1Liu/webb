@@ -8,9 +8,11 @@ export function timeout(ms: number): Promise<void> {
   return new Promise((res) => setTimeout(res, ms));
 }
 
-export function memoize<T>(
-  _maker: () => T
-): { (): T; clear: () => void; memoizedValue?: T } {
+export function memoize<T>(_maker: () => T): {
+  (): T;
+  clear: () => void;
+  memoizedValue?: T;
+} {
   let maker: (() => T) | undefined = _maker;
 
   const func = () => {

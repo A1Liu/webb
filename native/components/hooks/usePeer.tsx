@@ -10,7 +10,7 @@ interface PeerContext {
 
 export function usePeer(
   peerId: string,
-  opts: { onData: (data: string) => void }
+  opts: { onData: (data: string) => void },
 ): PeerContext {
   const dataListenerRef = useRef<(data: string) => void>(opts.onData);
   dataListenerRef.current = opts.onData;
@@ -52,8 +52,10 @@ function IncomingPeer({ peer }: { peer: { id: string } }) {
   });
 
   return (
-    <div className="flex items-center gap-2 p-3">
-      <p>Peer {peer.id}</p>
+    <div className="flex items-center gap-2 p-1 border rounded">
+      <p className="text-ellipsis basis-0 grow overflow-hidden">
+        {peer.id.replaceAll("-", "")}
+      </p>
 
       <button
         className="bg-sky-700 p-2 rounded hover:bg-sky-900"

@@ -32,7 +32,7 @@ const usePlatformImpl = create<{ info: PlatformInfo; init: () => void }>(
               };
             default:
               throw new Error(
-                `failed to work on platform: ${navigator.platform}`
+                `failed to work on platform: ${navigator.platform}`,
               );
           }
         })();
@@ -40,7 +40,7 @@ const usePlatformImpl = create<{ info: PlatformInfo; init: () => void }>(
         set({ info });
       },
     };
-  }
+  },
 );
 
 export function usePlatform(): PlatformInfo {
