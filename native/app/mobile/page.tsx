@@ -15,7 +15,7 @@ const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 export default function Home() {
   const { otherDeviceId } = usePersistedState();
   const cb = useModifyGlobals();
-  const { connect, send } = usePeer({
+  const { connect, send } = usePeer(otherDeviceId ?? "", {
     onData: (data) => {
       toast(`data=${data}`);
     },
@@ -65,7 +65,7 @@ export default function Home() {
         <button
           className={buttonClass}
           disabled={!otherDeviceId}
-          onClick={() => connect(otherDeviceId ?? "")}
+          onClick={() => connect()}
         >
           connect
         </button>

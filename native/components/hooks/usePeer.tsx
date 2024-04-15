@@ -12,11 +12,14 @@ const getNetworkLayerGlobal = registerGlobal("networkLayer", () => {
 });
 
 interface PeerContext {
-  connect: (target: string) => Promise<void>;
+  connect: () => Promise<void>;
   send: (s: string) => void;
 }
 
-export function usePeer(opts: { onData: (data: string) => void }): PeerContext {
+export function usePeer(
+  target: string,
+  opts: { onData: (data: string) => void }
+): PeerContext {
   const connectionRef = useRef<PeerConnection>();
   const dataListenerRef = useRef<(data: string) => void>(opts.onData);
   dataListenerRef.current = opts.onData;
@@ -46,27 +49,37 @@ export function usePeer(opts: { onData: (data: string) => void }): PeerContext {
     };
   }, []);
 
+  async function connect() {
+    if (connectionRef.current) return connectionRef.current;
+
+    if (!target) {
+      throw new Error("empty string target");
+    }
+
+    const layer = getNetworkLayerGlobal();
+    const conn = await layer.connect(target);
+    toast("connected!");
+
+    connectionRef.current = conn;
+
+    return conn;
+  }
+
   return {
-    connect: async (target) => {
-      if (connectionRef.current) return;
-
+    connect: async () => {
       try {
-        const layer = getNetworkLayerGlobal();
-        const conn = await layer.connect(target);
-        toast("connected!");
-
-        connectionRef.current = conn;
+        connect();
       } catch (e) {
         toast.error(String(e));
       }
     },
     send: async (s) => {
-      if (connectionRef.current === undefined) {
-        return;
+      try {
+        const conn = await connect();
+        await conn.send(s);
+      } catch (e) {
+        toast.error(String(e));
       }
-
-      const channel = connectionRef.current;
-      await channel.send(s);
     },
   };
 }
