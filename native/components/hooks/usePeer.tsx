@@ -25,8 +25,27 @@ export function usePeer(
   dataListenerRef.current = opts.onData;
 
   useEffect(() => {
-    getNetworkLayerGlobal().peer;
-  }, []);
+    const layer = getNetworkLayerGlobal();
+    layer.connect(target).then((conn) => {
+      connectionRef.current = conn;
+    });
+  }, [target]);
+
+  async function connect() {
+    if (connectionRef.current) return connectionRef.current;
+
+    if (!target) {
+      throw new Error("empty string target");
+    }
+
+    const layer = getNetworkLayerGlobal();
+    const conn = await layer.connect(target);
+    toast("connected!");
+
+    connectionRef.current = conn;
+
+    return conn;
+  }
 
   useEffect(() => {
     let run = true;
@@ -48,22 +67,6 @@ export function usePeer(
       run = false;
     };
   }, []);
-
-  async function connect() {
-    if (connectionRef.current) return connectionRef.current;
-
-    if (!target) {
-      throw new Error("empty string target");
-    }
-
-    const layer = getNetworkLayerGlobal();
-    const conn = await layer.connect(target);
-    toast("connected!");
-
-    connectionRef.current = conn;
-
-    return conn;
-  }
 
   return {
     connect: async () => {
