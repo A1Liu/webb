@@ -1,6 +1,12 @@
 import { create } from "zustand";
 
+enum Platform {
+  MacOS = "MacOS",
+  IPhone = "iPhone",
+}
+
 interface PlatformInfo {
+  platform: Platform;
   isMobile: boolean;
 }
 
@@ -8,15 +14,22 @@ const usePlatformImpl = create<{ info: PlatformInfo; init: () => void }>(
   (set) => {
     return {
       info: {
+        platform: Platform.MacOS,
         isMobile: false,
       },
       init: () => {
         const info = ((): Omit<PlatformInfo, "cb"> => {
           switch (navigator.platform.toLowerCase()) {
             case "macintel":
-              return { isMobile: false };
+              return {
+                platform: Platform.MacOS,
+                isMobile: false,
+              };
             case "iphone":
-              return { isMobile: true };
+              return {
+                platform: Platform.IPhone,
+                isMobile: true,
+              };
             default:
               throw new Error(
                 `failed to work on platform: ${navigator.platform}`

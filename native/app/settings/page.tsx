@@ -16,7 +16,7 @@ export const dynamic = "force-static";
 const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 export default function Home() {
-  const { isMobile } = usePlatform();
+  const { isMobile, platform } = usePlatform();
   const { otherDeviceId } = usePersistedState();
   const cb = useModifyGlobals();
   const { connect } = usePeer(otherDeviceId ?? "", {
@@ -41,11 +41,15 @@ export default function Home() {
     <main
       className={clsx("flex h-full flex-col items-center gap-4 py-24 px-8")}
     >
-      <h4>Mobile</h4>
+      <h4>{platform}</h4>
 
       <h6>Target: {otherDeviceId}</h6>
 
       <div className="flex gap-2 flex-wrap">
+        <Link href={"/"}>
+          <button className={buttonClass}>Home</button>
+        </Link>
+
         <button
           className={buttonClass}
           onClick={() => window.location.reload()}

@@ -26,10 +26,6 @@ export default function Home() {
         <Link href={"/settings"}>
           <button className={buttonClass}>Settings</button>
         </Link>
-
-        <Link href={"/desktop"}>
-          <button className={buttonClass}>Desktop</button>
-        </Link>
       </div>
     </main>
   );
