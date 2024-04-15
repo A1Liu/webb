@@ -61,13 +61,8 @@ export class NetworkLayer {
     const existingPeerConn = this.connections.get(peerId);
     if (existingPeerConn) return existingPeerConn;
 
-    const peerConn = new PeerConnection(
-      peerId,
-      new Channel<string>(),
-      async (data) => {
-        const channel = await this.getDataChannel(peerId);
-        await channel.send(data);
-      }
+    const peerConn = new PeerConnection(peerId, new Channel<string>(), (data) =>
+      this.sendData({ id: peerId, data })
     );
     this.connections.set(peerId, peerConn);
     this.inboundPeerChannel.send(peerConn);
@@ -145,6 +140,16 @@ export class NetworkLayer {
   async listen(): Promise<PeerConnection> {
     this._peerGetter();
     return this.inboundPeerChannel.pop();
+  }
+
+  async recv(id: string): Promise<string> {
+    const peerConn = this.getPeer(id);
+    return await peerConn.recv();
+  }
+
+  async sendData({ id, data }: { data: string; id: string }) {
+    const channel = await this.getDataChannel(id);
+    await channel.send(data);
   }
 
   async connect(peerId: string): Promise<PeerConnection> {

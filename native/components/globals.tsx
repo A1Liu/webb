@@ -10,6 +10,13 @@ import Head from "next/head";
 import { get, set, del } from "idb-keyval";
 import { useEffect } from "react";
 import { doPlatformInit } from "./hooks/usePlatform";
+import { registerGlobal } from "./constants";
+import { NetworkLayer } from "@a1liu/webb-ui-shared/network";
+import { getId, memoize } from "@a1liu/webb-ui-shared/util";
+
+export const getNetworkLayerGlobal = registerGlobal("networkLayer", () => {
+  return new NetworkLayer(getId());
+});
 
 // TODO: replace with real logging, e.g. pino
 if (typeof window !== "undefined") {
@@ -53,8 +60,13 @@ type AppState =
   | { kind: AppStateKind.Page; backgroundFlowId?: undefined }
   | { kind: AppStateKind.BackgroundFlow; backgroundFlowId: string };
 
+interface PeerData {
+  readonly id: string;
+}
+
 interface PersistedAppState {
   otherDeviceId: string;
+  peers: Record<string, PeerData>;
 }
 
 interface BackgroundFlowOptions {}
@@ -70,12 +82,20 @@ interface WebbGlobals {
   state: AppState;
   persistedState: Partial<PersistedAppState> | typeof NO_HYDRATE;
 
+  privateCb: {
+    setPersistedData(
+      createState: (
+        state: Partial<PersistedAppState>
+      ) => Partial<PersistedAppState>
+    ): void;
+  };
+
   cb: {
     runBackgroundFlow: (
       flow: (props: BackgroundFlowProps) => Promise<void>,
       opts?: BackgroundFlowOptions
     ) => Promise<void>;
-    setOtherDeviceId: (val: string) => void;
+    addPeer: (peer: PeerData) => void;
   };
 }
 
@@ -100,9 +120,18 @@ const useGlobals = create<WebbGlobals>()(
         state: { kind: AppStateKind.Page },
         persistedState: NO_HYDRATE,
 
+        privateCb: {
+          setPersistedData,
+        },
+
         cb: {
-          setOtherDeviceId: (otherDeviceId) => {
-            setPersistedData((prev) => ({ ...prev, otherDeviceId }));
+          addPeer: (peer) => {
+            setPersistedData((prev) => ({
+              peers: {
+                ...prev.peers,
+                [peer.id]: peer,
+              },
+            }));
           },
           runBackgroundFlow: async (runFlow) => {
             const id = uuid();
@@ -135,6 +164,13 @@ const useGlobals = create<WebbGlobals>()(
     }
   )
 );
+
+const initNetworkLayer = memoize(async () => {
+  while (true) {
+    const peer = await getNetworkLayerGlobal().listen();
+    useGlobals.getState().cb.addPeer({ id: peer.name });
+  }
+});
 
 export function usePersistedState<S>(
   pick: (s: Partial<PersistedAppState>) => S
@@ -169,6 +205,8 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
     useGlobals.persist.rehydrate();
 
     doPlatformInit();
+
+    initNetworkLayer();
   }, []);
 
   return (
