@@ -11,14 +11,14 @@ export default function Home() {
       title={"Home"}
       buttons={[
         {
-          type: "button",
-          text: "Refresh",
-          onClick: () => window.location.reload(),
-        },
-        {
           type: "link",
           text: "Settings",
           href: "/settings",
+        },
+        {
+          type: "button",
+          text: "Refresh",
+          onClick: () => window.location.reload(),
         },
       ]}
     >

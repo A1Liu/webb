@@ -19,35 +19,37 @@ export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
   // py-24 px-8
   return (
     <main className={clsx("flex h-full flex-col gap-4")}>
-      <div className="flex gap-2 flex-wrap justify-end w-full p-4">
-        {buttons.map((buttonInfo) => {
-          switch (buttonInfo.type) {
-            case "link":
-              return (
-                <Link
-                  key={`${buttonInfo.type}-${buttonInfo.text}-${buttonInfo.href}`}
-                  href={buttonInfo.href}
-                >
-                  <button className={buttonClass}>{buttonInfo.text}</button>
-                </Link>
-              );
-            case "button":
-              return (
-                <button
-                  key={`${buttonInfo.type}-${buttonInfo.text}`}
-                  className={buttonClass}
-                  onClick={() => buttonInfo.onClick()}
-                >
-                  {buttonInfo.text}
-                </button>
-              );
-          }
-        })}
+      <div className="flex justify-between items-center p-4 w-full">
+        <h4>{title}</h4>
+
+        <div className="flex gap-2 flex-wrap">
+          {buttons.map((buttonInfo) => {
+            switch (buttonInfo.type) {
+              case "link":
+                return (
+                  <Link
+                    key={`${buttonInfo.type}-${buttonInfo.text}-${buttonInfo.href}`}
+                    href={buttonInfo.href}
+                  >
+                    <button className={buttonClass}>{buttonInfo.text}</button>
+                  </Link>
+                );
+              case "button":
+                return (
+                  <button
+                    key={`${buttonInfo.type}-${buttonInfo.text}`}
+                    className={buttonClass}
+                    onClick={() => buttonInfo.onClick()}
+                  >
+                    {buttonInfo.text}
+                  </button>
+                );
+            }
+          })}
+        </div>
       </div>
 
-      <h4 className="text-center">{title}</h4>
-
-      <div className={"flex flex-col gap-4 px-2 w-full"}>{children}</div>
+      <div className={"flex flex-col gap-4 px-4 w-full"}>{children}</div>
     </main>
   );
 }
