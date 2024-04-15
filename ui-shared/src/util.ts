@@ -8,11 +8,11 @@ export function timeout(ms: number): Promise<void> {
   return new Promise((res) => setTimeout(res, ms));
 }
 
-export function memoize<T>(_maker: () => T): () => T {
+export function memoize<T>(_maker: () => T): { (): T; clear: () => void } {
   let maker: (() => T) | undefined = _maker;
   let slot: T;
 
-  return () => {
+  const func = () => {
     if (maker) {
       const result = maker();
       maker = undefined;
@@ -22,6 +22,12 @@ export function memoize<T>(_maker: () => T): () => T {
 
     return slot;
   };
+
+  func.clear = () => {
+    maker = _maker;
+  };
+
+  return func;
 }
 
 export interface UnwrappedPromise<T> {
