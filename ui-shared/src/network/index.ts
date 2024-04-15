@@ -1,6 +1,6 @@
 import { Peer } from "peerjs";
 import type { DataConnection } from "peerjs";
-import { Future, memoize } from "../util";
+import { Future, memoize, UnwrappedPromise } from "../util";
 import { Channel } from "../channel";
 
 // TODO: Figure out what to do here long term. For now, this is the shit implementation.
@@ -9,14 +9,17 @@ import { Channel } from "../channel";
 // tied directly to device+user IDs. For now... I guess this is fine.
 
 // make new peerjs peer+conn frequently
+
+const getPeerjsCode = memoize(() => import("peerjs"));
+
 export class NetworkLayer {
   readonly inboundConnectionChannel = new Channel<PeerConnection>();
 
-  private readonly _peerGetter = memoize(() => {
+  static getPeer(network: NetworkLayer): UnwrappedPromise<Peer> {
     const fut = new Future<Peer>();
 
-    import("peerjs").then((peerjs) => {
-      const peer = new peerjs.Peer(this.id, { debug: 2 });
+    getPeerjsCode().then((peerjs) => {
+      const peer = new peerjs.Peer(network.id, { debug: 2 });
 
       peer.on("open", () => {
         console.log("peer opened");
@@ -27,7 +30,7 @@ export class NetworkLayer {
           conn.on("open", () => {
             console.log("PeerConn from listen");
             const peerConn = new PeerConnection(conn);
-            this.inboundConnectionChannel.send(peerConn);
+            network.inboundConnectionChannel.send(peerConn);
           });
         });
       });
@@ -38,17 +41,21 @@ export class NetworkLayer {
         console.log("Peer disconnect");
       });
       peer.on("close", () => {
-        console.error("peer close");
+        console.error("Peer close");
       });
     });
 
     return fut.unwrapped;
+  }
+
+  private _peerGetter = memoize(() => {
+    return NetworkLayer.getPeer(this);
   });
 
   constructor(readonly id: string) {}
 
-  get peer(): Peer | undefined {
-    return this._peerGetter().value;
+  get peer(): Promise<Peer> {
+    return this._peerGetter().promise;
   }
 
   async listen(): Promise<PeerConnection> {
