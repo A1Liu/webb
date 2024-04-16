@@ -1,13 +1,11 @@
 "use client";
 
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import type { StateStorage } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 import { v4 as uuid } from "uuid";
 import { toast, Toaster } from "react-hot-toast";
 import clsx from "clsx";
 import Head from "next/head";
-import { get, set, del } from "idb-keyval";
 import { useEffect } from "react";
 import { doPlatformInit } from "./hooks/usePlatform";
 import { registerGlobal } from "./constants";
@@ -15,6 +13,7 @@ import { NetworkLayer, PeerData } from "@a1liu/webb-ui-shared/network";
 import { getId, memoize } from "@a1liu/webb-ui-shared/util";
 import { z } from "zod";
 import md5 from "md5";
+import { ZustandJsonStorage } from "./util";
 
 export const getNetworkLayerGlobal = registerGlobal("networkLayer", () => {
   return new NetworkLayer(getId());
@@ -33,21 +32,6 @@ if (typeof window !== "undefined") {
     error(...args);
   };
 }
-
-// Custom storage object
-const storage: StateStorage = {
-  getItem: async (name: string): Promise<string | null> => {
-    return (await get(name)) ?? null;
-  },
-  setItem: async (name: string, value: string): Promise<void> => {
-    console.debug("IDB set", { name, value });
-    await set(name, value);
-  },
-  removeItem: async (name: string): Promise<void> => {
-    console.debug("IDB remove", { name });
-    await del(name);
-  },
-};
 
 export enum AppStateKind {
   Page = "Page",
@@ -230,62 +214,7 @@ export const useGlobals = create<WebbGlobals>()(
 
     {
       name: "global-storage",
-      storage: createJSONStorage(() => storage, {
-        reviver: (_key, value) => {
-          try {
-            if (
-              !value ||
-              typeof value !== "object" ||
-              !("__typename" in value)
-            ) {
-              return value;
-            }
-
-            switch (value.__typename) {
-              case "Map": {
-                const schema = z.object({
-                  state: z.array(z.tuple([z.string(), z.unknown()])),
-                });
-                const parsed = schema.parse(value);
-
-                return new Map(parsed.state);
-              }
-              case "Date": {
-                const schema = z.object({ state: z.string() });
-                const parsed = schema.parse(value);
-
-                return new Date(parsed.state);
-              }
-
-              default:
-                toast.error(`Unrecognized typename: ${value.__typename}`);
-                throw new Error(`Unrecognized typename: ${value.__typename}`);
-            }
-          } catch (e) {
-            toast.error(
-              `Unrecognized typename: ${String(
-                JSON.stringify(value),
-              )} with ${e}`,
-            );
-          }
-        },
-        replacer: (_key, value) => {
-          if (value instanceof Map) {
-            return {
-              __typename: "Map",
-              state: Array.from(value.entries()),
-            };
-          }
-          if (value instanceof Date) {
-            return {
-              __typename: "Date",
-              state: value.toISOString(),
-            };
-          }
-
-          return value;
-        },
-      }),
+      storage: ZustandJsonStorage,
       skipHydration: true,
       partialize: ({ persistedState }) => ({ persistedState }),
     },
