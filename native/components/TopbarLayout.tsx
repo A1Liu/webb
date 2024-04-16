@@ -13,7 +13,8 @@ interface TopbarLayoutProps {
   children: React.ReactNode;
 }
 
-const buttonClass = "bg-sky-700 px-2 py-1 rounded hover:bg-sky-900 p-10";
+export const buttonClass =
+  "bg-sky-700 px-2 py-1 rounded hover:bg-sky-900 p-10 disabled:hover:bg-sky-700";
 
 export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
   // py-24 px-8

@@ -8,7 +8,9 @@ export function timeout(ms: number): Promise<void> {
   return new Promise((res) => setTimeout(res, ms));
 }
 
-export function memoize<T>(_maker: () => T): {
+export function memoize<T>(
+  _maker: () => T
+): {
   (): T;
   clear: () => void;
   memoizedValue?: T;
@@ -85,4 +87,20 @@ export function getId(): string {
   }
 
   return id;
+}
+
+// Gets from Map. If the value doesn't exist, compute it using the provided lambda
+// and store it in the map, and then return it
+export function getOrCompute<T>(
+  map: Map<string, T>,
+  key: string,
+  make: () => T
+): T {
+  const value = map.get(key);
+  if (value !== undefined) return value;
+
+  const newValue = make();
+  map.set(key, newValue);
+
+  return newValue;
 }

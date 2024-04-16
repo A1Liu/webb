@@ -1,6 +1,12 @@
 import { Peer } from "peerjs";
 import { DataConnection } from "peerjs";
-import { Future, memoize, timeout, UnwrappedPromise } from "../util";
+import {
+  Future,
+  getOrCompute,
+  memoize,
+  timeout,
+  UnwrappedPromise,
+} from "../util";
 import { Channel } from "../channel";
 
 // TODO: Figure out what to do here long term. For now, this is the shit implementation.
@@ -12,18 +18,6 @@ import { Channel } from "../channel";
 
 const getPeerjsCode = memoize(() => import("peerjs"));
 
-// Gets from Map. If the value doesn't exist, compute it using the provided lambda
-// and store it in the map, and then return it
-function getOrCompute<T>(map: Map<string, T>, key: string, make: () => T): T {
-  const value = map.get(key);
-  if (value !== undefined) return value;
-
-  const newValue = make();
-  map.set(key, newValue);
-
-  return newValue;
-}
-
 export interface PeerData {
   id: string;
 }
@@ -32,11 +26,13 @@ export interface PeerData {
 export interface Chunk {
   peerId: string;
   channel: string;
+  ignorePeerIdForChannel?: boolean;
   data: unknown;
 }
 
 function getChannel(chunkId: Omit<Chunk, "data">) {
-  return `${chunkId.peerId}\0${chunkId.channel}`;
+  const peerId = chunkId.ignorePeerIdForChannel ? "" : chunkId.peerId;
+  return `${peerId}\0${chunkId.channel}`;
 }
 
 export class NetworkLayer {
@@ -100,17 +96,17 @@ export class NetworkLayer {
 
     conn.on("data", (dataIn) => {
       // TODO: fix the cast later
-      const chunk = dataIn as any as Chunk;
+      const chunk = (dataIn as any) as Chunk;
 
-      const key = getChannel({ peerId, channel: chunk.channel });
+      const key = getChannel({ ...chunk, peerId });
 
       const channel = getOrCompute(
         this.channels,
         key,
-        () => new Channel(Infinity),
+        () => new Channel(Infinity)
       );
 
-      channel.send(chunk);
+      channel.send({ ...chunk, peerId });
     });
     conn.on("error", (evt) => {
       console.error("conn error", JSON.stringify(evt));
@@ -182,7 +178,7 @@ export class NetworkLayer {
     const channel = getOrCompute(
       this.channels,
       key,
-      () => new Channel(Infinity),
+      () => new Channel(Infinity)
     );
 
     return await channel.pop();
@@ -197,6 +193,6 @@ export class NetworkLayer {
 export class PeerConnection {
   constructor(
     readonly id: string,
-    readonly dataChannels: Set<DataConnection>,
+    readonly dataChannels: Set<DataConnection>
   ) {}
 }

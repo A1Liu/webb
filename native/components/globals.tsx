@@ -57,16 +57,21 @@ type AppState =
   | { kind: AppStateKind.Page; backgroundFlowId?: undefined }
   | { kind: AppStateKind.BackgroundFlow; backgroundFlowId: string };
 
-interface NoteData {
-  id: string;
-  hash: string;
-  text: string;
-  date: Date;
-}
+export type NoteData = z.infer<typeof NoteDataSchema> & {
+  // TODO: probably need to save where the merges came from as well
+  merges?: z.infer<typeof NoteDataSchema>[];
+};
+export const NoteDataSchema = z.object({
+  id: z.string(),
+  hash: z.string(),
+  text: z.string(),
+  lastUpdateDate: z.coerce.date(),
+  lastSyncDate: z.coerce.date(),
+});
 
 interface PersistedAppState {
   otherDeviceId: string;
-  peers: Record<string, PeerData>;
+  peers: Map<string, PeerData>;
   activeNote: string;
   notes: Map<string, NoteData>;
 }
@@ -87,15 +92,15 @@ interface WebbGlobals {
   privateCb: {
     setPersistedData(
       createState: (
-        state: Partial<PersistedAppState>,
-      ) => Partial<PersistedAppState>,
+        state: Partial<PersistedAppState>
+      ) => Partial<PersistedAppState>
     ): void;
   };
 
   cb: {
     runBackgroundFlow: (
       flow: (props: BackgroundFlowProps) => Promise<void>,
-      opts?: BackgroundFlowOptions,
+      opts?: BackgroundFlowOptions
     ) => Promise<void>;
     addPeer: (peer: PeerData) => void;
     updateNote: (note: NoteData) => void;
@@ -105,13 +110,13 @@ interface WebbGlobals {
 
 // NOTE: we need to call this with `create()(stuff)` because otherwise Typescript
 // has an aneurysm.
-const useGlobals = create<WebbGlobals>()(
+export const useGlobals = create<WebbGlobals>()(
   persist(
     (set, get) => {
       function setPersistedData(
         createState: (
-          state: Partial<PersistedAppState>,
-        ) => Partial<PersistedAppState>,
+          state: Partial<PersistedAppState>
+        ) => Partial<PersistedAppState>
       ): void {
         set((prev) => ({
           persistedState:
@@ -151,12 +156,11 @@ const useGlobals = create<WebbGlobals>()(
             }));
           },
           addPeer: (peer) => {
-            setPersistedData((prev) => ({
-              peers: {
-                ...prev.peers,
-                [peer.id]: peer,
-              },
-            }));
+            setPersistedData((prev) => {
+              const peers = new Map(prev.peers ?? []);
+              peers.set(peer.id, peer);
+              return { peers };
+            });
           },
           runBackgroundFlow: async (runFlow) => {
             const id = uuid();
@@ -217,8 +221,8 @@ const useGlobals = create<WebbGlobals>()(
           } catch (e) {
             toast.error(
               `Unrecognized typename: ${String(
-                JSON.stringify(value),
-              )} with ${e}`,
+                JSON.stringify(value)
+              )} with ${e}`
             );
           }
         },
@@ -241,8 +245,8 @@ const useGlobals = create<WebbGlobals>()(
       }),
       skipHydration: true,
       partialize: ({ persistedState }) => ({ persistedState }),
-    },
-  ),
+    }
+  )
 );
 
 const initNetworkLayer = memoize(async () => {
@@ -253,14 +257,14 @@ const initNetworkLayer = memoize(async () => {
 });
 
 export function usePersistedState<S>(
-  pick: (s: Partial<PersistedAppState>) => S,
+  pick: (s: Partial<PersistedAppState>) => S
 ): S;
 export function usePersistedState(): Partial<PersistedAppState>;
 export function usePersistedState<S>(
-  pick: (s: Partial<PersistedAppState>) => S = (s) => s as S,
+  pick: (s: Partial<PersistedAppState>) => S = (s) => s as S
 ): S {
   return useGlobals((s) =>
-    pick(typeof s.persistedState === "symbol" ? {} : s.persistedState),
+    pick(typeof s.persistedState === "symbol" ? {} : s.persistedState)
   );
 }
 
@@ -277,7 +281,7 @@ export function useModifyGlobals(): WebbGlobals["cb"] {
 // For debugging state
 const initUseGlobalRegistration = registerGlobal(
   "globalZustand",
-  () => useGlobals,
+  () => useGlobals
 );
 
 export function GlobalWrapper({ children }: { children: React.ReactNode }) {
@@ -306,7 +310,7 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
       <div
         className={clsx(
           "h-full w-full",
-          kind === AppStateKind.BackgroundFlow && "hidden",
+          kind === AppStateKind.BackgroundFlow && "hidden"
         )}
       >
         {children}
