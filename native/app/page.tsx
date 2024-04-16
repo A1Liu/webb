@@ -13,7 +13,7 @@ import {
 } from "@/components/globals";
 import { v4 as uuid } from "uuid";
 import md5 from "md5";
-import { useDebounceFn, useRequest } from "ahooks";
+import { useRequest } from "ahooks";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { z } from "zod";
 import toast from "react-hot-toast";
@@ -29,7 +29,7 @@ const initSyncListener = memoize(async () => {
       channel: "notes-fetch",
       ignorePeerIdForChannel: true,
     });
-    console.log(`received notes-fetch req`, JSON.stringify(chunk));
+    console.log(`received notes-fetch req`, chunk.peerId);
 
     const { persistedState } = useGlobals.getState();
     if (persistedState === NO_HYDRATE || !persistedState.notes) {
@@ -105,7 +105,6 @@ function SyncNotesButton() {
   const { isMobile } = usePlatform();
   const { runAsync, loading } = useRequest(
     async () => {
-      console.log("sync clicked...");
       if (!peers) return;
 
       console.log("sync starting...");
@@ -119,7 +118,6 @@ function SyncNotesButton() {
         ]);
       }
 
-      console.log("sync setup done");
       for (const [peerId, _peer] of peers.entries()) {
         await network.sendData({
           peerId,
@@ -136,8 +134,6 @@ function SyncNotesButton() {
           peerId,
           channel: "notes-fetch-count",
         });
-
-        console.log(`fetch-count gotten`);
 
         const countResult = z
           .object({ count: z.number() })
@@ -166,24 +162,30 @@ function SyncNotesButton() {
           const versions = getOrCompute(noteVersions, note.id, () => []);
           versions.push(note);
         }
-
-        console.log(`fetch handling done`);
       }
+
+      console.log(`fetch handling done`);
 
       const outboundNotes = new Map<string, NoteData>();
       for (const [noteId, versions] of noteVersions.entries()) {
         const { ...maxSyncNote } = versions.reduce((maxNote, note) => {
+          // TODO: figure out why the timestamps are getting... rounded?
+          // truncated? something is up with the timestamp math.
+          if (md5(maxNote.text) === note.lastSyncHash) return note;
+          if (md5(note.text) === maxNote.lastSyncHash) return maxNote;
+
           if (note.lastSyncDate > maxNote.lastSyncDate) return note;
           if (note.lastSyncDate < maxNote.lastSyncDate) return maxNote;
 
           if (note.lastUpdateDate > maxNote.lastUpdateDate) return note;
+          if (note.lastUpdateDate < maxNote.lastUpdateDate) return maxNote;
 
           return maxNote;
         });
 
         const relevantVersions = versions.filter((version) => {
           if (version.text === maxSyncNote.text) return false;
-          if (version.lastUpdateDate > maxSyncNote.lastSyncDate) return true;
+          if (md5(version.text) === maxSyncNote.lastSyncHash) return false;
 
           return true;
         });
@@ -194,6 +196,7 @@ function SyncNotesButton() {
         }
 
         if (!merges) {
+          maxSyncNote.lastSyncHash = md5(maxSyncNote.text);
           maxSyncNote.lastSyncDate = new Date();
           maxSyncNote.lastUpdateDate = maxSyncNote.lastSyncDate;
           outboundNotes.set(noteId, maxSyncNote);
@@ -285,27 +288,11 @@ export default function Home() {
     (state) =>
       state.notes?.get(state.activeNote ?? "") ?? {
         id: uuid(),
-        hash: md5(""),
         text: "",
+        lastSyncHash: md5(""),
         lastSyncDate: new Date(),
         lastUpdateDate: new Date(),
       },
-  );
-
-  const { run: updateHash } = useDebounceFn(
-    (id: string, text: string) => {
-      cb.updateNote({
-        id,
-        lastUpdateDate: new Date(),
-        lastSyncDate: note.lastSyncDate,
-        text,
-        hash: md5(text),
-      });
-    },
-    {
-      trailing: true,
-      wait: 500,
-    },
   );
 
   return (
@@ -337,10 +324,8 @@ export default function Home() {
             ...note,
             text: evt.target.value,
             lastUpdateDate: new Date(),
-            lastSyncDate: note.lastSyncDate,
           });
           cb.setActiveNote(note.id);
-          updateHash(note.id, evt.target.value);
         }}
       />
     </TopbarLayout>

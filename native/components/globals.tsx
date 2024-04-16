@@ -63,10 +63,10 @@ export type NoteData = z.infer<typeof NoteDataSchema> & {
 };
 export const NoteDataSchema = z.object({
   id: z.string(),
-  hash: z.string(),
   text: z.string(),
   lastUpdateDate: z.coerce.date(),
   lastSyncDate: z.coerce.date(),
+  lastSyncHash: z.string(),
 });
 
 interface PersistedAppState {
