@@ -8,20 +8,6 @@ import Head from "next/head";
 import { useEffect } from "react";
 import { registerGlobal } from "./constants";
 
-// TODO: replace with real logging, e.g. pino
-if (typeof window !== "undefined") {
-  const { error, log } = console;
-
-  console.log = (...args: unknown[]) => {
-    toast(args.map(String).join(" "));
-    log(...args);
-  };
-  console.error = (...args: unknown[]) => {
-    toast.error(args.map(String).join(" "));
-    error(...args);
-  };
-}
-
 export enum AppStateKind {
   Page = "Page",
   BackgroundFlow = "BackgroundFlow",
@@ -46,7 +32,7 @@ interface WebbGlobals {
   cb: {
     runBackgroundFlow: (
       flow: (props: BackgroundFlowProps) => Promise<void>,
-      opts?: BackgroundFlowOptions,
+      opts?: BackgroundFlowOptions
     ) => Promise<void>;
   };
 }
@@ -106,7 +92,7 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
       <div
         className={clsx(
           "h-full w-full",
-          kind === AppStateKind.BackgroundFlow && "hidden",
+          kind === AppStateKind.BackgroundFlow && "hidden"
         )}
       >
         {children}

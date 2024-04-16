@@ -1,6 +1,7 @@
 "use client";
 
 import { memoize } from "@a1liu/webb-ui-shared/util";
+import toast from "react-hot-toast";
 
 export const EnvFlags = {
   registeredGlobals: new Map<string, unknown>(),
@@ -58,4 +59,24 @@ registerGlobal.init = memoize(() => {
   for (const init of globalEagerInits.values()) {
     init();
   }
+});
+
+registerGlobal({
+  field: "toast",
+  eagerInit: true,
+  create: () => {
+    // TODO: replace with real logging, e.g. pino
+    const { error, log } = console;
+
+    console.log = (...args: unknown[]) => {
+      toast(args.map(String).join(" "));
+      log(...args);
+    };
+    console.error = (...args: unknown[]) => {
+      toast.error(args.map(String).join(" "));
+      error(...args);
+    };
+
+    return toast;
+  },
 });
