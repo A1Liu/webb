@@ -106,6 +106,7 @@ interface WebbGlobals {
     ) => Promise<void>;
     addPeer: (peer: PeerData) => void;
     updateNote: (id: string, updater: (prev: NoteData) => NoteData) => void;
+    updateNoteFromSync: (note: NoteData) => void;
     setActiveNote: (id: string) => void;
   };
 }
@@ -143,7 +144,7 @@ export const useGlobals = create<WebbGlobals>()(
           setActiveNote: (id) =>
             setPersistedData((prev) => {
               if (prev.activeNote === id) {
-                return {};
+                return prev;
               }
               const prevActive = prev.notes?.get(prev.activeNote ?? "");
               if (prevActive && (!prevActive.text || prevActive.isTombstone)) {
@@ -158,6 +159,28 @@ export const useGlobals = create<WebbGlobals>()(
 
               return { activeNote: id };
             }),
+          updateNoteFromSync: (note: NoteData) => {
+            setPersistedData((prev) => {
+              if (!note.isTombstone) {
+                const notes = new Map(prev.notes ?? []);
+                notes.set(note.id, note);
+                return { notes };
+              }
+
+              const prevNote = prev.notes?.get(note.id);
+              if (!prevNote) return prev;
+
+              const notes = new Map(prev.notes ?? []);
+
+              if (prevNote.isTombstone) {
+                notes.delete(note.id);
+                return { notes };
+              }
+
+              notes.set(note.id, note);
+              return { notes };
+            });
+          },
           updateNote: (noteId, updater) => {
             setPersistedData((prev) => {
               const notes = new Map(prev.notes ?? []);
@@ -172,10 +195,7 @@ export const useGlobals = create<WebbGlobals>()(
 
               notes.set(noteId, updater(prevNote));
 
-              return {
-                ...prev,
-                notes,
-              };
+              return { notes };
             });
           },
           addPeer: (peer) => {

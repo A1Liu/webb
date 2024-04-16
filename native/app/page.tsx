@@ -93,7 +93,7 @@ const initSyncWriteListener = memoize(async () => {
       }
 
       const note = result.data.note;
-      cb.updateNote(note.id, () => note);
+      cb.updateNoteFromSync(note);
     }
 
     console.log(`executed notes-write-data`);
@@ -203,10 +203,10 @@ function SyncNotesButton() {
           outboundNotes.set(noteId, maxSyncNote);
         }
 
-        cb.updateNote(maxSyncNote.id, () => ({
+        cb.updateNoteFromSync({
           ...maxSyncNote,
           merges,
-        }));
+        });
       }
 
       console.log(`Finalized ${outboundNotes.size} notes`);
