@@ -16,7 +16,18 @@ if (typeof window !== "undefined") {
   window.EnvironmentFlags = EnvFlags;
 }
 
-export function registerGlobal<T>(field: string, createT: () => T): () => T {
+interface RegisterGlobalProps<T> {
+  field: string;
+  eagerInit?: boolean;
+  create: () => T;
+}
+
+const globalEagerInits = new Map<string, () => unknown>();
+export function registerGlobal<T>({
+  field,
+  eagerInit,
+  create,
+}: RegisterGlobalProps<T>): () => T {
   if (typeof window === "undefined") {
     return () => {
       throw new Error("failed to register global");
@@ -29,10 +40,22 @@ export function registerGlobal<T>(field: string, createT: () => T): () => T {
 
   window.EnvironmentFlags.registeredGlobals.set(field, null);
 
-  return memoize(() => {
-    const t = createT();
+  const initializer = memoize(() => {
+    const t = create();
 
     window.EnvironmentFlags.registeredGlobals.set(field, t);
     return t;
   });
+
+  if (eagerInit) {
+    globalEagerInits.set(field, initializer);
+  }
+
+  return initializer;
 }
+
+registerGlobal.init = memoize(() => {
+  for (const init of globalEagerInits.values()) {
+    init();
+  }
+});

@@ -288,10 +288,6 @@ export default function Home() {
     }),
   );
 
-  useEffect(() => {
-    useNotesState.persist.rehydrate();
-  }, []);
-
   return (
     <TopbarLayout
       title={"Home"}

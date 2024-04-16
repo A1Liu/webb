@@ -1,12 +1,26 @@
 import { create } from "zustand";
 import { NetworkLayer, PeerData } from "@a1liu/webb-ui-shared/network";
-import { getId, memoize } from "@a1liu/webb-ui-shared/util";
+import { getId } from "@a1liu/webb-ui-shared/util";
 import { persist } from "zustand/middleware";
 import { ZustandJsonStorage } from "../util";
 import { registerGlobal } from "../constants";
 
-export const getNetworkLayerGlobal = registerGlobal("networkLayer", () => {
-  return new NetworkLayer(getId());
+export const getNetworkLayerGlobal = registerGlobal({
+  field: "networkLayer",
+  eagerInit: true,
+  create: () => {
+    const network = new NetworkLayer(getId());
+    async function initListener() {
+      while (true) {
+        const peer = await network.listen();
+        usePeers.getState().cb.addPeer(peer);
+      }
+    }
+
+    initListener();
+
+    return network;
+  },
 });
 
 interface PeersState {
@@ -42,9 +56,14 @@ export const usePeers = create<PeersState>()(
   ),
 );
 
-export const initNetworkLayer = memoize(async () => {
-  while (true) {
-    const peer = await getNetworkLayerGlobal().listen();
-    usePeers.getState().cb.addPeer(peer);
-  }
+registerGlobal({
+  field: "usePeers",
+  eagerInit: true,
+  create: () => {
+    // Manually call rehydrate on startup to work around SSR nonsense
+    // in Next.js
+    usePeers.persist.rehydrate();
+
+    return usePeers;
+  },
 });

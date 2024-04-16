@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { registerGlobal } from "../constants";
 
 enum Platform {
   MacOS = "MacOS",
@@ -10,43 +11,37 @@ interface PlatformInfo {
   isMobile: boolean;
 }
 
-const usePlatformImpl = create<{ info: PlatformInfo; init: () => void }>(
-  (set) => {
-    return {
-      info: {
+export const usePlatform = create<PlatformInfo>(() => {
+  return {
+    platform: Platform.MacOS,
+    isMobile: false,
+  };
+});
+
+function getPlatformInfo(): Omit<PlatformInfo, "cb"> {
+  switch (navigator.platform.toLowerCase()) {
+    case "macintel":
+      return {
         platform: Platform.MacOS,
         isMobile: false,
-      },
-      init: () => {
-        const info = ((): Omit<PlatformInfo, "cb"> => {
-          switch (navigator.platform.toLowerCase()) {
-            case "macintel":
-              return {
-                platform: Platform.MacOS,
-                isMobile: false,
-              };
-            case "iphone":
-              return {
-                platform: Platform.IPhone,
-                isMobile: true,
-              };
-            default:
-              throw new Error(
-                `failed to work on platform: ${navigator.platform}`,
-              );
-          }
-        })();
+      };
+    case "iphone":
+      return {
+        platform: Platform.IPhone,
+        isMobile: true,
+      };
+    default:
+      throw new Error(`failed to work on platform: ${navigator.platform}`);
+  }
+}
 
-        set({ info });
-      },
-    };
+registerGlobal({
+  field: "usePlatform",
+  eagerInit: true,
+  create: () => {
+    const platformInfo = getPlatformInfo();
+    usePlatform.setState(platformInfo);
+
+    return usePlatform;
   },
-);
-
-export function usePlatform(): PlatformInfo {
-  return usePlatformImpl((s) => s.info);
-}
-
-export function doPlatformInit() {
-  usePlatformImpl.getState().init();
-}
+});

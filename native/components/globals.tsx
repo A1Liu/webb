@@ -6,9 +6,7 @@ import { toast, Toaster } from "react-hot-toast";
 import clsx from "clsx";
 import Head from "next/head";
 import { useEffect } from "react";
-import { doPlatformInit } from "./hooks/usePlatform";
 import { registerGlobal } from "./constants";
-import { initNetworkLayer, usePeers } from "./state/peers";
 
 // TODO: replace with real logging, e.g. pino
 if (typeof window !== "undefined") {
@@ -84,10 +82,11 @@ export const useGlobals = create<WebbGlobals>()((set, get) => {
 });
 
 // For debugging state
-const initUseGlobalRegistration = registerGlobal(
-  "globalZustand",
-  () => useGlobals,
-);
+registerGlobal({
+  field: "useGlobals",
+  eagerInit: true,
+  create: () => useGlobals,
+});
 
 export function GlobalWrapper({ children }: { children: React.ReactNode }) {
   const {
@@ -95,15 +94,7 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
   } = useGlobals();
 
   useEffect(() => {
-    // Manually call rehydrate on startup to work around SSR nonsense
-    // in Next.js
-    usePeers.persist.rehydrate();
-
-    doPlatformInit();
-
-    initNetworkLayer();
-
-    initUseGlobalRegistration();
+    registerGlobal.init();
   }, []);
 
   return (

@@ -4,6 +4,7 @@ import { v4 as uuid } from "uuid";
 import { z } from "zod";
 import md5 from "md5";
 import { ZustandJsonStorage } from "../util";
+import { registerGlobal } from "../constants";
 
 export type NoteData = z.infer<typeof NoteDataSchema> & {
   // TODO: probably need to save where the merges came from as well
@@ -105,3 +106,15 @@ export const useNotesState = create<NoteGlobalState>()(
     },
   ),
 );
+
+registerGlobal({
+  field: "useNotesState",
+  eagerInit: true,
+  create: () => {
+    // Manually call rehydrate on startup to work around SSR nonsense
+    // in Next.js
+    useNotesState.persist.rehydrate();
+
+    return useNotesState;
+  },
+});
