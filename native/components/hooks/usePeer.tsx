@@ -29,9 +29,8 @@ export function usePeer<T>(
     async function runner() {
       const network = getNetworkLayerGlobal();
       while (run) {
-        const chunk = await network.recv(peerId);
-        const { data, channel: _recvChannel } = chunk;
-        const result = schema.safeParse(data);
+        const chunk = await network.recv({ peerId, channel });
+        const result = schema.safeParse(chunk.data);
         if (result.success) {
           dataListenerRef.current(result.data);
         } else {
@@ -51,7 +50,7 @@ export function usePeer<T>(
     send: async (data) => {
       try {
         const network = getNetworkLayerGlobal();
-        await network.sendData({ id: peerId, chunk: { data, channel } });
+        await network.sendData({ peerId, data, channel });
       } catch (e) {
         toast.error(String(e));
       }

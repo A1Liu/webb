@@ -30,6 +30,7 @@ export interface PeerData {
 
 // Doesn't work for `Map` type
 export interface Chunk {
+  peerId: string;
   channel: string;
   data: unknown;
 }
@@ -165,13 +166,13 @@ export class NetworkLayer {
     return this.inboundPeerChannel.pop();
   }
 
-  async recv(id: string): Promise<Chunk> {
-    const peerConn = this.getPeer(id);
+  async recv(chunkId: Omit<Chunk, "data">): Promise<Chunk> {
+    const peerConn = this.getPeer(chunkId.peerId);
     return await peerConn.inboundPackets.pop();
   }
 
-  async sendData({ id, chunk }: { chunk: Chunk; id: string }) {
-    const channel = await this.getDataChannel(id);
+  async sendData(chunk: Chunk) {
+    const channel = await this.getDataChannel(chunk.peerId);
     await channel.send(chunk);
   }
 }
