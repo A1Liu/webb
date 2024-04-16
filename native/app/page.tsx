@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { useShallow } from "zustand/react/shallow";
 import { buttonClass, TopbarLayout } from "@/components/TopbarLayout";
 import { v4 as uuid } from "uuid";
@@ -9,17 +9,18 @@ import { useRequest } from "ahooks";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { z } from "zod";
 import toast from "react-hot-toast";
-import { getOrCompute, memoize } from "@a1liu/webb-ui-shared/util";
+import { getOrCompute } from "@a1liu/webb-ui-shared/util";
 import {
   NoteData,
   NoteDataSchema,
   useNotesState,
 } from "@/components/state/notes";
 import { getNetworkLayerGlobal, usePeers } from "@/components/state/peers";
+import { registerInit } from "@/components/constants";
 
 export const dynamic = "force-static";
 
-const initSyncListener = memoize(async () => {
+registerInit("InitSyncFetchResponder", async () => {
   const network = getNetworkLayerGlobal();
   while (true) {
     const chunk = await network.recv({
@@ -46,7 +47,7 @@ const initSyncListener = memoize(async () => {
   }
 });
 
-const initSyncWriteListener = memoize(async () => {
+registerInit("InitSyncWriter", async () => {
   const network = getNetworkLayerGlobal();
   const { cb } = useNotesState.getState();
   while (true) {
@@ -220,11 +221,6 @@ function SyncNotesButton() {
       manual: true,
     },
   );
-
-  useEffect(() => {
-    initSyncListener();
-    initSyncWriteListener();
-  }, []);
 
   if (isMobile) return null;
 

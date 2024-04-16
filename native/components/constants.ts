@@ -49,7 +49,7 @@ export function registerGlobal<T>({
   });
 
   if (eagerInit) {
-    globalEagerInits.set(field, initializer);
+    registerInit(field, initializer);
   }
 
   return initializer;
@@ -59,7 +59,20 @@ registerGlobal.init = memoize(() => {
   for (const init of globalEagerInits.values()) {
     init();
   }
+
+  return true;
 });
+
+export function registerInit(name: string, init: () => void) {
+  const func = memoize(init);
+  if (registerGlobal.init.memoizedValue) {
+    // We've already run initialization,
+    // so this should just execute once global code has finished execution
+    setTimeout(func);
+  }
+
+  globalEagerInits.set(name, func);
+}
 
 registerGlobal({
   field: "toast",
