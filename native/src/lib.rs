@@ -15,6 +15,9 @@ pub struct AppBuilder {
     pub builder: tauri::Builder<tauri::Wry>,
 }
 
+// Download links using:
+// https://stackoverflow.com/questions/77394050/how-can-i-download-the-contents-from-a-url-through-my-tauri-app-on-mac
+
 impl AppBuilder {
     pub fn new() -> Self {
         Self::default()
@@ -36,6 +39,9 @@ impl AppBuilder {
                 if let Some(setup) = setup {
                     (setup)(app)?;
                 }
+
+                // let main_window = app.get_webview_window("main").unwrap();
+
                 Ok(())
             })
             .run(tauri::generate_context!())

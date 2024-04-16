@@ -33,5 +33,11 @@ macro_rules! generate_handler {
 */
 
 fn main() {
-    app::AppBuilder::new().run();
+    let mut app_builder = app::AppBuilder::new();
+
+    app_builder.builder = app_builder
+        .builder
+        .plugin(tauri_plugin_clipboard_manager::init());
+
+    app_builder.run();
 }
