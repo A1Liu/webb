@@ -14,6 +14,7 @@ import { registerGlobal } from "./constants";
 import { NetworkLayer, PeerData } from "@a1liu/webb-ui-shared/network";
 import { getId, memoize } from "@a1liu/webb-ui-shared/util";
 import { z } from "zod";
+import md5 from "md5";
 
 export const getNetworkLayerGlobal = registerGlobal("networkLayer", () => {
   return new NetworkLayer(getId());
@@ -64,6 +65,7 @@ export type NoteData = z.infer<typeof NoteDataSchema> & {
 export const NoteDataSchema = z.object({
   id: z.string(),
   text: z.string(),
+  isTombstone: z.boolean().optional(),
   lastUpdateDate: z.coerce.date(),
   lastSyncDate: z.coerce.date(),
   lastSyncHash: z.string(),
@@ -103,7 +105,7 @@ interface WebbGlobals {
       opts?: BackgroundFlowOptions,
     ) => Promise<void>;
     addPeer: (peer: PeerData) => void;
-    updateNote: (note: NoteData) => void;
+    updateNote: (id: string, updater: (prev: NoteData) => NoteData) => void;
     setActiveNote: (id: string) => void;
   };
 }
@@ -140,20 +142,41 @@ export const useGlobals = create<WebbGlobals>()(
         cb: {
           setActiveNote: (id) =>
             setPersistedData((prev) => {
+              if (prev.activeNote === id) {
+                return {};
+              }
               const prevActive = prev.notes?.get(prev.activeNote ?? "");
-              if (prevActive && !prevActive.text) {
+              if (prevActive && (!prevActive.text || prevActive.isTombstone)) {
                 const notes = new Map(prev.notes);
-                notes.delete(prevActive.id);
-                return { ...prev, activeNote: id, notes };
+                notes.set(prevActive.id, {
+                  ...prevActive,
+                  isTombstone: true,
+                });
+
+                return { activeNote: id, notes };
               }
 
-              return { ...prev, activeNote: id };
+              return { activeNote: id };
             }),
-          updateNote: (note) => {
-            setPersistedData((prev) => ({
-              ...prev,
-              notes: new Map(prev.notes ?? []).set(note.id, note),
-            }));
+          updateNote: (noteId, updater) => {
+            setPersistedData((prev) => {
+              const notes = new Map(prev.notes ?? []);
+              const now = new Date();
+              const prevNote: NoteData = notes.get(noteId) ?? {
+                id: noteId,
+                text: "",
+                lastUpdateDate: now,
+                lastSyncDate: now,
+                lastSyncHash: md5(""),
+              };
+
+              notes.set(noteId, updater(prevNote));
+
+              return {
+                ...prev,
+                notes,
+              };
+            });
           },
           addPeer: (peer) => {
             setPersistedData((prev) => {

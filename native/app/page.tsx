@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { buttonClass, TopbarLayout } from "@/components/TopbarLayout";
 import {
   getNetworkLayerGlobal,
@@ -92,7 +93,7 @@ const initSyncWriteListener = memoize(async () => {
       }
 
       const note = result.data.note;
-      cb.updateNote(note);
+      cb.updateNote(note.id, () => note);
     }
 
     console.log(`executed notes-write-data`);
@@ -202,10 +203,10 @@ function SyncNotesButton() {
           outboundNotes.set(noteId, maxSyncNote);
         }
 
-        cb.updateNote({
+        cb.updateNote(maxSyncNote.id, () => ({
           ...maxSyncNote,
           merges,
-        });
+        }));
       }
 
       console.log(`Finalized ${outboundNotes.size} notes`);
@@ -266,33 +267,39 @@ function SelectActiveNote() {
         cb.setActiveNote(evt.target.value);
       }}
     >
-      <option key={"dummy"} value={undefined}>
+      <option key={"dummy"} value={uuid()}>
         -- New note --
       </option>
 
-      {[...(notes ? notes?.values() : [])].map((note) => {
-        return (
-          <option key={note.id} value={note.id}>
-            {note.merges ? "*" : ""}
-            {note.text.split("\n", 1)[0]}
-          </option>
-        );
-      })}
+      {[...(notes ? notes?.values() : [])]
+        .filter((note) => !note.isTombstone)
+        .map((note) => {
+          return (
+            <option key={note.id} value={note.id}>
+              {note.merges ? "*" : ""}
+              {note.text.split("\n", 1)[0]}
+            </option>
+          );
+        })}
     </select>
   );
 }
 
 export default function Home() {
   const cb = useModifyGlobals();
-  const note = usePersistedState(
-    (state) =>
-      state.notes?.get(state.activeNote ?? "") ?? {
+  const { text, activeNote } = usePersistedState(
+    useShallow((state): { activeNote: string; text: string } => {
+      const id = state.activeNote ?? uuid();
+      const { text } = state.notes?.get(id) ?? {
         id: uuid(),
         text: "",
         lastSyncHash: md5(""),
         lastSyncDate: new Date(),
         lastUpdateDate: new Date(),
-      },
+      };
+
+      return { activeNote: id, text };
+    }),
   );
 
   return (
@@ -318,14 +325,13 @@ export default function Home() {
 
       <textarea
         className="bg-black outline-none flex-grow resize-none"
-        value={note.text}
+        value={text}
         onChange={(evt) => {
-          cb.updateNote({
-            ...note,
+          cb.updateNote(activeNote, (prev) => ({
+            ...prev,
             text: evt.target.value,
             lastUpdateDate: new Date(),
-          });
-          cb.setActiveNote(note.id);
+          }));
         }}
       />
     </TopbarLayout>
