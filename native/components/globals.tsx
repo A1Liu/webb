@@ -92,15 +92,15 @@ interface WebbGlobals {
   privateCb: {
     setPersistedData(
       createState: (
-        state: Partial<PersistedAppState>
-      ) => Partial<PersistedAppState>
+        state: Partial<PersistedAppState>,
+      ) => Partial<PersistedAppState>,
     ): void;
   };
 
   cb: {
     runBackgroundFlow: (
       flow: (props: BackgroundFlowProps) => Promise<void>,
-      opts?: BackgroundFlowOptions
+      opts?: BackgroundFlowOptions,
     ) => Promise<void>;
     addPeer: (peer: PeerData) => void;
     updateNote: (note: NoteData) => void;
@@ -115,8 +115,8 @@ export const useGlobals = create<WebbGlobals>()(
     (set, get) => {
       function setPersistedData(
         createState: (
-          state: Partial<PersistedAppState>
-        ) => Partial<PersistedAppState>
+          state: Partial<PersistedAppState>,
+        ) => Partial<PersistedAppState>,
       ): void {
         set((prev) => ({
           persistedState:
@@ -221,8 +221,8 @@ export const useGlobals = create<WebbGlobals>()(
           } catch (e) {
             toast.error(
               `Unrecognized typename: ${String(
-                JSON.stringify(value)
-              )} with ${e}`
+                JSON.stringify(value),
+              )} with ${e}`,
             );
           }
         },
@@ -245,8 +245,8 @@ export const useGlobals = create<WebbGlobals>()(
       }),
       skipHydration: true,
       partialize: ({ persistedState }) => ({ persistedState }),
-    }
-  )
+    },
+  ),
 );
 
 const initNetworkLayer = memoize(async () => {
@@ -257,14 +257,14 @@ const initNetworkLayer = memoize(async () => {
 });
 
 export function usePersistedState<S>(
-  pick: (s: Partial<PersistedAppState>) => S
+  pick: (s: Partial<PersistedAppState>) => S,
 ): S;
 export function usePersistedState(): Partial<PersistedAppState>;
 export function usePersistedState<S>(
-  pick: (s: Partial<PersistedAppState>) => S = (s) => s as S
+  pick: (s: Partial<PersistedAppState>) => S = (s) => s as S,
 ): S {
   return useGlobals((s) =>
-    pick(typeof s.persistedState === "symbol" ? {} : s.persistedState)
+    pick(typeof s.persistedState === "symbol" ? {} : s.persistedState),
   );
 }
 
@@ -281,7 +281,7 @@ export function useModifyGlobals(): WebbGlobals["cb"] {
 // For debugging state
 const initUseGlobalRegistration = registerGlobal(
   "globalZustand",
-  () => useGlobals
+  () => useGlobals,
 );
 
 export function GlobalWrapper({ children }: { children: React.ReactNode }) {
@@ -310,7 +310,7 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
       <div
         className={clsx(
           "h-full w-full",
-          kind === AppStateKind.BackgroundFlow && "hidden"
+          kind === AppStateKind.BackgroundFlow && "hidden",
         )}
       >
         {children}

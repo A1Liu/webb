@@ -8,9 +8,7 @@ export function timeout(ms: number): Promise<void> {
   return new Promise((res) => setTimeout(res, ms));
 }
 
-export function memoize<T>(
-  _maker: () => T
-): {
+export function memoize<T>(_maker: () => T): {
   (): T;
   clear: () => void;
   memoizedValue?: T;
@@ -94,7 +92,7 @@ export function getId(): string {
 export function getOrCompute<T>(
   map: Map<string, T>,
   key: string,
-  make: () => T
+  make: () => T,
 ): T {
   const value = map.get(key);
   if (value !== undefined) return value;

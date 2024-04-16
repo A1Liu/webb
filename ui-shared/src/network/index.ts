@@ -96,14 +96,14 @@ export class NetworkLayer {
 
     conn.on("data", (dataIn) => {
       // TODO: fix the cast later
-      const chunk = (dataIn as any) as Chunk;
+      const chunk = dataIn as any as Chunk;
 
       const key = getChannel({ ...chunk, peerId });
 
       const channel = getOrCompute(
         this.channels,
         key,
-        () => new Channel(Infinity)
+        () => new Channel(Infinity),
       );
 
       channel.send({ ...chunk, peerId });
@@ -178,7 +178,7 @@ export class NetworkLayer {
     const channel = getOrCompute(
       this.channels,
       key,
-      () => new Channel(Infinity)
+      () => new Channel(Infinity),
     );
 
     return await channel.pop();
@@ -193,6 +193,6 @@ export class NetworkLayer {
 export class PeerConnection {
   constructor(
     readonly id: string,
-    readonly dataChannels: Set<DataConnection>
+    readonly dataChannels: Set<DataConnection>,
   ) {}
 }

@@ -226,7 +226,7 @@ function SyncNotesButton() {
     },
     {
       manual: true,
-    }
+    },
   );
 
   useEffect(() => {
@@ -289,7 +289,7 @@ export default function Home() {
         text: "",
         lastSyncDate: new Date(),
         lastUpdateDate: new Date(),
-      }
+      },
   );
 
   const { run: updateHash } = useDebounceFn(
@@ -305,7 +305,7 @@ export default function Home() {
     {
       trailing: true,
       wait: 500,
-    }
+    },
   );
 
   return (

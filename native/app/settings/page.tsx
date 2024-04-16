@@ -41,7 +41,7 @@ export default function Home() {
     {
       wait: 1_000,
       trailing: true,
-    }
+    },
   );
 
   useEffect(() => {
