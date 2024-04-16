@@ -9,6 +9,34 @@ import { useDebounceFn } from "ahooks";
 
 export const dynamic = "force-static";
 
+function SelectActiveNote() {
+  const cb = useModifyGlobals();
+  const notes = usePersistedState((state) => state.notes);
+  const activeNote = usePersistedState((state) => state.activeNote);
+
+  return (
+    <select
+      className="bg-slate-800"
+      value={activeNote}
+      onChange={(evt) => {
+        cb.setActiveNote(evt.target.value);
+      }}
+    >
+      <option key={"dummy"} value={undefined}>
+        New note
+      </option>
+
+      {[...(notes ? notes?.values() : [])].map((note) => {
+        return (
+          <option key={note.id} value={note.id}>
+            {note.text.split("\n", 1)[0]}
+          </option>
+        );
+      })}
+    </select>
+  );
+}
+
 export default function Home() {
   const cb = useModifyGlobals();
   const note = usePersistedState(
@@ -52,6 +80,10 @@ export default function Home() {
         },
       ]}
     >
+      <div className="absolute top-12 right-6">
+        <SelectActiveNote />
+      </div>
+
       <textarea
         className="bg-black outline-none flex-grow resize-none"
         value={note.text}

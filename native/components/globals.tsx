@@ -134,7 +134,16 @@ const useGlobals = create<WebbGlobals>()(
 
         cb: {
           setActiveNote: (id) =>
-            setPersistedData((prev) => ({ ...prev, activeNote: id })),
+            setPersistedData((prev) => {
+              const prevActive = prev.notes?.get(prev.activeNote ?? "");
+              if (prevActive && !prevActive.text) {
+                const notes = new Map(prev.notes);
+                notes.delete(prevActive.id);
+                return { ...prev, activeNote: id, notes };
+              }
+
+              return { ...prev, activeNote: id };
+            }),
           updateNote: (note) => {
             setPersistedData((prev) => ({
               ...prev,
