@@ -35,7 +35,12 @@ export interface Chunk {
   data: unknown;
 }
 
+function getChannel(chunkId: Omit<Chunk, "data">) {
+  return `${chunkId.peerId}\0${chunkId.channel}`;
+}
+
 export class NetworkLayer {
+  private readonly channels = new Map<string, Channel<Chunk>>();
   private readonly inboundPeerChannel = new Channel<PeerData>(Infinity);
   private readonly connections = new Map<string, PeerConnection>();
 
@@ -82,11 +87,7 @@ export class NetworkLayer {
   private getPeer(peerId: string): PeerConnection {
     return getOrCompute(this.connections, peerId, () => {
       this.inboundPeerChannel.send({ id: peerId });
-      return new PeerConnection(
-        peerId,
-        new Channel<Chunk>(Infinity),
-        new Set(),
-      );
+      return new PeerConnection(peerId, new Set());
     });
   }
 
@@ -97,9 +98,19 @@ export class NetworkLayer {
     if (peerConn.dataChannels.has(conn)) return;
     peerConn.dataChannels.add(conn);
 
-    conn.on("data", (data) => {
+    conn.on("data", (dataIn) => {
       // TODO: fix the cast later
-      this.getPeer(peerId).inboundPackets.send(data as any);
+      const chunk = dataIn as any as Chunk;
+
+      const key = getChannel({ peerId, channel: chunk.channel });
+
+      const channel = getOrCompute(
+        this.channels,
+        key,
+        () => new Channel(Infinity),
+      );
+
+      channel.send(chunk);
     });
     conn.on("error", (evt) => {
       console.error("conn error", JSON.stringify(evt));
@@ -167,8 +178,14 @@ export class NetworkLayer {
   }
 
   async recv(chunkId: Omit<Chunk, "data">): Promise<Chunk> {
-    const peerConn = this.getPeer(chunkId.peerId);
-    return await peerConn.inboundPackets.pop();
+    const key = getChannel(chunkId);
+    const channel = getOrCompute(
+      this.channels,
+      key,
+      () => new Channel(Infinity),
+    );
+
+    return await channel.pop();
   }
 
   async sendData(chunk: Chunk) {
@@ -180,7 +197,6 @@ export class NetworkLayer {
 export class PeerConnection {
   constructor(
     readonly id: string,
-    readonly inboundPackets: Channel<Chunk>,
     readonly dataChannels: Set<DataConnection>,
   ) {}
 }
