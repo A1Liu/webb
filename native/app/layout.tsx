@@ -1,4 +1,4 @@
-import { GlobalWrapper } from "@/components/globals";
+import { GlobalWrapper } from "@/components/GlobalWrapper";
 import clsx from "clsx";
 import { Metadata } from "next";
 import { Inter } from "next/font/google";

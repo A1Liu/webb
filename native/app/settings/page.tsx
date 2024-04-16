@@ -4,7 +4,7 @@ import { v4 as uuid } from "uuid";
 import React, { useEffect, useRef, useState } from "react";
 import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
 import { toast } from "react-hot-toast";
-import { useGlobals } from "@/components/globals";
+import { useGlobals } from "@/components/state/appGlobals";
 import { IncomingPeers } from "@/components/hooks/usePeer";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { toCanvas } from "qrcode";
