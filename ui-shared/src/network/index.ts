@@ -152,10 +152,6 @@ export class NetworkLayer {
     timeout(1000).then(() => this._peerGetter());
   }
 
-  get peer(): Promise<Peer> {
-    return this._peerGetter().promise;
-  }
-
   async listen(): Promise<PeerData> {
     this._peerGetter();
     return this.inboundPeerChannel.pop();
