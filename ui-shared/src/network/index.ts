@@ -23,10 +23,8 @@ export interface Chunk {
 }
 
 export class NetworkLayer {
-  private readonly dataChannels = new Map<string, Set<DataConnection>>();
-
-  readonly inboundPeerChannel = new Channel<PeerData>(Infinity);
-  readonly connections = new Map<string, PeerConnection>();
+  private readonly inboundPeerChannel = new Channel<PeerData>(Infinity);
+  private readonly connections = new Map<string, PeerConnection>();
 
   constructor(readonly id: string) {}
 
@@ -72,7 +70,11 @@ export class NetworkLayer {
     const existingPeerConn = this.connections.get(peerId);
     if (existingPeerConn) return existingPeerConn;
 
-    const peerConn = new PeerConnection(peerId, new Channel<Chunk>(Infinity));
+    const peerConn = new PeerConnection(
+      peerId,
+      new Channel<Chunk>(Infinity),
+      new Set()
+    );
     this.connections.set(peerId, peerConn);
     this.inboundPeerChannel.send({ id: peerId });
 
@@ -81,11 +83,10 @@ export class NetworkLayer {
 
   private addDataChannel(conn: DataConnection) {
     const peerId = conn.peer;
-    const peerChannels = this.dataChannels.get(peerId) ?? new Set();
-    this.dataChannels.set(peerId, peerChannels);
+    const peerConn = this.getPeer(peerId);
 
-    if (peerChannels.has(conn)) return;
-    peerChannels.add(conn);
+    if (peerConn.dataChannels.has(conn)) return;
+    peerConn.dataChannels.add(conn);
 
     conn.on("data", (data) => {
       // TODO: fix the cast later
@@ -98,9 +99,7 @@ export class NetworkLayer {
     conn.on("close", () => {
       console.log("conn closed");
 
-      const dataChannels = this.dataChannels.get(peerId);
-      dataChannels?.delete(conn);
-
+      this.getPeer(peerId).dataChannels.delete(conn);
       this.reset();
     });
     conn.on("iceStateChanged", (evt) => {
@@ -112,7 +111,7 @@ export class NetworkLayer {
   }
 
   private async getDataChannel(peerId: string): Promise<DataConnection> {
-    const channels = this.dataChannels.get(peerId);
+    const channels = this.getPeer(peerId).dataChannels;
     if (channels) {
       for (const channel of channels) {
         return channel;
@@ -177,5 +176,6 @@ export class PeerConnection {
   constructor(
     readonly id: string,
     readonly inboundPackets: Channel<Chunk>,
+    readonly dataChannels: Set<DataConnection>
   ) {}
 }
