@@ -16,6 +16,12 @@ export interface PeerData {
   id: string;
 }
 
+// Doesn't work for `Map` type
+export interface Chunk {
+  channel: string;
+  data: unknown;
+}
+
 export class NetworkLayer {
   private readonly dataChannels = new Map<string, Set<DataConnection>>();
 
@@ -66,7 +72,7 @@ export class NetworkLayer {
     const existingPeerConn = this.connections.get(peerId);
     if (existingPeerConn) return existingPeerConn;
 
-    const peerConn = new PeerConnection(peerId, new Channel<string>(Infinity));
+    const peerConn = new PeerConnection(peerId, new Channel<Chunk>(Infinity));
     this.connections.set(peerId, peerConn);
     this.inboundPeerChannel.send({ id: peerId });
 
@@ -82,12 +88,8 @@ export class NetworkLayer {
     peerChannels.add(conn);
 
     conn.on("data", (data) => {
-      if (!(typeof data === "string")) {
-        console.debug(data, "wtf");
-        return;
-      }
-
-      this.getPeer(peerId).inboundPackets.send(data);
+      // TODO: fix the cast later
+      this.getPeer(peerId).inboundPackets.send(data as any);
     });
     conn.on("error", (evt) => {
       console.error("conn error", JSON.stringify(evt));
@@ -120,7 +122,7 @@ export class NetworkLayer {
     const fut = new Future<DataConnection>();
     const peerFut = this._peerGetter();
     const peer = peerFut.value ?? (await peerFut.promise);
-    const conn = peer.connect(peerId, { serialization: "raw" });
+    const conn = peer.connect(peerId, { serialization: "binary" });
     conn.on("open", () => {
       console.log("PeerConn started");
       this.addDataChannel(conn);
@@ -160,36 +162,20 @@ export class NetworkLayer {
     return this.inboundPeerChannel.pop();
   }
 
-  async recv(id: string): Promise<string> {
+  async recv(id: string): Promise<Chunk> {
     const peerConn = this.getPeer(id);
     return await peerConn.inboundPackets.pop();
   }
 
-  async sendData({ id, data }: { data: string; id: string }) {
+  async sendData({ id, chunk }: { chunk: Chunk; id: string }) {
     const channel = await this.getDataChannel(id);
-    await channel.send(data);
-  }
-
-  async connect(peerId: string): Promise<PeerConnection> {
-    console.debug("try connect");
-
-    const fut = new Future<PeerConnection>();
-    const peer = await this._peerGetter().promise;
-    const conn = peer.connect(peerId, { serialization: "raw" });
-    conn.on("open", () => {
-      console.log("PeerConn started");
-
-      this.addDataChannel(conn);
-      fut.resolve(this.getPeer(peerId));
-    });
-
-    return fut.promise;
+    await channel.send(chunk);
   }
 }
 
 export class PeerConnection {
   constructor(
     readonly id: string,
-    readonly inboundPackets: Channel<string>,
+    readonly inboundPackets: Channel<Chunk>,
   ) {}
 }

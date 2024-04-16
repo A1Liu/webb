@@ -23,7 +23,7 @@ function SelectActiveNote() {
       }}
     >
       <option key={"dummy"} value={undefined}>
-        New note
+        -- New note --
       </option>
 
       {[...(notes ? notes?.values() : [])].map((note) => {

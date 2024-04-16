@@ -2,26 +2,41 @@
 
 import { useEffect, useRef } from "react";
 import toast from "react-hot-toast";
+import { z } from "zod";
 import { getNetworkLayerGlobal } from "../globals";
 
 interface PeerContext {
   send: (s: string) => void;
 }
 
-export function usePeer(
+export function usePeer<T>(
   peerId: string,
-  opts: { onData: (data: string) => void },
+  {
+    channel = "debug",
+    schema,
+    onData,
+  }: {
+    channel?: string;
+    schema: z.ZodSchema<T>;
+    onData: (data: T) => void;
+  },
 ): PeerContext {
-  const dataListenerRef = useRef<(data: string) => void>(opts.onData);
-  dataListenerRef.current = opts.onData;
+  const dataListenerRef = useRef<(data: T) => void>(onData);
+  dataListenerRef.current = onData;
 
   useEffect(() => {
     let run = true;
     async function runner() {
       const network = getNetworkLayerGlobal();
       while (run) {
-        const data = await network.recv(peerId);
-        dataListenerRef.current(data);
+        const chunk = await network.recv(peerId);
+        const { data, channel: _recvChannel } = chunk;
+        const result = schema.safeParse(data);
+        if (result.success) {
+          dataListenerRef.current(result.data);
+        } else {
+          console.error(`Failed parse`, result.error);
+        }
       }
     }
 
@@ -36,7 +51,7 @@ export function usePeer(
     send: async (data) => {
       try {
         const network = getNetworkLayerGlobal();
-        await network.sendData({ id: peerId, data });
+        await network.sendData({ id: peerId, chunk: { data, channel } });
       } catch (e) {
         toast.error(String(e));
       }
@@ -46,6 +61,7 @@ export function usePeer(
 
 function IncomingPeer({ peer }: { peer: { id: string } }) {
   const { send } = usePeer(peer.id, {
+    schema: z.string(),
     onData: (data) => {
       toast(`data=${data}`);
     },
