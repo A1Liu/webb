@@ -13,13 +13,13 @@ interface TopbarLayoutProps {
   children: React.ReactNode;
 }
 
-const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900 p-10";
+const buttonClass = "bg-sky-700 px-2 py-1 rounded hover:bg-sky-900 p-10";
 
 export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
   // py-24 px-8
   return (
-    <main className={clsx("flex h-full flex-col gap-4")}>
-      <div className="flex justify-between items-center p-4 w-full">
+    <main className={clsx("flex h-full flex-col gap-2")}>
+      <div className="flex justify-between items-center px-4 py-1 w-full border-b border-slate-400">
         <h4>{title}</h4>
 
         <div className="flex gap-2 flex-wrap">
@@ -49,7 +49,9 @@ export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
         </div>
       </div>
 
-      <div className={"flex flex-col gap-4 px-4 w-full"}>{children}</div>
+      <div className={"flex flex-col gap-4 px-4 w-full flex-grow pb-4"}>
+        {children}
+      </div>
     </main>
   );
 }

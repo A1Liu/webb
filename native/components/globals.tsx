@@ -13,6 +13,7 @@ import { doPlatformInit } from "./hooks/usePlatform";
 import { registerGlobal } from "./constants";
 import { NetworkLayer, PeerData } from "@a1liu/webb-ui-shared/network";
 import { getId, memoize } from "@a1liu/webb-ui-shared/util";
+import { z } from "zod";
 
 export const getNetworkLayerGlobal = registerGlobal("networkLayer", () => {
   return new NetworkLayer(getId());
@@ -35,19 +36,15 @@ if (typeof window !== "undefined") {
 // Custom storage object
 const storage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
-    return (await get(name)) || null;
+    return (await get(name)) ?? null;
   },
   setItem: async (name: string, value: string): Promise<void> => {
     console.debug("IDB set", { name, value });
-    const id = toast.loading(`IDB set ${name}...`);
     await set(name, value);
-    toast(`IDB set ${name} - DONE`, { id });
   },
   removeItem: async (name: string): Promise<void> => {
     console.debug("IDB remove", { name });
-    const id = toast.loading(`IDB del ${name}...`);
     await del(name);
-    toast(`IDB del ${name} - DONE`, { id });
   },
 };
 
@@ -60,9 +57,18 @@ type AppState =
   | { kind: AppStateKind.Page; backgroundFlowId?: undefined }
   | { kind: AppStateKind.BackgroundFlow; backgroundFlowId: string };
 
+interface NoteData {
+  id: string;
+  hash: string;
+  text: string;
+  date: Date;
+}
+
 interface PersistedAppState {
   otherDeviceId: string;
   peers: Record<string, PeerData>;
+  activeNote: string;
+  notes: Map<string, NoteData>;
 }
 
 interface BackgroundFlowOptions {}
@@ -92,6 +98,8 @@ interface WebbGlobals {
       opts?: BackgroundFlowOptions,
     ) => Promise<void>;
     addPeer: (peer: PeerData) => void;
+    updateNote: (note: NoteData) => void;
+    setActiveNote: (id: string) => void;
   };
 }
 
@@ -106,9 +114,13 @@ const useGlobals = create<WebbGlobals>()(
         ) => Partial<PersistedAppState>,
       ): void {
         set((prev) => ({
-          persistedState: createState(
-            typeof prev.persistedState === "symbol" ? {} : prev.persistedState,
-          ),
+          persistedState:
+            typeof prev.persistedState === "symbol"
+              ? createState({})
+              : {
+                  ...prev.persistedState,
+                  ...createState(prev.persistedState),
+                },
         }));
       }
 
@@ -121,6 +133,14 @@ const useGlobals = create<WebbGlobals>()(
         },
 
         cb: {
+          setActiveNote: (id) =>
+            setPersistedData((prev) => ({ ...prev, activeNote: id })),
+          updateNote: (note) => {
+            setPersistedData((prev) => ({
+              ...prev,
+              notes: new Map(prev.notes ?? []).set(note.id, note),
+            }));
+          },
           addPeer: (peer) => {
             setPersistedData((prev) => ({
               peers: {
@@ -154,7 +174,62 @@ const useGlobals = create<WebbGlobals>()(
 
     {
       name: "global-storage",
-      storage: createJSONStorage(() => storage),
+      storage: createJSONStorage(() => storage, {
+        reviver: (_key, value) => {
+          try {
+            if (
+              !value ||
+              typeof value !== "object" ||
+              !("__typename" in value)
+            ) {
+              return value;
+            }
+
+            switch (value.__typename) {
+              case "Map": {
+                const schema = z.object({
+                  state: z.array(z.tuple([z.string(), z.unknown()])),
+                });
+                const parsed = schema.parse(value);
+
+                return new Map(parsed.state);
+              }
+              case "Date": {
+                const schema = z.object({ state: z.string() });
+                const parsed = schema.parse(value);
+
+                return new Date(parsed.state);
+              }
+
+              default:
+                toast.error(`Unrecognized typename: ${value.__typename}`);
+                throw new Error(`Unrecognized typename: ${value.__typename}`);
+            }
+          } catch (e) {
+            toast.error(
+              `Unrecognized typename: ${String(
+                JSON.stringify(value),
+              )} with ${e}`,
+            );
+          }
+        },
+        replacer: (_key, value) => {
+          if (value instanceof Map) {
+            return {
+              __typename: "Map",
+              state: Array.from(value.entries()),
+            };
+          }
+          if (value instanceof Date) {
+            return {
+              __typename: "Date",
+              state: value.toISOString(),
+            };
+          }
+
+          return value;
+        },
+      }),
       skipHydration: true,
       partialize: ({ persistedState }) => ({ persistedState }),
     },
@@ -190,6 +265,12 @@ export function useModifyGlobals(): WebbGlobals["cb"] {
   return useGlobals((s) => s.cb);
 }
 
+// For debugging state
+const initUseGlobalRegistration = registerGlobal(
+  "globalZustand",
+  () => useGlobals,
+);
+
 export function GlobalWrapper({ children }: { children: React.ReactNode }) {
   const {
     state: { kind },
@@ -203,6 +284,8 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
     doPlatformInit();
 
     initNetworkLayer();
+
+    initUseGlobalRegistration();
   }, []);
 
   return (
