@@ -3,15 +3,7 @@
 import React, { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { buttonClass, TopbarLayout } from "@/components/TopbarLayout";
-import {
-  getNetworkLayerGlobal,
-  NoteData,
-  NoteDataSchema,
-  NO_HYDRATE,
-  useGlobals,
-  useModifyGlobals,
-  usePersistedState,
-} from "@/components/globals";
+import { getNetworkLayerGlobal, usePersistedState } from "@/components/globals";
 import { v4 as uuid } from "uuid";
 import md5 from "md5";
 import { useRequest } from "ahooks";
@@ -19,6 +11,11 @@ import { usePlatform } from "@/components/hooks/usePlatform";
 import { z } from "zod";
 import toast from "react-hot-toast";
 import { getOrCompute, memoize } from "@a1liu/webb-ui-shared/util";
+import {
+  NoteData,
+  NoteDataSchema,
+  useNotesState,
+} from "@/components/state/notes";
 
 export const dynamic = "force-static";
 
@@ -32,23 +29,14 @@ const initSyncListener = memoize(async () => {
     });
     console.log(`received notes-fetch req`, chunk.peerId);
 
-    const { persistedState } = useGlobals.getState();
-    if (persistedState === NO_HYDRATE || !persistedState.notes) {
-      await network.sendData({
-        peerId: chunk.peerId,
-        channel: "notes-fetch-count",
-        data: { count: 0 },
-      });
-      continue;
-    }
-
+    const { notes } = useNotesState.getState();
     await network.sendData({
       peerId: chunk.peerId,
       channel: "notes-fetch-count",
-      data: { count: persistedState.notes.size },
+      data: { count: notes.size },
     });
 
-    for (const [_noteId, note] of persistedState.notes.entries()) {
+    for (const [_noteId, note] of notes.entries()) {
       await network.sendData({
         peerId: chunk.peerId,
         channel: "notes-fetch-data",
@@ -60,7 +48,7 @@ const initSyncListener = memoize(async () => {
 
 const initSyncWriteListener = memoize(async () => {
   const network = getNetworkLayerGlobal();
-  const { cb } = useGlobals.getState();
+  const { cb } = useNotesState.getState();
   while (true) {
     const countChunk = await network.recv({
       peerId: "",
@@ -101,8 +89,8 @@ const initSyncWriteListener = memoize(async () => {
 });
 
 function SyncNotesButton() {
-  const { peers, notes } = usePersistedState();
-  const cb = useModifyGlobals();
+  const { peers } = usePersistedState();
+  const { notes, cb } = useNotesState();
   const { isMobile } = usePlatform();
   const { runAsync, loading } = useRequest(
     async () => {
@@ -255,9 +243,7 @@ function SyncNotesButton() {
 }
 
 function SelectActiveNote() {
-  const cb = useModifyGlobals();
-  const notes = usePersistedState((state) => state.notes);
-  const activeNote = usePersistedState((state) => state.activeNote);
+  const { notes, activeNote, cb } = useNotesState();
 
   return (
     <select
@@ -286,8 +272,8 @@ function SelectActiveNote() {
 }
 
 export default function Home() {
-  const cb = useModifyGlobals();
-  const { text, activeNote } = usePersistedState(
+  const cb = useNotesState((s) => s.cb);
+  const { text, activeNote } = useNotesState(
     useShallow((state): { activeNote: string; text: string } => {
       const id = state.activeNote ?? uuid();
       const { text } = state.notes?.get(id) ?? {
@@ -301,6 +287,10 @@ export default function Home() {
       return { activeNote: id, text };
     }),
   );
+
+  useEffect(() => {
+    useNotesState.persist.rehydrate();
+  }, []);
 
   return (
     <TopbarLayout
