@@ -11,7 +11,7 @@ import { toCanvas } from "qrcode";
 import { getId } from "@a1liu/webb-ui-shared/util";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { useDebounceFn, useMemoizedFn } from "ahooks";
-import { usePeers } from "@/components/state/peers";
+import { getNetworkLayerGlobal, usePeers } from "@/components/state/peers";
 import { useNotesState } from "@/components/state/notes";
 
 export const dynamic = "force-static";
@@ -96,6 +96,12 @@ export default function Home() {
                   toast(result.content);
 
                   cb.addPeer({ id: result.content });
+
+                  getNetworkLayerGlobal().sendData({
+                    peerId: result.content,
+                    channel: "debug",
+                    data: "peer connect",
+                  });
                 });
               }}
             >
