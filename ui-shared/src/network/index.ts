@@ -12,6 +12,18 @@ import { Channel } from "../channel";
 
 const getPeerjsCode = memoize(() => import("peerjs"));
 
+// Gets from Map. If the value doesn't exist, compute it using the provided lambda
+// and store it in the map, and then return it
+function getOrCompute<T>(map: Map<string, T>, key: string, make: () => T): T {
+  const value = map.get(key);
+  if (value !== undefined) return value;
+
+  const newValue = make();
+  map.set(key, newValue);
+
+  return newValue;
+}
+
 export interface PeerData {
   id: string;
 }
@@ -67,18 +79,14 @@ export class NetworkLayer {
   }
 
   private getPeer(peerId: string): PeerConnection {
-    const existingPeerConn = this.connections.get(peerId);
-    if (existingPeerConn) return existingPeerConn;
-
-    const peerConn = new PeerConnection(
-      peerId,
-      new Channel<Chunk>(Infinity),
-      new Set()
-    );
-    this.connections.set(peerId, peerConn);
-    this.inboundPeerChannel.send({ id: peerId });
-
-    return peerConn;
+    return getOrCompute(this.connections, peerId, () => {
+      this.inboundPeerChannel.send({ id: peerId });
+      return new PeerConnection(
+        peerId,
+        new Channel<Chunk>(Infinity),
+        new Set(),
+      );
+    });
   }
 
   private addDataChannel(conn: DataConnection) {
@@ -172,6 +180,6 @@ export class PeerConnection {
   constructor(
     readonly id: string,
     readonly inboundPackets: Channel<Chunk>,
-    readonly dataChannels: Set<DataConnection>
+    readonly dataChannels: Set<DataConnection>,
   ) {}
 }
