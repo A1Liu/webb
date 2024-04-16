@@ -3,7 +3,6 @@
 import React, { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { buttonClass, TopbarLayout } from "@/components/TopbarLayout";
-import { getNetworkLayerGlobal, usePersistedState } from "@/components/globals";
 import { v4 as uuid } from "uuid";
 import md5 from "md5";
 import { useRequest } from "ahooks";
@@ -16,6 +15,7 @@ import {
   NoteDataSchema,
   useNotesState,
 } from "@/components/state/notes";
+import { getNetworkLayerGlobal, usePeers } from "@/components/state/peers";
 
 export const dynamic = "force-static";
 
@@ -89,7 +89,7 @@ const initSyncWriteListener = memoize(async () => {
 });
 
 function SyncNotesButton() {
-  const { peers } = usePersistedState();
+  const { peers } = usePeers();
   const { notes, cb } = useNotesState();
   const { isMobile } = usePlatform();
   const { runAsync, loading } = useRequest(

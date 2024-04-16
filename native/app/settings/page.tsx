@@ -1,19 +1,18 @@
 "use client";
 
+import { v4 as uuid } from "uuid";
 import React, { useEffect, useRef, useState } from "react";
 import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
 import { toast } from "react-hot-toast";
-import {
-  useGlobals,
-  useModifyGlobals,
-  usePersistedState,
-} from "@/components/globals";
+import { useGlobals } from "@/components/globals";
 import { IncomingPeers } from "@/components/hooks/usePeer";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { toCanvas } from "qrcode";
 import { getId } from "@a1liu/webb-ui-shared/util";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { useDebounceFn, useMemoizedFn } from "ahooks";
+import { usePeers } from "@/components/state/peers";
+import { useNotesState } from "@/components/state/notes";
 
 export const dynamic = "force-static";
 
@@ -21,18 +20,19 @@ const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 export default function Home() {
   const { isMobile, platform } = usePlatform();
-  const { peers } = usePersistedState();
-  const cb = useModifyGlobals();
+  const { peers, cb } = usePeers();
+  const globals = useGlobals((s) => s.cb);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [resetCount, setResetCounter] = useState(5);
-  const hardReset = useMemoizedFn(() => {
+  const hardReset = useMemoizedFn(async () => {
     if (resetCount > 1) {
       setResetCounter((prev) => prev - 1);
       return;
     }
 
-    useGlobals.setState({ persistedState: {} });
+    usePeers.setState({ peers: new Map() });
+    useNotesState.setState({ notes: new Map(), activeNote: uuid() });
     setResetCounter(5);
   });
 
@@ -83,7 +83,7 @@ export default function Home() {
             <button
               className={buttonClass}
               onTouchStart={async () => {
-                await cb.runBackgroundFlow(async () => {
+                await globals.runBackgroundFlow(async () => {
                   // `windowed: true` actually sets the webview to transparent
                   // instead of opening a separate view for the camera
                   // make sure your user interface is ready to show what is underneath with a transparent element

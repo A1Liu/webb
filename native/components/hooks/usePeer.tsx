@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { z } from "zod";
-import { getNetworkLayerGlobal } from "../globals";
+import { getNetworkLayerGlobal } from "../state/peers";
 
 interface PeerContext {
   send: (s: string) => void;
