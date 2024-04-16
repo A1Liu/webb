@@ -32,7 +32,7 @@ interface WebbGlobals {
   cb: {
     runBackgroundFlow: (
       flow: (props: BackgroundFlowProps) => Promise<void>,
-      opts?: BackgroundFlowOptions
+      opts?: BackgroundFlowOptions,
     ) => Promise<void>;
   };
 }
@@ -92,7 +92,7 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
       <div
         className={clsx(
           "h-full w-full",
-          kind === AppStateKind.BackgroundFlow && "hidden"
+          kind === AppStateKind.BackgroundFlow && "hidden",
         )}
       >
         {children}
