@@ -6,6 +6,7 @@ import Head from "next/head";
 import { useEffect } from "react";
 import { GlobalInitGroup } from "./constants";
 import { AppStateKind, useGlobals } from "./state/appGlobals";
+import { NotesSyncInitGroup } from "./state/notes";
 
 export function GlobalWrapper({ children }: { children: React.ReactNode }) {
   const {
@@ -14,6 +15,7 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     GlobalInitGroup.init();
+    NotesSyncInitGroup.init();
   }, []);
 
   return (

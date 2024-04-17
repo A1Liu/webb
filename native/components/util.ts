@@ -4,6 +4,8 @@ import { z } from "zod";
 import { toast } from "react-hot-toast";
 import { get, set, del } from "idb-keyval";
 
+z.discriminatedUnion;
+
 // Not sure how I feel about this yet, but the idea is at least interesting.
 // There is some argument to be made that this kind of thing should not be
 // necessary, but at the same time the optional array spread syntax can be
@@ -33,53 +35,68 @@ const storage: StateStorage = {
   },
 };
 
-export const ZustandJsonStorage = createJSONStorage(() => storage, {
-  reviver: (_key, value) => {
-    try {
-      if (!value || typeof value !== "object" || !("__typename" in value)) {
-        return value;
+export function zustandJsonReviver(_key: string, value: unknown): unknown {
+  try {
+    if (!value || typeof value !== "object" || !("__typename" in value)) {
+      return value;
+    }
+
+    switch (value.__typename) {
+      case "Map": {
+        const schema = z.object({
+          state: z.array(z.tuple([z.string(), z.unknown()])),
+        });
+        const parsed = schema.parse(value);
+
+        return new Map(parsed.state);
+      }
+      case "Date": {
+        const schema = z.object({ state: z.string() });
+        const parsed = schema.parse(value);
+
+        return new Date(parsed.state);
       }
 
-      switch (value.__typename) {
-        case "Map": {
-          const schema = z.object({
-            state: z.array(z.tuple([z.string(), z.unknown()])),
-          });
-          const parsed = schema.parse(value);
-
-          return new Map(parsed.state);
-        }
-        case "Date": {
-          const schema = z.object({ state: z.string() });
-          const parsed = schema.parse(value);
-
-          return new Date(parsed.state);
-        }
-
-        default:
-          toast.error(`Unrecognized typename: ${value.__typename}`);
-          throw new Error(`Unrecognized typename: ${value.__typename}`);
-      }
-    } catch (e) {
-      toast.error(
-        `Unrecognized typename: ${String(JSON.stringify(value))} with ${e}`,
-      );
+      default:
+        toast.error(`Unrecognized typename: ${value.__typename}`);
+        throw new Error(`Unrecognized typename: ${value.__typename}`);
     }
-  },
-  replacer: (_key, value) => {
-    if (value instanceof Map) {
-      return {
-        __typename: "Map",
-        state: Array.from(value.entries()),
-      };
-    }
-    if (value instanceof Date) {
-      return {
-        __typename: "Date",
-        state: value.toISOString(),
-      };
-    }
+  } catch (e) {
+    toast.error(
+      `Unrecognized typename: ${String(JSON.stringify(value))} with ${e}`,
+    );
+  }
+}
 
+export function zustandJsonReplacer(
+  this: unknown,
+  _key: string,
+  value: unknown,
+): unknown {
+  if (value instanceof Map) {
+    return {
+      __typename: "Map",
+      state: [...value.entries()],
+    };
+  }
+
+  if (typeof this !== "object" || !this) {
     return value;
-  },
+  }
+
+  const holder = this as Record<string, unknown>;
+  const rawValue = holder[_key];
+  if (rawValue instanceof Date) {
+    return {
+      __typename: "Date",
+      state: rawValue.toISOString(),
+    };
+  }
+
+  return value;
+}
+
+export const ZustandJsonStorage = createJSONStorage(() => storage, {
+  reviver: zustandJsonReviver,
+  replacer: zustandJsonReplacer,
 });

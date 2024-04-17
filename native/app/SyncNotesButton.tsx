@@ -11,44 +11,30 @@ import { getOrCompute } from "@a1liu/webb-ui-shared/util";
 import {
   NoteData,
   NoteDataSchema,
+  NotesSyncInitGroup,
   useNotesState,
 } from "@/components/state/notes";
 import { getNetworkLayerGlobal, usePeers } from "@/components/state/peers";
-import { InitGroup } from "@/components/constants";
 
 export const dynamic = "force-static";
 
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
 
-export const NotesSyncInitGroup = new InitGroup("notesSync");
-
 NotesSyncInitGroup.registerInit("InitSyncFetchResponder", async () => {
   const network = getNetworkLayerGlobal();
   while (true) {
-    const chunk = await network.recv({
-      channel: "notes-fetch",
-    });
-
-    console.debug(`received notes-fetch req`, chunk.peerId);
-    toast.loading(`Syncing ... sending notes`, {
-      id: SYNC_STATUS_TOAST_ID,
-    });
-
-    const { notes } = useNotesState.getState();
-    await network.sendData({
-      peerId: chunk.peerId,
-      channel: "notes-fetch-count",
-      data: { count: notes.size },
-    });
-
-    for (const [_noteId, note] of notes.entries()) {
-      await network.sendData({
-        peerId: chunk.peerId,
-        channel: "notes-fetch-data",
-        data: { note },
+    await network.rpcSingleExec("notes-fetch", async function* (chunk) {
+      console.debug(`received notes-fetch req`, chunk.peerId);
+      toast.loading(`Syncing ... sending notes`, {
+        id: SYNC_STATUS_TOAST_ID,
       });
-    }
+
+      const { notes } = useNotesState.getState();
+      for (const [_noteId, note] of notes.entries()) {
+        yield { note };
+      }
+    });
   }
 });
 
@@ -130,37 +116,21 @@ export function SyncNotesButton() {
         ]);
       }
 
+      const rpcStreams = [];
+
       for (const [peerId, _peer] of peers.entries()) {
-        await network.sendData({
-          peerId,
-          channel: "notes-fetch",
-          ignorePeerIdForChannel: true,
-          data: "",
-        });
+        rpcStreams.push(
+          network.rpcCall({
+            peerId,
+            channel: "notes-fetch",
+            data: "",
+          }),
+        );
       }
 
       let totalCount = 0;
-      for (const [peerId, _peer] of peers.entries()) {
-        const countChunk = await network.recv({
-          peerId,
-          channel: "notes-fetch-count",
-        });
-
-        const countResult = z
-          .object({ count: z.number() })
-          .safeParse(countChunk.data);
-        if (!countResult.success) {
-          toast.error(`parse error ${String(countResult.error)}`);
-          continue;
-        }
-
-        const count = countResult.data.count;
-
-        for (let i = 0; i < count; i++) {
-          const chunk = await network.recv({
-            peerId,
-            channel: "notes-fetch-data",
-          });
+      for (const stream of rpcStreams) {
+        for await (const chunk of stream) {
           const result = z
             .object({ note: NoteDataSchema })
             .safeParse(chunk.data);
@@ -257,7 +227,7 @@ export function SyncNotesButton() {
   return (
     <button
       className={buttonClass}
-      disabled={!peers?.size || loading}
+      disabled={!peers.size || loading}
       onClick={() => {
         runAsync();
       }}

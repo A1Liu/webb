@@ -6,7 +6,7 @@ import { v4 as uuid } from "uuid";
 import { z } from "zod";
 import md5 from "md5";
 import { ZustandJsonStorage } from "../util";
-import { GlobalInitGroup } from "../constants";
+import { InitGroup } from "../constants";
 
 export type NoteData = z.infer<typeof NoteDataSchema> & {
   // TODO: probably need to save where the merges came from as well
@@ -41,7 +41,7 @@ export const useNotesState = create<NoteGlobalState>()(
         cb: {
           updateNote: (noteId, updater) => {
             set((prev) => {
-              const notes = new Map(prev.notes ?? []);
+              const notes = new Map(prev.notes);
               const now = new Date();
               const prevNote: NoteData = notes.get(noteId) ?? {
                 id: noteId,
@@ -78,11 +78,13 @@ export const useNotesState = create<NoteGlobalState>()(
               }
 
               const notes = new Map(
-                [...mutableNotesMap.entries()].sort(
-                  (l, r) =>
+                [...mutableNotesMap.entries()].sort((l, r) => {
+                  console.log(l[1], r[1]);
+                  return (
                     l[1].lastUpdateDate.getTime() -
-                    r[1].lastUpdateDate.getTime(),
-                ),
+                    r[1].lastUpdateDate.getTime()
+                  );
+                }),
               );
 
               return { notes };
@@ -119,7 +121,9 @@ export const useNotesState = create<NoteGlobalState>()(
   ),
 );
 
-GlobalInitGroup.registerValue({
+export const NotesSyncInitGroup = new InitGroup("notesSync");
+
+NotesSyncInitGroup.registerValue({
   field: "useNotesState",
   eagerInit: true,
   create: () => {
