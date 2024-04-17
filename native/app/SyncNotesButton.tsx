@@ -125,7 +125,7 @@ export function SyncNotesButton() {
 
           const note = result.data.note;
           const versions = getOrCompute(noteVersions, note.id, () => []);
-          versions.push(note);
+          versions.push({ ...note, merges: undefined }, ...(note.merges ?? []));
 
           toast.loading(`Syncing ... fetching notes (${++totalCount})`, {
             id: ACTIVE_SYNC_STATUS_TOAST_ID,
@@ -135,9 +135,8 @@ export function SyncNotesButton() {
 
       console.debug(`fetch handling done`);
 
-      const outboundNotes = new Map<string, NoteData>();
       const notesToUpdate = [];
-      for (const [noteId, versions] of noteVersions.entries()) {
+      for (const [_noteId, versions] of noteVersions.entries()) {
         const { ...maxSyncNote } = versions.reduce((maxNote, note) => {
           // TODO: figure out why the timestamps are getting... rounded?
           // truncated? something is up with the timestamp math.
@@ -165,7 +164,6 @@ export function SyncNotesButton() {
         if (!merges) {
           maxSyncNote.lastSyncHash = md5(maxSyncNote.text);
           maxSyncNote.lastSyncDate = new Date();
-          outboundNotes.set(noteId, maxSyncNote);
         }
 
         notesToUpdate.push({
@@ -175,8 +173,8 @@ export function SyncNotesButton() {
       }
       cb.updateNotesFromSync(notesToUpdate);
 
-      console.debug(`Finalized ${outboundNotes.size} notes`);
-      toast.loading(`Syncing ... resolved ${outboundNotes.size} notes`, {
+      console.debug(`Finalized ${notesToUpdate.length} notes`);
+      toast.loading(`Syncing ... resolved ${notesToUpdate.length} notes`, {
         id: ACTIVE_SYNC_STATUS_TOAST_ID,
       });
 

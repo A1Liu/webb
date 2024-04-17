@@ -8,17 +8,18 @@ import md5 from "md5";
 import { ZustandJsonStorage } from "../util";
 import { InitGroup } from "../constants";
 
-export type NoteData = z.infer<typeof NoteDataSchema> & {
-  // TODO: probably need to save where the merges came from as well
-  merges?: z.infer<typeof NoteDataSchema>[];
-};
-export const NoteDataSchema = z.object({
+const NoteDateSchemaInternal = z.object({
   id: z.string(),
   text: z.string(),
   isTombstone: z.boolean().optional(),
   lastUpdateDate: z.coerce.date(),
   lastSyncDate: z.coerce.date(),
   lastSyncHash: z.string(),
+});
+
+export type NoteData = z.infer<typeof NoteDataSchema>;
+export const NoteDataSchema = NoteDateSchemaInternal.extend({
+  merges: NoteDateSchemaInternal.array().optional(),
 });
 
 export interface NoteGlobalState {
