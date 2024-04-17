@@ -49,3 +49,4 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
 - NWConnection - https://developer.apple.com/documentation/network/nwconnection
 - https://www.browserstack.com/blog/building-secure-native-apps-with-self-signed-ssl-certificates-using-certificate-pinning/
 - https://stackoverflow.com/questions/54452129/how-to-create-ios-nwconnection-for-tls-with-self-signed-cert
+- qp2p? - https://github.com/maidsafe/qp2p
