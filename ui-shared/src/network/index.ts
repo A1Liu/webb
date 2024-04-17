@@ -1,4 +1,4 @@
-import { Peer } from "peerjs";
+import { Peer, PeerErrorType } from "peerjs";
 import { v4 as uuid } from "uuid";
 import { DataConnection } from "peerjs";
 import {
@@ -52,6 +52,19 @@ interface ChunkData {
   data: unknown;
 }
 
+export type NetworkUpdate =
+  | {
+      type: "peerStatus";
+      status: "disconnected" | "connecting" | "connected";
+    }
+  | {
+      type: "peerError";
+      errorType: `${PeerErrorType}`;
+    }
+  | { type: "peerConnected"; peer: PeerData }
+  | { type: "connInfo"; event: string; msg: string }
+  | { type: "peerDisconnected"; peerId: string };
+
 const RPC_ENDPOINT = "rpcCallEndpoint";
 const RPC_CALL_CLIENT = "rpcCallClient";
 
@@ -60,6 +73,7 @@ function getChannel({ peerId = "", channel, suffix }: ChunkMailbox) {
 }
 
 export class NetworkLayer {
+  readonly statusChannel = new Channel<NetworkUpdate>(Infinity);
   private readonly channels = new Map<string, Channel<ChunkData>>();
   private readonly inboundPeerChannel = new Channel<PeerData>(Infinity);
   private readonly connections = new Map<string, PeerConnection>();
@@ -67,20 +81,25 @@ export class NetworkLayer {
   constructor(readonly id: string) {}
 
   static getPeer(network: NetworkLayer): UnwrappedPromise<Peer> {
-    console.log("getting peer");
+    network.statusChannel.send({ type: "peerStatus", status: "connecting" });
     const fut = new Future<Peer>();
 
     getPeerjsCode().then((peerjs) => {
       const peer = new peerjs.Peer(network.id, { debug: 2 });
 
       peer.on("open", () => {
-        console.log("peer opened");
+        network.statusChannel.send({ type: "peerStatus", status: "connected" });
 
         fut.resolve(peer);
 
         peer.on("connection", (conn) => {
           conn.on("open", () => {
-            console.log("PeerConn from listen");
+            network.inboundPeerChannel.send({ id: conn.peer });
+            network.statusChannel.send({
+              type: "peerConnected",
+              peer: { id: conn.peer },
+            });
+
             network.addDataChannel(conn);
 
             // Ensure that the peer connection is added to the channel
@@ -89,14 +108,20 @@ export class NetworkLayer {
         });
       });
       peer.on("error", (e) => {
-        console.error("peer error", JSON.stringify(e));
+        network.statusChannel.send({ type: "peerError", errorType: e.type });
       });
       peer.on("disconnected", () => {
-        console.log("Peer disconnect");
+        network.statusChannel.send({
+          type: "peerStatus",
+          status: "disconnected",
+        });
         network.reset();
       });
       peer.on("close", () => {
-        console.error("Peer close");
+        network.statusChannel.send({
+          type: "peerStatus",
+          status: "disconnected",
+        });
         network.reset();
       });
     });
@@ -106,7 +131,6 @@ export class NetworkLayer {
 
   private getPeer(peerId: string): PeerConnection {
     return getOrCompute(this.connections, peerId, () => {
-      this.inboundPeerChannel.send({ id: peerId });
       return new PeerConnection(peerId, new Set());
     });
   }
@@ -137,17 +161,25 @@ export class NetworkLayer {
       channel.send({ ...chunk, peerId });
     });
     conn.on("error", (evt) => {
-      console.error("conn error", JSON.stringify(evt));
+      this.statusChannel.send({
+        type: "connInfo",
+        event: "error",
+        msg: evt.type,
+      });
       conn.close();
     });
     conn.on("close", () => {
-      console.log("conn closed");
+      this.statusChannel.send({ type: "peerDisconnected", peerId });
 
       this.getPeer(peerId).dataChannels.delete(conn);
       this.reset();
     });
     conn.on("iceStateChanged", (evt) => {
-      console.log("ice state changed", JSON.stringify(evt));
+      this.statusChannel.send({
+        type: "connInfo",
+        event: "iceStateChanged",
+        msg: evt,
+      });
       if (evt === "disconnected") {
         conn.close();
       }
@@ -167,7 +199,8 @@ export class NetworkLayer {
     const peer = peerFut.value ?? (await peerFut.promise);
     const conn = peer.connect(peerId, { serialization: "binary" });
     conn.on("open", () => {
-      console.log("PeerConn started");
+      this.statusChannel.send({ type: "peerConnected", peer: { id: peerId } });
+
       this.addDataChannel(conn);
       fut.resolve(conn);
     });
@@ -178,6 +211,10 @@ export class NetworkLayer {
   private readonly _peerGetter = memoize(() => {
     return NetworkLayer.getPeer(this);
   });
+
+  ensureInit() {
+    this._peerGetter();
+  }
 
   reset() {
     const peer = this._peerGetter.memoizedValue?.value;

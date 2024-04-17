@@ -78,18 +78,7 @@ registerGlobal({
   field: "toast",
   eagerInit: true,
   create: () => {
-    // TODO: replace with real logging, e.g. pino
-    const { error, log } = console;
-
-    console.log = (...args: unknown[]) => {
-      toast(args.map(String).join(" "));
-      log(...args);
-    };
-    console.error = (...args: unknown[]) => {
-      toast.error(args.map(String).join(" "));
-      error(...args);
-    };
-
+    // TODO: add real logging, e.g. pino
     return toast;
   },
 });

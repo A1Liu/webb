@@ -4,16 +4,65 @@ import { getId } from "@a1liu/webb-ui-shared/util";
 import { persist } from "zustand/middleware";
 import { ZustandJsonStorage } from "../util";
 import { registerGlobal } from "../constants";
+import { toast } from "react-hot-toast";
 
 export const getNetworkLayerGlobal = registerGlobal({
   field: "networkLayer",
   eagerInit: true,
   create: () => {
     const network = new NetworkLayer(getId());
+    network.ensureInit();
     async function initListener() {
+      let connected = false;
       while (true) {
-        const peer = await network.listen();
-        usePeers.getState().cb.addPeer(peer);
+        const update = await network.statusChannel.pop();
+        switch (update.type) {
+          case "peerStatus": {
+            switch (update.status) {
+              case "connected":
+                if (!connected) {
+                  toast.success("Connected!", { id: update.type });
+                  toast.dismiss("peerError");
+                  connected = true;
+                }
+                break;
+              case "connecting":
+                if (!connected) {
+                  toast.loading("Connecting...", { id: update.type });
+                }
+                break;
+              case "disconnected":
+                if (connected) {
+                  toast.error("Disconnected!", { id: update.type });
+                  connected = false;
+                }
+                break;
+            }
+
+            break;
+          }
+
+          case "peerError":
+            toast.error(`Peer Error: ${update.errorType}`, { id: update.type });
+            connected = false;
+            break;
+
+          case "peerConnected":
+            usePeers.getState().cb.addPeer(update.peer);
+            break;
+
+          case "peerDisconnected":
+            // TODO: Set this up with more info about peers
+            break;
+
+          case "connInfo":
+            // TODO: Set this up with more info about peers
+            toast.error(`connInfo ${JSON.stringify(update)}`);
+            break;
+
+          default:
+            toast(`Unrecognized update=${JSON.stringify(update)}`);
+        }
       }
     }
 

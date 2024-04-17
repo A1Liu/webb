@@ -18,6 +18,7 @@ export class Channel<T> {
       for (const listener of this.listeners) {
         listener(t);
       }
+      this.listeners.length = 0;
 
       return true;
     }
