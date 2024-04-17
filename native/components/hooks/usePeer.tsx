@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { z } from "zod";
-import { getNetworkLayerGlobal } from "../state/peers";
+import { getNetworkLayerGlobal, usePeers } from "../state/peers";
 
 interface PeerContext {
   send: (s: string) => void;
@@ -59,6 +59,7 @@ export function usePeer<T>(
 }
 
 function IncomingPeer({ peer }: { peer: { id: string } }) {
+  const { cb } = usePeers();
   const { send } = usePeer(peer.id, {
     schema: z.string(),
     onData: (data) => {
@@ -72,18 +73,29 @@ function IncomingPeer({ peer }: { peer: { id: string } }) {
         {peer.id.replaceAll("-", "")}
       </p>
 
-      <button
-        className="bg-sky-700 p-2 rounded hover:bg-sky-900"
-        onClick={async () => {
-          try {
-            send("hi");
-          } catch (e) {
-            toast.error(String(e));
-          }
-        }}
-      >
-        ping
-      </button>
+      <div className="flex gap-2">
+        <button
+          className="bg-sky-700 p-2 rounded hover:bg-sky-900"
+          onClick={() => {
+            cb.deletePeer(peer.id);
+          }}
+        >
+          delete
+        </button>
+
+        <button
+          className="bg-sky-700 p-2 rounded hover:bg-sky-900"
+          onClick={async () => {
+            try {
+              send("hi");
+            } catch (e) {
+              toast.error(String(e));
+            }
+          }}
+        >
+          ping
+        </button>
+      </div>
     </div>
   );
 }

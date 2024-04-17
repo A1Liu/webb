@@ -27,6 +27,7 @@ interface PeersState {
   peers: Map<string, PeerData>;
   cb: {
     addPeer: (peer: PeerData) => void;
+    deletePeer: (peerId: string) => void;
   };
 }
 
@@ -36,6 +37,13 @@ export const usePeers = create<PeersState>()(
       return {
         peers: new Map(),
         cb: {
+          deletePeer: (peerId) => {
+            set((prev) => {
+              const peers = new Map(prev.peers ?? []);
+              peers.delete(peerId);
+              return { peers };
+            });
+          },
           addPeer: (peer) => {
             set((prev) => {
               const peers = new Map(prev.peers ?? []);

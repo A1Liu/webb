@@ -5,6 +5,7 @@
   "build": {
     "beforeBuildCommand": "pnpm build:web",
     "beforeDevCommand": "pnpm dev:web",
+    "frontendDist": "./out",
     "devUrl": "http://localhost:4110"
   },
   "identifier": "webb",

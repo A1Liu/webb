@@ -41,6 +41,8 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
   the UI automatically figured out everything else. That was 3 hours of investigation.
 - Got `error sending request for url (http://192.IP_ADDRESS:3000/): error trying to connect: tcp connect error: No route to host (os error 65)` - need to make sure the web server is running on `0.0.0.0`
   so that it's available to other devices on the wifi network
+- XCode runs a non-interactive non-login shell for its scripts, so for e.g. Zsh
+  you need to ensure that setup is in `.zshenv`
 
 
 ## Secure P2P Connection
