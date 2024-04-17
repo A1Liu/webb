@@ -79,7 +79,6 @@ export const useNotesState = create<NoteGlobalState>()(
 
               const notes = new Map(
                 [...mutableNotesMap.entries()].sort((l, r) => {
-                  console.log(l[1], r[1]);
                   return (
                     l[1].lastUpdateDate.getTime() -
                     r[1].lastUpdateDate.getTime()

@@ -26,9 +26,6 @@ NotesSyncInitGroup.registerInit("InitSyncFetchResponder", async () => {
   while (true) {
     await network.rpcSingleExec("notes-fetch", async function* (chunk) {
       console.debug(`received notes-fetch req`, chunk.peerId);
-      toast.loading(`Syncing ... sending notes`, {
-        id: SYNC_STATUS_TOAST_ID,
-      });
 
       const { notes } = useNotesState.getState();
       for (const [_noteId, note] of notes.entries()) {
@@ -43,7 +40,7 @@ NotesSyncInitGroup.registerInit("InitSyncWriter", async () => {
   const { cb } = useNotesState.getState();
   while (true) {
     const countChunk = await network.recv({
-      channel: "notes-write-count",
+      channel: "notes-write",
     });
 
     console.debug(`received notes-write req`);
@@ -51,43 +48,34 @@ NotesSyncInitGroup.registerInit("InitSyncWriter", async () => {
       id: SYNC_STATUS_TOAST_ID,
     });
 
-    const countResult = z
-      .object({ count: z.number() })
-      .safeParse(countChunk.data);
-    if (!countResult.success) {
-      toast.error(`parse error ${String(countResult.error)}`);
-      continue;
-    }
-
-    console.debug(`reading notes-write-data`);
-
-    const count = countResult.data.count;
+    const stream = network.rpcCall({
+      peerId: countChunk.peerId,
+      channel: "notes-fetch",
+      data: "",
+    });
 
     const notesToUpdate = [];
-    for (let i = 0; i < count; i++) {
-      toast.loading(`Syncing ... fetching notes (${i + 1})`, {
-        id: SYNC_STATUS_TOAST_ID,
-      });
-
-      const chunk = await network.recv({
-        peerId: countChunk.peerId,
-        channel: "notes-write-data",
-      });
+    for await (const chunk of stream) {
       const result = z.object({ note: NoteDataSchema }).safeParse(chunk.data);
       if (!result.success) {
         toast.error(`parse error ${String(result.error)}`);
         continue;
       }
 
+      toast.loading(
+        `Syncing ... fetching notes (${notesToUpdate.length + 1})`,
+        { id: SYNC_STATUS_TOAST_ID },
+      );
       notesToUpdate.push(result.data.note);
     }
 
-    toast.loading(`Syncing ... writing notes (${count})`, {
+    toast.loading(`Syncing ... writing notes (${notesToUpdate.length})`, {
       id: SYNC_STATUS_TOAST_ID,
     });
+
     cb.updateNotesFromSync(notesToUpdate);
 
-    console.debug(`executed notes-write-data`);
+    console.debug(`executed notes-write`);
     toast.success(`Sync complete!`, {
       id: SYNC_STATUS_TOAST_ID,
     });
@@ -199,27 +187,17 @@ export function SyncNotesButton() {
       for (const [peerId, _peer] of peers.entries()) {
         await network.sendData({
           peerId,
-          channel: "notes-write-count",
+          channel: "notes-write",
           ignorePeerIdForChannel: true,
-          data: { count: outboundNotes.size },
+          data: {},
         });
-
-        for (const [_noteId, note] of outboundNotes.entries()) {
-          await network.sendData({
-            peerId,
-            channel: "notes-write-data",
-            data: { note },
-          });
-        }
       }
 
       toast.success(`Sync complete!`, {
         id: ACTIVE_SYNC_STATUS_TOAST_ID,
       });
     },
-    {
-      manual: true,
-    },
+    { manual: true },
   );
 
   if (isMobile) return null;

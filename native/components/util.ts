@@ -26,11 +26,9 @@ const storage: StateStorage = {
     return (await get(name)) ?? null;
   },
   setItem: async (name: string, value: string): Promise<void> => {
-    console.debug("IDB set", { name, value });
     await set(name, value);
   },
   removeItem: async (name: string): Promise<void> => {
-    console.debug("IDB remove", { name });
     await del(name);
   },
 };
