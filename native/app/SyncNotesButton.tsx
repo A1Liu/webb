@@ -104,17 +104,13 @@ export function SyncNotesButton() {
         ]);
       }
 
-      const rpcStreams = [];
-
-      for (const [peerId, _peer] of peers.entries()) {
-        rpcStreams.push(
-          network.rpcCall({
-            peerId,
-            channel: "notes-fetch",
-            data: "",
-          }),
-        );
-      }
+      const rpcStreams = [...peers.values()].map((peer) =>
+        network.rpcCall({
+          peerId: peer.id,
+          channel: "notes-fetch",
+          data: "",
+        }),
+      );
 
       let totalCount = 0;
       for (const stream of rpcStreams) {
