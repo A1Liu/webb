@@ -23,12 +23,6 @@ export interface PeerData {
   id: string;
 }
 
-export interface ChunkAddr {
-  peerId: string;
-  channel: string;
-  ignorePeerIdForChannel?: boolean;
-}
-
 export interface ChunkListenAddr {
   peerId?: string;
   channel: string;
@@ -41,13 +35,17 @@ interface ChunkMailbox {
 }
 
 // Doesn't work for `Map` type
-export interface Chunk extends ChunkAddr {
+export interface Chunk {
+  peerId: string;
+  channel: string;
+  ignorePeerIdForChannel?: boolean;
   data: unknown;
 }
 
 interface ChunkData {
   peerId: string;
   channel: string;
+  suffix?: string;
   ignorePeerIdForChannel?: boolean;
   __rpc_id?: string;
   __end_rpc_list?: boolean;
@@ -127,7 +125,7 @@ export class NetworkLayer {
       const key = getChannel({
         channel: chunk.channel,
         peerId: chunk.ignorePeerIdForChannel ? undefined : peerId,
-        suffix: chunk.__rpc_id ? RPC_ENDPOINT : undefined,
+        suffix: chunk.suffix,
       });
 
       const channel = getOrCompute(
@@ -230,6 +228,7 @@ export class NetworkLayer {
     {
       await this.sendDataRaw(chunk.peerId, {
         ...chunk,
+        suffix: RPC_ENDPOINT,
         __rpc_id: id,
         ignorePeerIdForChannel: true,
       });
@@ -279,14 +278,18 @@ export class NetworkLayer {
     for await (const resp of rpc(request)) {
       await this.sendDataRaw(request.peerId, {
         peerId: request.peerId,
-        channel: `${channel}\0${RPC_CALL_CLIENT + id}`,
+        channel,
+        suffix: RPC_CALL_CLIENT + id,
+        __rpc_id: id,
         data: resp,
       });
     }
 
     await this.sendDataRaw(request.peerId, {
       peerId: request.peerId,
-      channel: `${channel}\0${RPC_CALL_CLIENT + id}`,
+      channel,
+      suffix: RPC_CALL_CLIENT + id,
+      __rpc_id: id,
       __end_rpc_list: true,
       data: {},
     });

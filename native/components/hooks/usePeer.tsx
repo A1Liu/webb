@@ -1,5 +1,6 @@
 "use client";
 
+import { timeout } from "@a1liu/webb-ui-shared/util";
 import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -28,10 +29,18 @@ export function usePeer<T>(
 
   useEffect(() => {
     let run = true;
+    const timeoutMs = 1000; // TODO: maybe this should vary
     async function runner() {
       const network = getNetworkLayerGlobal();
       while (run) {
-        const chunk = await network.recv({ peerId, channel });
+        const chunk = await Promise.race([
+          network.recv({ peerId, channel }),
+          timeout(timeoutMs),
+        ]);
+        if (!chunk) {
+          continue;
+        }
+
         const result = schema.safeParse(chunk.data);
         if (result.success) {
           dataListenerRef.current(result.data);
@@ -78,7 +87,7 @@ function IncomingPeer({ peer }: { peer: { id: string } }) {
   const { send } = usePeer(peer.id, {
     schema: z.string(),
     onData: (data) => {
-      toast(`data=${data}`);
+      toast(`blarka=${data}`);
     },
   });
 
