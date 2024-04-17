@@ -12,7 +12,8 @@ import { getId } from "@a1liu/webb-ui-shared/util";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { useDebounceFn, useMemoizedFn } from "ahooks";
 import { getNetworkLayerGlobal, usePeers } from "@/components/state/peers";
-import { useNotesState } from "@/components/state/notes";
+import { NoteDataSchema, useNotesState } from "@/components/state/notes";
+import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 
 export const dynamic = "force-static";
 
@@ -21,6 +22,7 @@ const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 export default function Home() {
   const { isMobile, platform } = usePlatform();
   const { peers, cb } = usePeers();
+  const notesCb = useNotesState((s) => s.cb);
   const globals = useGlobals((s) => s.cb);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -109,9 +111,46 @@ export default function Home() {
             </button>
           ) : null}
 
-          <button className={buttonClass} onClick={() => toast("hello")}>
-            hi
-          </button>
+          {!isMobile ? (
+            <>
+              <button
+                className={buttonClass}
+                onClick={async () => {
+                  const data = [...useNotesState.getState().notes.values()];
+
+                  const json = JSON.stringify(data);
+
+                  console.log(json);
+
+                  await writeText(json);
+
+                  toast.success(`Copied to clipboard`);
+                }}
+              >
+                Backup
+              </button>
+
+              <button
+                className={buttonClass}
+                onClick={async () => {
+                  try {
+                    const text = await readText();
+                    const data = JSON.parse(text);
+                    const parsedData = NoteDataSchema.array().parse(data);
+
+                    notesCb.updateNotesFromSync(parsedData);
+
+                    toast.success(`Restored from clipboard`);
+                  } catch (e) {
+                    toast.error(`Failed to restore`);
+                    console.error(e);
+                  }
+                }}
+              >
+                Restore
+              </button>
+            </>
+          ) : null}
 
           <button className={buttonClass} onClick={() => hardReset()}>
             HARD RESET ({resetCount} clicks to activate)

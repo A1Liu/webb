@@ -1,16 +1,12 @@
 "use client";
 
-import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import React from "react";
 import { useShallow } from "zustand/react/shallow";
-import { buttonClass, TopbarLayout } from "@/components/TopbarLayout";
+import { TopbarLayout } from "@/components/TopbarLayout";
 import { v4 as uuid } from "uuid";
 import md5 from "md5";
-import { NoteDataSchema, useNotesState } from "@/components/state/notes";
+import { useNotesState } from "@/components/state/notes";
 import { SyncNotesButton } from "./SyncNotesButton";
-import { usePlatform } from "@/components/hooks/usePlatform";
-import toast from "react-hot-toast";
-import { zustandJsonReplacer } from "@/components/util";
 
 export const dynamic = "force-static";
 
@@ -46,7 +42,6 @@ function SelectActiveNote() {
 
 export default function Home() {
   const cb = useNotesState((s) => s.cb);
-  const { isMobile } = usePlatform();
   const { text, activeNote } = useNotesState(
     useShallow((state): { activeNote: string; text: string } => {
       const id = state.activeNote ?? uuid();
@@ -81,49 +76,6 @@ export default function Home() {
       <div className="absolute top-12 right-4 flex flex-col gap-2 items-end">
         <SelectActiveNote />
         <SyncNotesButton />
-
-        {!isMobile ? (
-          <>
-            <button
-              className={buttonClass}
-              onClick={async () => {
-                const data = [...useNotesState.getState().notes.values()];
-
-                const json = JSON.stringify(data, function (key, value) {
-                  return zustandJsonReplacer(key, value);
-                });
-
-                console.log(json);
-
-                await writeText(json);
-
-                toast.success(`Copied to clipboard`);
-              }}
-            >
-              Backup
-            </button>
-
-            <button
-              className={buttonClass}
-              onClick={async () => {
-                try {
-                  const text = await readText();
-                  const data = JSON.parse(text);
-                  const parsedData = NoteDataSchema.array().parse(data);
-
-                  cb.updateNotesFromSync(parsedData);
-
-                  toast.success(`Restored from clipboard`);
-                } catch (e) {
-                  toast.error(`Failed to restore`);
-                  console.error(e);
-                }
-              }}
-            >
-              Restore
-            </button>
-          </>
-        ) : null}
       </div>
 
       <textarea
