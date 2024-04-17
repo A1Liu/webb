@@ -1,6 +1,8 @@
 export const CHANNEL_BUFFER_FULL = Symbol("channel buffer full");
 
 // Trying to emulate golang channels
+// Eventually, need to decide what the behavior should actually be.
+// Probably need to add timeouts as well.
 export class Channel<T> {
   private readonly listeners: ((t: T) => unknown)[] = [];
   private readonly queue: T[] = [];
@@ -8,13 +10,15 @@ export class Channel<T> {
   constructor(readonly capacity: number = 1) {}
 
   get size(): number {
-    return this.listeners.length + this.queue.length;
+    return this.queue.length;
   }
 
   async send(t: T): Promise<boolean> {
-    const listener = this.listeners.shift();
-    if (listener) {
-      listener(t);
+    if (this.listeners.length) {
+      for (const listener of this.listeners) {
+        listener(t);
+      }
+
       return true;
     }
 

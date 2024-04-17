@@ -25,9 +25,7 @@ registerInit("InitSyncFetchResponder", async () => {
   const network = getNetworkLayerGlobal();
   while (true) {
     const chunk = await network.recv({
-      peerId: "",
       channel: "notes-fetch",
-      ignorePeerIdForChannel: true,
     });
 
     console.debug(`received notes-fetch req`, chunk.peerId);
@@ -57,9 +55,7 @@ registerInit("InitSyncWriter", async () => {
   const { cb } = useNotesState.getState();
   while (true) {
     const countChunk = await network.recv({
-      peerId: "",
       channel: "notes-write-count",
-      ignorePeerIdForChannel: true,
     });
 
     console.debug(`received notes-write req`);

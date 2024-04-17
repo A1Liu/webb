@@ -22,16 +22,24 @@ export interface PeerData {
   id: string;
 }
 
-// Doesn't work for `Map` type
-export interface Chunk {
+export interface ChunkAddr {
   peerId: string;
   channel: string;
   ignorePeerIdForChannel?: boolean;
+}
+
+export interface ChunkListenAddr {
+  peerId?: string;
+  channel: string;
+}
+
+// Doesn't work for `Map` type
+export interface Chunk extends ChunkAddr {
   data: unknown;
 }
 
-function getChannel(chunkId: Omit<Chunk, "data">) {
-  const peerId = chunkId.ignorePeerIdForChannel ? "" : chunkId.peerId;
+function getChannel(chunkId: ChunkListenAddr) {
+  const peerId = chunkId.peerId ?? "";
   return `${peerId}\0${chunkId.channel}`;
 }
 
@@ -98,7 +106,10 @@ export class NetworkLayer {
       // TODO: fix the cast later
       const chunk = dataIn as any as Chunk;
 
-      const key = getChannel({ ...chunk, peerId });
+      const key = getChannel({
+        channel: chunk.channel,
+        peerId: chunk.ignorePeerIdForChannel ? undefined : peerId,
+      });
 
       const channel = getOrCompute(
         this.channels,
@@ -173,7 +184,7 @@ export class NetworkLayer {
     return this.inboundPeerChannel.pop();
   }
 
-  async recv(chunkId: Omit<Chunk, "data">): Promise<Chunk> {
+  async recv(chunkId: ChunkListenAddr): Promise<Chunk> {
     const key = getChannel(chunkId);
     const channel = getOrCompute(
       this.channels,
