@@ -1,4 +1,5 @@
 import { Peer } from "peerjs";
+import { v4 as uuid } from "uuid";
 import { DataConnection } from "peerjs";
 import {
   Future,
@@ -26,6 +27,7 @@ export interface ChunkAddr {
   peerId: string;
   channel: string;
   ignorePeerIdForChannel?: boolean;
+  __rpc_id?: string;
 }
 
 export interface ChunkListenAddr {
@@ -35,12 +37,16 @@ export interface ChunkListenAddr {
 
 // Doesn't work for `Map` type
 export interface Chunk extends ChunkAddr {
+  __end_rpc_list?: boolean;
   data: unknown;
 }
 
-function getChannel(chunkId: ChunkListenAddr) {
+const RPC_ENDPOINT = "rpcCallEndpoint";
+const RPC_CALL_CLIENT = "rpcCallClient";
+
+function getChannel(chunkId: ChunkListenAddr, suffix?: string) {
   const peerId = chunkId.peerId ?? "";
-  return `${peerId}\0${chunkId.channel}`;
+  return `${peerId}\0${chunkId.channel}${suffix ? `\0${suffix}` : ""}`;
 }
 
 export class NetworkLayer {
@@ -106,10 +112,13 @@ export class NetworkLayer {
       // TODO: fix the cast later
       const chunk = dataIn as any as Chunk;
 
-      const key = getChannel({
-        channel: chunk.channel,
-        peerId: chunk.ignorePeerIdForChannel ? undefined : peerId,
-      });
+      const key = getChannel(
+        {
+          channel: chunk.channel,
+          peerId: chunk.ignorePeerIdForChannel ? undefined : peerId,
+        },
+        chunk.__rpc_id ? RPC_ENDPOINT : undefined,
+      );
 
       const channel = getOrCompute(
         this.channels,
@@ -198,6 +207,77 @@ export class NetworkLayer {
   async sendData(chunk: Chunk) {
     const channel = await this.getDataChannel(chunk.peerId);
     await channel.send(chunk);
+  }
+
+  async *rpcCall(
+    chunk: Omit<Chunk, "ignorePeerIdForChannel">,
+  ): AsyncGenerator<Chunk> {
+    const id = uuid();
+    {
+      const channel = await this.getDataChannel(chunk.peerId);
+      await channel.send({
+        ...chunk,
+        __rpc_id: id,
+        ignorePeerIdForChannel: true,
+      });
+    }
+
+    const key = getChannel(
+      { peerId: chunk.peerId, channel: chunk.channel },
+      RPC_CALL_CLIENT + id,
+    );
+    const channel = getOrCompute(
+      this.channels,
+      key,
+      () => new Channel(Infinity),
+    );
+
+    while (true) {
+      const chunk = await channel.pop();
+      if (chunk.__end_rpc_list) break;
+
+      yield chunk;
+    }
+  }
+
+  async rpcSingleExec(
+    channel: string,
+    rpc: (data: Chunk) => AsyncGenerator<unknown>,
+  ): Promise<void> {
+    const key = getChannel({ channel }, RPC_ENDPOINT);
+
+    const inputChannel = getOrCompute(
+      this.channels,
+      key,
+      () => new Channel(Infinity),
+    );
+
+    const request = await inputChannel.pop();
+    const id = request.__rpc_id;
+    if (!id) {
+      console.error(
+        "RPC request didn't contain RPC id",
+        JSON.stringify(request),
+      );
+      return;
+    }
+
+    const outputChannel = await this.getDataChannel(request.peerId);
+
+    for await (const resp of rpc(request)) {
+      await outputChannel.send({
+        peerId: request.peerId,
+        channel: `${channel}\0${RPC_CALL_CLIENT + id}`,
+        data: resp,
+      });
+    }
+
+    await outputChannel.send({
+      peerId: request.peerId,
+      channel: `${channel}\0${RPC_CALL_CLIENT + id}`,
+      __end_rpc_list: true,
+      data: {},
+    });
   }
 }
 

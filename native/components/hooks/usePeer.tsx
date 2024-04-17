@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import clsx from "clsx";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { z } from "zod";
+import { registerInit } from "../constants";
 import { getNetworkLayerGlobal, usePeers } from "../state/peers";
 
 interface PeerContext {
@@ -58,8 +60,21 @@ export function usePeer<T>(
   };
 }
 
+const RPC_CHANNEL = "debug-rpc";
+
+registerInit("rpcDebug", async () => {
+  const network = getNetworkLayerGlobal();
+  while (true) {
+    await network.rpcSingleExec(RPC_CHANNEL, async function* (input) {
+      console.log("rpc called");
+      yield* String(input.data).split(" ");
+    });
+  }
+});
+
 function IncomingPeer({ peer }: { peer: { id: string } }) {
   const { cb } = usePeers();
+  const [open, setOpen] = useState(false);
   const { send } = usePeer(peer.id, {
     schema: z.string(),
     onData: (data) => {
@@ -68,12 +83,32 @@ function IncomingPeer({ peer }: { peer: { id: string } }) {
   });
 
   return (
-    <div className="flex items-center gap-2 p-1 border rounded">
-      <p className="text-ellipsis basis-0 grow overflow-hidden">
-        {peer.id.replaceAll("-", "")}
-      </p>
+    <div className="flex flex-col gap-2 p-1 border rounded">
+      <div className="flex items-center">
+        <button
+          className="text-ellipsis basis-0 grow overflow-hidden"
+          onClick={() => setOpen((prev) => !prev)}
+        >
+          {peer.id.replaceAll("-", "")}
+        </button>
 
-      <div className="flex gap-2">
+        <div className="flex gap-2">
+          <button
+            className="bg-sky-700 p-2 rounded hover:bg-sky-900"
+            onClick={async () => {
+              try {
+                send("hi");
+              } catch (e) {
+                toast.error(String(e));
+              }
+            }}
+          >
+            ping
+          </button>
+        </div>
+      </div>
+
+      <div className={clsx(!open && "hidden", "flex gap-2")}>
         <button
           className="bg-sky-700 p-2 rounded hover:bg-sky-900"
           onClick={() => {
@@ -86,14 +121,18 @@ function IncomingPeer({ peer }: { peer: { id: string } }) {
         <button
           className="bg-sky-700 p-2 rounded hover:bg-sky-900"
           onClick={async () => {
-            try {
-              send("hi");
-            } catch (e) {
-              toast.error(String(e));
+            const network = getNetworkLayerGlobal();
+            const rpcResult = network.rpcCall({
+              peerId: peer.id,
+              channel: RPC_CHANNEL,
+              data: "hello world!",
+            });
+            for await (const result of rpcResult) {
+              toast(String(result.data));
             }
           }}
         >
-          ping
+          RPC
         </button>
       </div>
     </div>
