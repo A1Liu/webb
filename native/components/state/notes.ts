@@ -6,7 +6,7 @@ import { v4 as uuid } from "uuid";
 import { z } from "zod";
 import md5 from "md5";
 import { ZustandJsonStorage } from "../util";
-import { registerGlobal } from "../constants";
+import { GlobalInitGroup } from "../constants";
 
 export type NoteData = z.infer<typeof NoteDataSchema> & {
   // TODO: probably need to save where the merges came from as well
@@ -27,7 +27,7 @@ export interface NoteGlobalState {
 
   cb: {
     updateNote: (id: string, updater: (prev: NoteData) => NoteData) => void;
-    updateNoteFromSync: (note: NoteData) => void;
+    updateNotesFromSync: (notes: NoteData[]) => void;
     setActiveNote: (id: string) => void;
   };
 }
@@ -57,25 +57,34 @@ export const useNotesState = create<NoteGlobalState>()(
               return { notes };
             });
           },
-          updateNoteFromSync: (note: NoteData) => {
+
+          updateNotesFromSync: (newNotes) => {
             set((prev) => {
-              if (!note.isTombstone) {
-                const notes = new Map(prev.notes ?? []);
-                notes.set(note.id, note);
-                return { notes };
+              const mutableNotesMap = new Map(prev.notes);
+              for (const newNote of newNotes) {
+                if (!newNote.isTombstone) {
+                  mutableNotesMap.set(newNote.id, newNote);
+                }
+
+                const prevNote = prev.notes?.get(newNote.id);
+                if (!prevNote) continue;
+
+                if (prevNote.isTombstone) {
+                  mutableNotesMap.delete(newNote.id);
+                  continue;
+                }
+
+                mutableNotesMap.set(newNote.id, newNote);
               }
 
-              const prevNote = prev.notes?.get(note.id);
-              if (!prevNote) return prev;
+              const notes = new Map(
+                [...mutableNotesMap.entries()].sort(
+                  (l, r) =>
+                    l[1].lastUpdateDate.getTime() -
+                    r[1].lastUpdateDate.getTime(),
+                ),
+              );
 
-              const notes = new Map(prev.notes ?? []);
-
-              if (prevNote.isTombstone) {
-                notes.delete(note.id);
-                return { notes };
-              }
-
-              notes.set(note.id, note);
               return { notes };
             });
           },
@@ -110,7 +119,7 @@ export const useNotesState = create<NoteGlobalState>()(
   ),
 );
 
-registerGlobal({
+GlobalInitGroup.registerValue({
   field: "useNotesState",
   eagerInit: true,
   create: () => {

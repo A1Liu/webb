@@ -4,7 +4,7 @@ import { Toaster } from "react-hot-toast";
 import clsx from "clsx";
 import Head from "next/head";
 import { useEffect } from "react";
-import { registerGlobal } from "./constants";
+import { GlobalInitGroup } from "./constants";
 import { AppStateKind, useGlobals } from "./state/appGlobals";
 
 export function GlobalWrapper({ children }: { children: React.ReactNode }) {
@@ -13,7 +13,7 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
   } = useGlobals();
 
   useEffect(() => {
-    registerGlobal.init();
+    GlobalInitGroup.init();
   }, []);
 
   return (

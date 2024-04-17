@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { registerGlobal } from "../constants";
+import { GlobalInitGroup } from "../constants";
 
 enum Platform {
   MacOS = "MacOS",
@@ -35,7 +35,7 @@ function getPlatformInfo(): Omit<PlatformInfo, "cb"> {
   }
 }
 
-registerGlobal({
+GlobalInitGroup.registerValue({
   field: "usePlatform",
   eagerInit: true,
   create: () => {

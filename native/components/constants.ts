@@ -4,7 +4,10 @@ import { memoize } from "@a1liu/webb-ui-shared/util";
 import toast from "react-hot-toast";
 
 export const EnvFlags = {
-  registeredGlobals: new Map<string, unknown>(),
+  registry: {} as Record<
+    string,
+    (() => unknown) | Record<string, () => unknown>
+  >,
 } as const;
 
 // Explicitly declaring the flags on the window interface so that they're editable
@@ -23,58 +26,79 @@ interface RegisterGlobalProps<T> {
   create: () => T;
 }
 
-const globalEagerInits = new Map<string, () => unknown>();
-export function registerGlobal<T>({
-  field,
-  eagerInit,
-  create,
-}: RegisterGlobalProps<T>): () => T {
-  if (typeof window === "undefined") {
-    return () => {
-      throw new Error("failed to register global");
-    };
+export class InitGroup {
+  private initCalled = false;
+  private readonly valueCreatorRegistry: Record<string, () => unknown> = {};
+  private readonly eagerInitRegistry: Record<string, () => unknown> = {};
+
+  constructor(readonly name: string) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (window.EnvironmentFlags.registry[name]) {
+      throw new Error(`Found previous global registration for ${name}`);
+    }
+
+    window.EnvironmentFlags.registry[name] = this.valueCreatorRegistry;
   }
 
-  if (window.EnvironmentFlags.registeredGlobals.has(field)) {
-    throw new Error(`Field '${field}' already exists`);
+  init() {
+    this.initCalled = true;
+    for (const init of Object.values(this.eagerInitRegistry)) {
+      init();
+    }
   }
 
-  window.EnvironmentFlags.registeredGlobals.set(field, null);
+  registerValue<T>({
+    field,
+    eagerInit,
+    create,
+  }: RegisterGlobalProps<T>): () => T {
+    if (typeof window === "undefined") {
+      return () => {
+        throw new Error("failed to register global");
+      };
+    }
 
-  const initializer = memoize(() => {
-    const t = create();
+    if (this.valueCreatorRegistry[field]) {
+      throw new Error(`Field '${field}' already exists`);
+    }
 
-    window.EnvironmentFlags.registeredGlobals.set(field, t);
-    return t;
-  });
+    const initializer = memoize(() => {
+      const t = create();
 
-  if (eagerInit) {
-    registerInit(field, initializer);
+      return t;
+    });
+
+    this.valueCreatorRegistry[field] = initializer;
+
+    if (eagerInit) {
+      this.registerInit(field, initializer);
+    }
+
+    return initializer;
   }
 
-  return initializer;
+  registerInit(name: string, init: () => void) {
+    if (this.eagerInitRegistry[name]) {
+      throw new Error(`Initializer '${name}' already exists`);
+    }
+
+    const func = memoize(init);
+    this.eagerInitRegistry[name] = func;
+
+    if (this.initCalled) {
+      // We've already run initialization,
+      // so this should just execute once global code has finished execution
+      setTimeout(func);
+    }
+  }
 }
 
-registerGlobal.init = memoize(() => {
-  for (const init of globalEagerInits.values()) {
-    init();
-  }
+export const GlobalInitGroup = new InitGroup("global");
 
-  return true;
-});
-
-export function registerInit(name: string, init: () => void) {
-  const func = memoize(init);
-  if (registerGlobal.init.memoizedValue) {
-    // We've already run initialization,
-    // so this should just execute once global code has finished execution
-    setTimeout(func);
-  }
-
-  globalEagerInits.set(name, func);
-}
-
-registerGlobal({
+GlobalInitGroup.registerValue({
   field: "toast",
   eagerInit: true,
   create: () => {

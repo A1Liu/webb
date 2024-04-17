@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { v4 as uuid } from "uuid";
 import { toast } from "react-hot-toast";
-import { registerGlobal } from "../constants";
+import { GlobalInitGroup } from "../constants";
 
 export enum AppStateKind {
   Page = "Page",
@@ -63,7 +63,7 @@ export const useGlobals = create<WebbGlobals>()((set, get) => {
 });
 
 // For debugging state
-registerGlobal({
+GlobalInitGroup.registerValue({
   field: "useGlobals",
   eagerInit: true,
   create: () => useGlobals,

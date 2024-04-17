@@ -3,10 +3,10 @@ import { NetworkLayer, PeerData } from "@a1liu/webb-ui-shared/network";
 import { getId } from "@a1liu/webb-ui-shared/util";
 import { persist } from "zustand/middleware";
 import { ZustandJsonStorage } from "../util";
-import { registerGlobal } from "../constants";
+import { GlobalInitGroup } from "../constants";
 import { toast } from "react-hot-toast";
 
-export const getNetworkLayerGlobal = registerGlobal({
+export const getNetworkLayerGlobal = GlobalInitGroup.registerValue({
   field: "networkLayer",
   eagerInit: true,
   create: () => {
@@ -113,7 +113,7 @@ export const usePeers = create<PeersState>()(
   ),
 );
 
-registerGlobal({
+GlobalInitGroup.registerValue({
   field: "usePeers",
   eagerInit: true,
   create: () => {

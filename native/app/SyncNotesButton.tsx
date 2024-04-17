@@ -14,14 +14,16 @@ import {
   useNotesState,
 } from "@/components/state/notes";
 import { getNetworkLayerGlobal, usePeers } from "@/components/state/peers";
-import { registerInit } from "@/components/constants";
+import { InitGroup } from "@/components/constants";
 
 export const dynamic = "force-static";
 
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
 
-registerInit("InitSyncFetchResponder", async () => {
+export const NotesSyncInitGroup = new InitGroup("notesSync");
+
+NotesSyncInitGroup.registerInit("InitSyncFetchResponder", async () => {
   const network = getNetworkLayerGlobal();
   while (true) {
     const chunk = await network.recv({
@@ -50,7 +52,7 @@ registerInit("InitSyncFetchResponder", async () => {
   }
 });
 
-registerInit("InitSyncWriter", async () => {
+NotesSyncInitGroup.registerInit("InitSyncWriter", async () => {
   const network = getNetworkLayerGlobal();
   const { cb } = useNotesState.getState();
   while (true) {
@@ -75,7 +77,12 @@ registerInit("InitSyncWriter", async () => {
 
     const count = countResult.data.count;
 
+    const notesToUpdate = [];
     for (let i = 0; i < count; i++) {
+      toast.loading(`Syncing ... fetching notes (${i + 1})`, {
+        id: SYNC_STATUS_TOAST_ID,
+      });
+
       const chunk = await network.recv({
         peerId: countChunk.peerId,
         channel: "notes-write-data",
@@ -86,13 +93,13 @@ registerInit("InitSyncWriter", async () => {
         continue;
       }
 
-      const note = result.data.note;
-      cb.updateNoteFromSync(note);
-
-      toast.loading(`Syncing ... writing notes (${i + 1})`, {
-        id: SYNC_STATUS_TOAST_ID,
-      });
+      notesToUpdate.push(result.data.note);
     }
+
+    toast.loading(`Syncing ... writing notes (${count})`, {
+      id: SYNC_STATUS_TOAST_ID,
+    });
+    cb.updateNotesFromSync(notesToUpdate);
 
     console.debug(`executed notes-write-data`);
     toast.success(`Sync complete!`, {
@@ -175,6 +182,7 @@ export function SyncNotesButton() {
       console.debug(`fetch handling done`);
 
       const outboundNotes = new Map<string, NoteData>();
+      const notesToUpdate = [];
       for (const [noteId, versions] of noteVersions.entries()) {
         const { ...maxSyncNote } = versions.reduce((maxNote, note) => {
           // TODO: figure out why the timestamps are getting... rounded?
@@ -206,11 +214,12 @@ export function SyncNotesButton() {
           outboundNotes.set(noteId, maxSyncNote);
         }
 
-        cb.updateNoteFromSync({
+        notesToUpdate.push({
           ...maxSyncNote,
           merges,
         });
       }
+      cb.updateNotesFromSync(notesToUpdate);
 
       console.debug(`Finalized ${outboundNotes.size} notes`);
       toast.loading(`Syncing ... resolved ${outboundNotes.size} notes`, {

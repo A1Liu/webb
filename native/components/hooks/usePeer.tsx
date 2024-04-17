@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { z } from "zod";
-import { registerInit } from "../constants";
+import { GlobalInitGroup } from "../constants";
 import { getNetworkLayerGlobal, usePeers } from "../state/peers";
 
 interface PeerContext {
@@ -71,11 +71,11 @@ export function usePeer<T>(
 
 const RPC_CHANNEL = "debug-rpc";
 
-registerInit("rpcDebug", async () => {
+GlobalInitGroup.registerInit("rpcDebug", async () => {
   const network = getNetworkLayerGlobal();
   while (true) {
     await network.rpcSingleExec(RPC_CHANNEL, async function* (input) {
-      console.log("rpc called");
+      toast("rpc called");
       yield* String(input.data).split(" ");
     });
   }
