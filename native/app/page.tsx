@@ -29,12 +29,13 @@ function SelectActiveNote() {
       </option>
 
       {[...(notes ? notes?.values() : [])]
+        .reverse()
         .filter((note) => !note.isTombstone)
         .map((note) => {
           return (
             <option key={note.id} value={note.id}>
               {note.merges ? "*" : ""}
-              {note.text.split("\n", 1)[0]}
+              {note.text.split("\n", 1)[0].slice(0, 20)}
             </option>
           );
         })}

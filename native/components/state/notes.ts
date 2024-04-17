@@ -51,6 +51,7 @@ export const useNotesState = create<NoteGlobalState>()(
                 lastSyncHash: md5(""),
               };
 
+              notes.delete(noteId);
               notes.set(noteId, updater(prevNote));
 
               return { notes };

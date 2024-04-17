@@ -18,6 +18,9 @@ import { registerInit } from "@/components/constants";
 
 export const dynamic = "force-static";
 
+const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
+const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
+
 registerInit("InitSyncFetchResponder", async () => {
   const network = getNetworkLayerGlobal();
   while (true) {
@@ -26,7 +29,11 @@ registerInit("InitSyncFetchResponder", async () => {
       channel: "notes-fetch",
       ignorePeerIdForChannel: true,
     });
-    console.log(`received notes-fetch req`, chunk.peerId);
+
+    console.debug(`received notes-fetch req`, chunk.peerId);
+    toast.loading(`Syncing ... sending notes`, {
+      id: SYNC_STATUS_TOAST_ID,
+    });
 
     const { notes } = useNotesState.getState();
     await network.sendData({
@@ -54,7 +61,11 @@ registerInit("InitSyncWriter", async () => {
       channel: "notes-write-count",
       ignorePeerIdForChannel: true,
     });
-    console.log(`received notes-write req`);
+
+    console.debug(`received notes-write req`);
+    toast.loading(`Syncing ... writing notes`, {
+      id: SYNC_STATUS_TOAST_ID,
+    });
 
     const countResult = z
       .object({ count: z.number() })
@@ -64,7 +75,7 @@ registerInit("InitSyncWriter", async () => {
       continue;
     }
 
-    console.log(`reading notes-write-data`);
+    console.debug(`reading notes-write-data`);
 
     const count = countResult.data.count;
 
@@ -81,9 +92,16 @@ registerInit("InitSyncWriter", async () => {
 
       const note = result.data.note;
       cb.updateNoteFromSync(note);
+
+      toast.loading(`Syncing ... writing notes (${i + 1})`, {
+        id: SYNC_STATUS_TOAST_ID,
+      });
     }
 
-    console.log(`executed notes-write-data`);
+    console.debug(`executed notes-write-data`);
+    toast.success(`Sync complete!`, {
+      id: SYNC_STATUS_TOAST_ID,
+    });
   }
 });
 
@@ -95,7 +113,10 @@ export function SyncNotesButton() {
     async () => {
       if (!peers) return;
 
-      console.log("sync starting...");
+      console.debug("Sync starting...");
+      toast.loading(`Syncing ... fetching notes`, {
+        id: ACTIVE_SYNC_STATUS_TOAST_ID,
+      });
 
       const network = getNetworkLayerGlobal();
       const noteVersions = new Map<string, NoteData[]>();
@@ -115,8 +136,7 @@ export function SyncNotesButton() {
         });
       }
 
-      console.log("sync requests sent");
-
+      let totalCount = 0;
       for (const [peerId, _peer] of peers.entries()) {
         const countChunk = await network.recv({
           peerId,
@@ -149,10 +169,14 @@ export function SyncNotesButton() {
           const note = result.data.note;
           const versions = getOrCompute(noteVersions, note.id, () => []);
           versions.push(note);
+
+          toast.loading(`Syncing ... fetching notes (${++totalCount})`, {
+            id: ACTIVE_SYNC_STATUS_TOAST_ID,
+          });
         }
       }
 
-      console.log(`fetch handling done`);
+      console.debug(`fetch handling done`);
 
       const outboundNotes = new Map<string, NoteData>();
       for (const [noteId, versions] of noteVersions.entries()) {
@@ -196,7 +220,10 @@ export function SyncNotesButton() {
         });
       }
 
-      console.log(`Finalized ${outboundNotes.size} notes`);
+      console.debug(`Finalized ${outboundNotes.size} notes`);
+      toast.loading(`Syncing ... resolved ${outboundNotes.size} notes`, {
+        id: ACTIVE_SYNC_STATUS_TOAST_ID,
+      });
 
       for (const [peerId, _peer] of peers.entries()) {
         await network.sendData({
@@ -214,6 +241,10 @@ export function SyncNotesButton() {
           });
         }
       }
+
+      toast.success(`Sync complete!`, {
+        id: ACTIVE_SYNC_STATUS_TOAST_ID,
+      });
     },
     {
       manual: true,
@@ -227,7 +258,6 @@ export function SyncNotesButton() {
       className={buttonClass}
       disabled={!peers?.size || loading}
       onClick={() => {
-        console.log("ehllo");
         runAsync();
       }}
     >
