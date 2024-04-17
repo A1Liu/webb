@@ -27,7 +27,6 @@ export interface ChunkAddr {
   peerId: string;
   channel: string;
   ignorePeerIdForChannel?: boolean;
-  __rpc_id?: string;
 }
 
 export interface ChunkListenAddr {
@@ -35,8 +34,22 @@ export interface ChunkListenAddr {
   channel: string;
 }
 
+interface ChunkMailbox {
+  peerId?: string;
+  channel: string;
+  suffix?: string;
+}
+
 // Doesn't work for `Map` type
 export interface Chunk extends ChunkAddr {
+  data: unknown;
+}
+
+interface ChunkData {
+  peerId: string;
+  channel: string;
+  ignorePeerIdForChannel?: boolean;
+  __rpc_id?: string;
   __end_rpc_list?: boolean;
   data: unknown;
 }
@@ -44,13 +57,12 @@ export interface Chunk extends ChunkAddr {
 const RPC_ENDPOINT = "rpcCallEndpoint";
 const RPC_CALL_CLIENT = "rpcCallClient";
 
-function getChannel(chunkId: ChunkListenAddr, suffix?: string) {
-  const peerId = chunkId.peerId ?? "";
-  return `${peerId}\0${chunkId.channel}${suffix ? `\0${suffix}` : ""}`;
+function getChannel({ peerId = "", channel, suffix }: ChunkMailbox) {
+  return `${peerId}\0${channel}${suffix ? `\0${suffix}` : ""}`;
 }
 
 export class NetworkLayer {
-  private readonly channels = new Map<string, Channel<Chunk>>();
+  private readonly channels = new Map<string, Channel<ChunkData>>();
   private readonly inboundPeerChannel = new Channel<PeerData>(Infinity);
   private readonly connections = new Map<string, PeerConnection>();
 
@@ -110,15 +122,13 @@ export class NetworkLayer {
 
     conn.on("data", (dataIn) => {
       // TODO: fix the cast later
-      const chunk = dataIn as any as Chunk;
+      const chunk = dataIn as any as ChunkData;
 
-      const key = getChannel(
-        {
-          channel: chunk.channel,
-          peerId: chunk.ignorePeerIdForChannel ? undefined : peerId,
-        },
-        chunk.__rpc_id ? RPC_ENDPOINT : undefined,
-      );
+      const key = getChannel({
+        channel: chunk.channel,
+        peerId: chunk.ignorePeerIdForChannel ? undefined : peerId,
+        suffix: chunk.__rpc_id ? RPC_ENDPOINT : undefined,
+      });
 
       const channel = getOrCompute(
         this.channels,
@@ -204,9 +214,13 @@ export class NetworkLayer {
     return await channel.pop();
   }
 
-  async sendData(chunk: Chunk) {
-    const channel = await this.getDataChannel(chunk.peerId);
+  private async sendDataRaw(peerId: string, chunk: ChunkData) {
+    const channel = await this.getDataChannel(peerId);
     await channel.send(chunk);
+  }
+
+  async sendData(chunk: Chunk) {
+    this.sendDataRaw(chunk.peerId, chunk);
   }
 
   async *rpcCall(
@@ -214,18 +228,18 @@ export class NetworkLayer {
   ): AsyncGenerator<Chunk> {
     const id = uuid();
     {
-      const channel = await this.getDataChannel(chunk.peerId);
-      await channel.send({
+      await this.sendDataRaw(chunk.peerId, {
         ...chunk,
         __rpc_id: id,
         ignorePeerIdForChannel: true,
       });
     }
 
-    const key = getChannel(
-      { peerId: chunk.peerId, channel: chunk.channel },
-      RPC_CALL_CLIENT + id,
-    );
+    const key = getChannel({
+      peerId: chunk.peerId,
+      channel: chunk.channel,
+      suffix: RPC_CALL_CLIENT + id,
+    });
     const channel = getOrCompute(
       this.channels,
       key,
@@ -244,7 +258,7 @@ export class NetworkLayer {
     channel: string,
     rpc: (data: Chunk) => AsyncGenerator<unknown>,
   ): Promise<void> {
-    const key = getChannel({ channel }, RPC_ENDPOINT);
+    const key = getChannel({ channel, suffix: RPC_ENDPOINT });
 
     const inputChannel = getOrCompute(
       this.channels,
@@ -262,17 +276,15 @@ export class NetworkLayer {
       return;
     }
 
-    const outputChannel = await this.getDataChannel(request.peerId);
-
     for await (const resp of rpc(request)) {
-      await outputChannel.send({
+      await this.sendDataRaw(request.peerId, {
         peerId: request.peerId,
         channel: `${channel}\0${RPC_CALL_CLIENT + id}`,
         data: resp,
       });
     }
 
-    await outputChannel.send({
+    await this.sendDataRaw(request.peerId, {
       peerId: request.peerId,
       channel: `${channel}\0${RPC_CALL_CLIENT + id}`,
       __end_rpc_list: true,
