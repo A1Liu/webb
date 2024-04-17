@@ -189,9 +189,6 @@ export function SyncNotesButton() {
           if (note.lastSyncDate > maxNote.lastSyncDate) return note;
           if (note.lastSyncDate < maxNote.lastSyncDate) return maxNote;
 
-          if (note.lastUpdateDate > maxNote.lastUpdateDate) return note;
-          if (note.lastUpdateDate < maxNote.lastUpdateDate) return maxNote;
-
           return maxNote;
         });
 
@@ -210,7 +207,6 @@ export function SyncNotesButton() {
         if (!merges) {
           maxSyncNote.lastSyncHash = md5(maxSyncNote.text);
           maxSyncNote.lastSyncDate = new Date();
-          maxSyncNote.lastUpdateDate = maxSyncNote.lastSyncDate;
           outboundNotes.set(noteId, maxSyncNote);
         }
 
