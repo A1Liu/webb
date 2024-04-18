@@ -4,14 +4,14 @@ import React from "react";
 import { useShallow } from "zustand/react/shallow";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { v4 as uuid } from "uuid";
-import {
-  NoteContentStoreProvider,
-  useNoteContents,
-  useNotesState,
-} from "@/components/state/notes";
+import { useNotesState } from "@/components/state/notes";
 import { SyncNotesButton } from "./SyncNotesButton";
 import md5 from "md5";
 import { useDebounceFn } from "ahooks";
+import {
+  NoteContentStoreProvider,
+  useNoteContents,
+} from "@/components/state/noteContents";
 
 export const dynamic = "force-static";
 

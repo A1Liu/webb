@@ -7,18 +7,17 @@ import { usePlatform } from "@/components/hooks/usePlatform";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { useDebounceFn, useMemoizedFn } from "ahooks";
 import { usePeers } from "@/components/state/peers";
-import {
-  NoteDateSchemaOld,
-  readNoteContents,
-  useNotesState,
-  writeNoteContents,
-} from "@/components/state/notes";
+import { NoteDateSchemaOld, useNotesState } from "@/components/state/notes";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import md5 from "md5";
 import Link from "next/link";
 import { DeviceQr, ScanAndConnectButton } from "@/components/DeviceQrCode";
 import { useUserProfile } from "@/components/state/userProfile";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
+import {
+  readNoteContents,
+  writeNoteContents,
+} from "@/components/state/noteContents";
 
 export const dynamic = "force-static";
 
@@ -54,7 +53,7 @@ export default function Settings() {
   useEffect(() => {
     if (resetCount >= 5) return;
     run();
-  }, [resetCount]);
+  }, [resetCount, run]);
 
   return (
     <TopbarLayout

@@ -56,7 +56,7 @@ export function usePeer<T>(
     return () => {
       run = false;
     };
-  }, []);
+  }, [channel, peerId, schema]);
 
   return {
     send: async (data) => {
@@ -81,11 +81,12 @@ const RpcDebug = registerRpc({
   },
 });
 
+const schema = z.string();
 function IncomingPeer({ peer }: { peer: { id: string } }) {
   const { cb } = usePeers();
   const [open, setOpen] = useState(false);
   const { send } = usePeer(peer.id, {
-    schema: z.string(),
+    schema,
     onData: (data) => {
       toast(`blarka=${data}`);
     },
