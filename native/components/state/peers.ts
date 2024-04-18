@@ -1,10 +1,12 @@
 import { create } from "zustand";
+import { v4 as uuid } from "uuid";
 import { PeerData } from "@a1liu/webb-ui-shared/network";
 import { persist } from "zustand/middleware";
 import { ZustandIdbStorage } from "../util";
-import { GlobalInitGroup, InitGroup } from "../constants";
+import { InitGroup } from "../constants";
 import { toast } from "react-hot-toast";
 import { getNetworkLayerGlobal } from "../network";
+import { Future } from "@a1liu/webb-ui-shared/util";
 
 export interface Peer extends PeerData {
   name?: string;
@@ -74,13 +76,14 @@ PeerInitGroup.registerInit("networkLayer", async () => {
   return network;
 });
 
-interface DeviceProfile {}
-
-interface UserProfile {
-  isValid: boolean;
+interface DeviceProfile {
+  id: string;
 }
 
+interface UserProfile {}
+
 interface PeersState {
+  hydrationStatus: Future<true>;
   userProfile: UserProfile;
   deviceProfile: DeviceProfile;
   peers: Map<string, Peer>;
@@ -94,10 +97,11 @@ export const usePeers = create<PeersState>()(
   persist(
     (set) => {
       return {
-        userProfile: {
-          isValid: false,
+        hydrationStatus: new Future(),
+        userProfile: {},
+        deviceProfile: {
+          id: uuid(),
         },
-        deviceProfile: {},
         peers: new Map(),
         cb: {
           deletePeer: (peerId) => {
@@ -123,12 +127,17 @@ export const usePeers = create<PeersState>()(
       name: "peers-storage",
       storage: ZustandIdbStorage,
       skipHydration: true,
-      partialize: ({ cb, ...rest }) => ({ ...rest }),
+      partialize: ({ cb, hydrationStatus, ...rest }) => ({ ...rest }),
+      onRehydrateStorage: (_state) => {
+        return (hydratedState) => {
+          hydratedState?.hydrationStatus.resolve(true);
+        };
+      },
     },
   ),
 );
 
-GlobalInitGroup.registerValue({
+PeerInitGroup.registerValue({
   field: "usePeers",
   eagerInit: true,
   create: () => {

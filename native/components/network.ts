@@ -1,8 +1,8 @@
 import toast from "react-hot-toast";
 import { z } from "zod";
 import { NetworkLayer } from "@a1liu/webb-ui-shared/network";
-import { getId } from "@a1liu/webb-ui-shared/util";
 import { InitGroup } from "./constants";
+import { usePeers } from "./state/peers";
 
 export const NetworkInitGroup = new InitGroup("network");
 
@@ -10,7 +10,10 @@ export const getNetworkLayerGlobal = NetworkInitGroup.registerValue({
   field: "networkLayer",
   eagerInit: true,
   create: async () => {
-    const network = new NetworkLayer(getId());
+    await usePeers.getState().hydrationStatus.promise;
+
+    const id = usePeers.getState().deviceProfile.id;
+    const network = new NetworkLayer(id);
     network.ensureInit();
 
     return network;

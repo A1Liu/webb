@@ -1,6 +1,5 @@
 "use client";
 
-import { v4 as uuid } from "uuid";
 import React, { useEffect, useRef, useState } from "react";
 import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
 import { toast } from "react-hot-toast";
@@ -8,7 +7,6 @@ import { useGlobals } from "@/components/state/appGlobals";
 import { IncomingPeers } from "@/components/hooks/usePeer";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { toCanvas } from "qrcode";
-import { getId } from "@a1liu/webb-ui-shared/util";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { useDebounceFn, useMemoizedFn } from "ahooks";
 import { usePeers } from "@/components/state/peers";
@@ -28,7 +26,7 @@ const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 export default function Home() {
   const { isMobile, platform } = usePlatform();
-  const { peers, cb } = usePeers();
+  const { peers, cb, deviceProfile } = usePeers();
   const notesCb = useNotesState((s) => s.cb);
   const globals = useGlobals((s) => s.cb);
 
@@ -40,8 +38,9 @@ export default function Home() {
       return;
     }
 
-    usePeers.setState({ peers: new Map() });
-    useNotesState.setState({ notes: new Map(), activeNote: uuid() });
+    usePeers.persist.clearStorage();
+    useNotesState.persist.clearStorage();
+    window.location.reload();
     setResetCounter(5);
   });
 
@@ -59,14 +58,15 @@ export default function Home() {
   }, [resetCount]);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    console.log("asdf", deviceProfile.id);
+    if (!canvasRef.current || !deviceProfile.id) return;
 
-    toCanvas(canvasRef.current, getId()).catch((error) => {
+    toCanvas(canvasRef.current, deviceProfile.id).catch((error) => {
       toast.error(`QR Code error: ${String(error)}`, {
         duration: 30_000,
       });
     });
-  }, []);
+  }, [deviceProfile.id]);
 
   return (
     <TopbarLayout
