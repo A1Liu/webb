@@ -1,4 +1,5 @@
-export interface EncryptedTextData {
+
+export interface AesGcmEncryptedTextData {
   __typename: "EncryptedText";
   iv: number[];
   wrappedEncryptionKey: string;
