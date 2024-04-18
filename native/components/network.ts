@@ -1,7 +1,21 @@
 import toast from "react-hot-toast";
 import { z } from "zod";
+import { NetworkLayer } from "@a1liu/webb-ui-shared/network";
+import { getId } from "@a1liu/webb-ui-shared/util";
 import { InitGroup } from "./constants";
-import { getNetworkLayerGlobal } from "./state/peers";
+
+export const NetworkInitGroup = new InitGroup("network");
+
+export const getNetworkLayerGlobal = NetworkInitGroup.registerValue({
+  field: "networkLayer",
+  eagerInit: true,
+  create: () => {
+    const network = new NetworkLayer(getId());
+    network.ensureInit();
+
+    return network;
+  },
+});
 
 export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
   funcName,

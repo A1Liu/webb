@@ -11,7 +11,7 @@ import { toCanvas } from "qrcode";
 import { getId } from "@a1liu/webb-ui-shared/util";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { useDebounceFn, useMemoizedFn } from "ahooks";
-import { getNetworkLayerGlobal, usePeers } from "@/components/state/peers";
+import { usePeers } from "@/components/state/peers";
 import {
   NoteDateSchemaOld,
   readNoteContents,
@@ -20,6 +20,7 @@ import {
 } from "@/components/state/notes";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import md5 from "md5";
+import { getNetworkLayerGlobal } from "@/components/network";
 
 export const dynamic = "force-static";
 

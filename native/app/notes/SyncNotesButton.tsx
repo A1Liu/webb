@@ -15,7 +15,8 @@ import {
   useNotesState,
   writeNoteContents,
 } from "@/components/state/notes";
-import { getNetworkLayerGlobal, usePeers } from "@/components/state/peers";
+import { usePeers } from "@/components/state/peers";
+import { getNetworkLayerGlobal } from "@/components/network";
 import { registerRpc } from "@/components/network";
 
 export const dynamic = "force-static";
@@ -143,13 +144,16 @@ export function SyncNotesButton() {
             return maxNote;
           }
 
-          // TODO: figure out why the timestamps are getting... rounded?
-          // truncated? something is up with the timestamp math.
           if (note.hash === maxNote.lastSyncHash) return maxNote;
           if (maxNote.hash === note.lastSyncHash) return note;
 
           if (note.lastSyncDate > maxNote.lastSyncDate) return note;
           if (note.lastSyncDate < maxNote.lastSyncDate) return maxNote;
+
+          // TODO: figure out why the timestamps are getting... rounded?
+          // truncated? something is up with the timestamp math.
+          if (note.lastUpdateDate > maxNote.lastUpdateDate) return note;
+          if (note.lastUpdateDate < maxNote.lastUpdateDate) return maxNote;
 
           return maxNote;
         });

@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { z } from "zod";
 import { GlobalInitGroup } from "../constants";
-import { getNetworkLayerGlobal, usePeers } from "../state/peers";
+import { getNetworkLayerGlobal, registerRpc } from "../network";
+import { usePeers } from "../state/peers";
 
 interface PeerContext {
   send: (s: string) => void;
@@ -69,16 +70,15 @@ export function usePeer<T>(
   };
 }
 
-const RPC_CHANNEL = "debug-rpc";
-
-GlobalInitGroup.registerInit("rpcDebug", async () => {
-  const network = getNetworkLayerGlobal();
-  while (true) {
-    await network.rpcSingleExec(RPC_CHANNEL, async function* (input) {
-      toast("rpc called");
-      yield* String(input.data).split(" ");
-    });
-  }
+const RpcDebug = registerRpc({
+  group: GlobalInitGroup,
+  funcName: "RpcDebug",
+  input: z.string(),
+  output: z.string(),
+  rpc: async function* (_peerId, input) {
+    toast("rpc called");
+    yield* input.split(" ");
+  },
 });
 
 function IncomingPeer({ peer }: { peer: { id: string } }) {
@@ -130,14 +130,9 @@ function IncomingPeer({ peer }: { peer: { id: string } }) {
         <button
           className="bg-sky-700 p-2 rounded hover:bg-sky-900"
           onClick={async () => {
-            const network = getNetworkLayerGlobal();
-            const rpcResult = network.rpcCall({
-              peerId: peer.id,
-              channel: RPC_CHANNEL,
-              data: "hello world!",
-            });
+            const rpcResult = RpcDebug.call(peer.id, "hello world!");
             for await (const result of rpcResult) {
-              toast(String(result.data));
+              toast(result);
             }
           }}
         >

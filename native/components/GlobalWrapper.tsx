@@ -7,6 +7,8 @@ import { useEffect } from "react";
 import { GlobalInitGroup } from "./constants";
 import { AppStateKind, useGlobals } from "./state/appGlobals";
 import { NotesSyncInitGroup } from "./state/notes";
+import { PeerInitGroup } from "./state/peers";
+import { NetworkInitGroup } from "./network";
 
 export function GlobalWrapper({ children }: { children: React.ReactNode }) {
   const {
@@ -15,6 +17,8 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     GlobalInitGroup.init();
+    NetworkInitGroup.init();
+    PeerInitGroup.init();
     NotesSyncInitGroup.init();
   }, []);
 
