@@ -14,7 +14,7 @@ import { getOrCompute } from "@/../ui-shared/dist/util";
 import toast from "react-hot-toast";
 
 export const NoteDateSchemaOld = z.object({
-  id: z.string(),
+  id: z.string(), // TODO: make this simpler
   text: z.string(),
   isTombstone: z.boolean().optional(),
   lastUpdateDate: z.coerce.date(),

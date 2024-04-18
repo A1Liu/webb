@@ -43,8 +43,8 @@ NotesSyncInitGroup.registerInit("InitContentsReadResponder", async () => {
 NotesSyncInitGroup.registerInit("InitSyncFetchResponder", async () => {
   const network = getNetworkLayerGlobal();
   while (true) {
-    await network.rpcSingleExec("notes-fetch", async function* (chunk) {
-      console.debug(`received notes-fetch req`, chunk.peerId);
+    await network.rpcSingleExec("notes-list", async function* (chunk) {
+      console.debug(`received notes-list req`, chunk.peerId);
 
       const { notes } = useNotesState.getState();
       for (const [_noteId, note] of notes.entries()) {
@@ -69,7 +69,7 @@ NotesSyncInitGroup.registerInit("InitSyncWriter", async () => {
 
     const stream = network.rpcCall({
       peerId: countChunk.peerId,
-      channel: "notes-fetch",
+      channel: "notes-list",
       data: "",
     });
 
@@ -138,15 +138,17 @@ export function SyncNotesButton() {
         string,
         (NoteData & { peerId?: string })[]
       >();
-      for (const [key, note] of (notes ?? new Map()).entries()) {
-        noteVersions.set(key, [{ ...note, merges: undefined }]);
+      for (const note of notes.values()) {
+        noteVersions.set(note.id, [
+          { ...note, merges: undefined, peerId: undefined },
+        ]);
       }
 
       let totalCount = 0;
       for (const peer of peers.values()) {
         const stream = network.rpcCall({
           peerId: peer.id,
-          channel: "notes-fetch",
+          channel: "notes-list",
           data: "",
         });
         for await (const chunk of stream) {
@@ -168,8 +170,6 @@ export function SyncNotesButton() {
         }
       }
 
-      console.debug(`fetch handling done`);
-
       const notesToUpdate = [];
       for (const [_noteId, versions] of noteVersions.entries()) {
         const { ...maxSyncNote } = versions.reduce((maxNote, note) => {
@@ -180,8 +180,8 @@ export function SyncNotesButton() {
 
           // TODO: figure out why the timestamps are getting... rounded?
           // truncated? something is up with the timestamp math.
-          if (maxNote.hash === note.lastSyncHash) return note;
           if (note.hash === maxNote.lastSyncHash) return maxNote;
+          if (maxNote.hash === note.lastSyncHash) return note;
 
           if (note.lastSyncDate > maxNote.lastSyncDate) return note;
           if (note.lastSyncDate < maxNote.lastSyncDate) return maxNote;
@@ -211,7 +211,9 @@ export function SyncNotesButton() {
           merges,
         });
       }
-      cb.updateNotesFromSync(notesToUpdate);
+      cb.updateNotesFromSync(
+        notesToUpdate.map(({ peerId, ...noteData }) => noteData),
+      );
 
       for (const note of notesToUpdate) {
         if (!note.peerId) {
