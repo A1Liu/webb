@@ -1,5 +1,3 @@
-import { v4 as uuid } from "uuid";
-
 export function assertUnreachable(_: never): void {
   console.error("unreachable code executed");
 }
@@ -74,17 +72,6 @@ export class Future<T> {
       },
     };
   }
-}
-
-export function getId(): string {
-  const id = window.localStorage.getItem("peerjs-id");
-  if (id === null) {
-    const newId = uuid();
-    window.localStorage.setItem("peerjs-id", newId);
-    return newId;
-  }
-
-  return id;
 }
 
 // Gets from Map. If the value doesn't exist, compute it using the provided lambda
