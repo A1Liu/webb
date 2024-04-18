@@ -6,6 +6,10 @@ import { GlobalInitGroup, InitGroup } from "../constants";
 import { toast } from "react-hot-toast";
 import { getNetworkLayerGlobal } from "../network";
 
+export interface Peer extends PeerData {
+  name?: string;
+}
+
 export const PeerInitGroup = new InitGroup("peers");
 
 PeerInitGroup.registerInit("networkLayer", () => {
@@ -47,7 +51,7 @@ PeerInitGroup.registerInit("networkLayer", () => {
           break;
 
         case "peerConnected":
-          usePeers.getState().cb.addPeer(update.peer);
+          usePeers.getState().cb.updatePeer(update.peer);
           break;
 
         case "peerDisconnected":
@@ -70,10 +74,18 @@ PeerInitGroup.registerInit("networkLayer", () => {
   return network;
 });
 
+interface DeviceProfile {}
+
+interface UserProfile {
+  isValid: boolean;
+}
+
 interface PeersState {
-  peers: Map<string, PeerData>;
+  userProfile: UserProfile;
+  deviceProfile: DeviceProfile;
+  peers: Map<string, Peer>;
   cb: {
-    addPeer: (peer: PeerData) => void;
+    updatePeer: (peer: PeerData & Partial<Peer>) => void;
     deletePeer: (peerId: string) => void;
   };
 }
@@ -82,19 +94,25 @@ export const usePeers = create<PeersState>()(
   persist(
     (set) => {
       return {
+        userProfile: {
+          isValid: false,
+        },
+        deviceProfile: {},
         peers: new Map(),
         cb: {
           deletePeer: (peerId) => {
             set((prev) => {
-              const peers = new Map(prev.peers ?? []);
+              const peers = new Map(prev.peers);
               peers.delete(peerId);
               return { peers };
             });
           },
-          addPeer: (peer) => {
+          updatePeer: (peer) => {
             set((prev) => {
-              const peers = new Map(prev.peers ?? []);
-              peers.set(peer.id, peer);
+              const peers = new Map(prev.peers);
+              const prevPeer: Partial<Peer> = peers.get(peer.id) ?? {};
+              peers.set(peer.id, { ...prevPeer, ...peer });
+
               return { peers };
             });
           },

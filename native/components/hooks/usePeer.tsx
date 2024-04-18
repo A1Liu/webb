@@ -72,7 +72,7 @@ export function usePeer<T>(
 
 const RpcDebug = registerRpc({
   group: GlobalInitGroup,
-  funcName: "RpcDebug",
+  name: "RpcDebug",
   input: z.string(),
   output: z.string(),
   rpc: async function* (_peerId, input) {

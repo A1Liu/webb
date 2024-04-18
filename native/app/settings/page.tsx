@@ -104,7 +104,7 @@ export default function Home() {
 
                   toast(result.content);
 
-                  cb.addPeer({ id: result.content });
+                  cb.updatePeer({ id: result.content });
 
                   getNetworkLayerGlobal().sendData({
                     peerId: result.content,
