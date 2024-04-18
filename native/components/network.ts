@@ -2,7 +2,7 @@ import toast from "react-hot-toast";
 import { z } from "zod";
 import { NetworkLayer } from "@a1liu/webb-ui-shared/network";
 import { InitGroup } from "./constants";
-import { usePeers } from "./state/peers";
+import { useDeviceProfile } from "./state/deviceProfile";
 
 export const NetworkInitGroup = new InitGroup("network");
 
@@ -10,9 +10,13 @@ export const getNetworkLayerGlobal = NetworkInitGroup.registerValue({
   field: "networkLayer",
   eagerInit: true,
   create: async () => {
-    await usePeers.getState().hydrationStatus.promise;
+    await useDeviceProfile.getState().hydrationPromise.promise;
 
-    const id = usePeers.getState().deviceProfile.id;
+    const id = useDeviceProfile.getState().deviceProfile?.id;
+    if (!id) {
+      // TODO: simplify this
+      throw new Error("WTF Device Profile should be available at this point");
+    }
     const network = new NetworkLayer(id);
     network.ensureInit();
 
@@ -52,7 +56,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
               const result = input.safeParse(chunk.data);
               if (!result.success) {
                 toast.error(
-                  `${field} had invalid input: ${JSON.stringify(chunk)}`,
+                  `${field} had invalid input: ${JSON.stringify(chunk)}`
                 );
                 return;
               }
@@ -82,7 +86,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
           const result = output.safeParse(chunk.data);
           if (!result.success) {
             toast.error(
-              `${field} had invalid output: ${JSON.stringify(chunk)}`,
+              `${field} had invalid output: ${JSON.stringify(chunk)}`
             );
             return;
           }

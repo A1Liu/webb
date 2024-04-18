@@ -50,7 +50,11 @@ export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
         </div>
       </div>
 
-      <div className={"flex flex-col gap-4 px-4 w-full flex-grow pb-4"}>
+      <div
+        className={
+          "flex flex-col gap-4 px-4 w-full flex-grow pb-4 overflow-y-scroll"
+        }
+      >
         {children}
       </div>
     </main>

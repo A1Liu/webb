@@ -10,8 +10,7 @@ import { InitGroup } from "../constants";
 import { createContext, useContext, useEffect } from "react";
 import { useCreation } from "ahooks";
 import { get, set } from "idb-keyval";
-import { getOrCompute } from "@/../ui-shared/dist/util";
-import toast from "react-hot-toast";
+import { getOrCompute } from "@a1liu/webb-ui-shared/util";
 
 export const NoteDateSchemaOld = z.object({
   id: z.string(), // TODO: make this simpler

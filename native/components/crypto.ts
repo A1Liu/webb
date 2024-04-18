@@ -1,3 +1,5 @@
+import stringify from "fast-json-stable-stringify";
+
 export interface AesGcmEncryptedTextData {
   __typename: "EncryptedText";
   iv: number[];
@@ -42,7 +44,7 @@ export class EncryptedText {
     const output = await window.crypto.subtle.decrypt(
       { name: "AES-GCM", iv: this.iv },
       this.rawEncryptionKey,
-      new TextEncoder().encode(this._text),
+      new TextEncoder().encode(this._text)
     );
 
     this._text = new TextDecoder().decode(output);
@@ -65,8 +67,25 @@ export class EncryptedText {
   }
 }
 
-export async function login(_passPhrase: string) {
-  await window.crypto.subtle.generateKey(
+export interface UserKeys {
+  // Using RSA-PSS
+  publicAuthUserId: string;
+  publicAuthKey: CryptoKey;
+  privateAuthKey: CryptoKey;
+
+  // Using AES-GCM
+  privateEncryptKey: CryptoKey;
+}
+
+function bytesToBase64(bytes: ArrayBuffer) {
+  const binString = Array.from(new Uint8Array(bytes), (byte) =>
+    String.fromCodePoint(byte)
+  ).join("");
+  return btoa(binString);
+}
+
+export async function createUserKeys(): Promise<UserKeys> {
+  const authKeyPair = await window.crypto.subtle.generateKey(
     {
       name: "RSA-PSS",
       modulusLength: 4096,
@@ -75,10 +94,57 @@ export async function login(_passPhrase: string) {
       publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
     },
     true,
-    ["sign", "verify"],
+    ["sign", "verify"]
   );
 
-  await window.crypto.subtle.generateKey(
+  const encrypt = await window.crypto.subtle.generateKey(
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
+  );
+
+  const publicId = await getUserIdFromPublicKey(authKeyPair.publicKey);
+
+  return {
+    publicAuthUserId: publicId,
+    publicAuthKey: authKeyPair.publicKey,
+    privateAuthKey: authKeyPair.privateKey,
+    privateEncryptKey: encrypt,
+  };
+}
+
+export async function verifyUserKey(
+  key: CryptoKey,
+  userId: string
+): Promise<boolean> {
+  if (key.algorithm.name !== "RSA-PSS") {
+    return false;
+  }
+
+  return userId === (await getUserIdFromPublicKey(key));
+}
+
+export async function getUserIdFromPublicKey(key: CryptoKey): Promise<string> {
+  const publicKeyJSON = await window.crypto.subtle.exportKey("jwk", key);
+
+  const publicKeyString = stringify(publicKeyJSON);
+
+  const publicKeyBytes = new TextEncoder().encode(publicKeyString);
+
+  const publicIdBytes = await window.crypto.subtle.digest(
+    "SHA-256",
+    publicKeyBytes
+  );
+
+  const publicId = bytesToBase64(publicIdBytes);
+
+  return publicId;
+}
+
+/*
+
+Public-key encryption:
+  const encryptPair = await window.crypto.subtle.generateKey(
     {
       name: "RSA-OAEP",
       modulusLength: 4096,
@@ -89,4 +155,5 @@ export async function login(_passPhrase: string) {
     true,
     ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
   );
-}
+
+ */

@@ -19,14 +19,17 @@ import {
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import md5 from "md5";
 import { getNetworkLayerGlobal } from "@/components/network";
+import Link from "next/link";
+import { useDeviceProfile } from "@/components/state/deviceProfile";
 
 export const dynamic = "force-static";
 
 const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
-export default function Home() {
+export default function Settings() {
   const { isMobile, platform } = usePlatform();
-  const { peers, cb, deviceProfile } = usePeers();
+  const { peers, cb } = usePeers();
+  const { deviceProfile } = useDeviceProfile();
   const notesCb = useNotesState((s) => s.cb);
   const globals = useGlobals((s) => s.cb);
 
@@ -41,7 +44,6 @@ export default function Home() {
     usePeers.persist.clearStorage();
     useNotesState.persist.clearStorage();
     window.location.reload();
-    setResetCounter(5);
   });
 
   const { run } = useDebounceFn(
@@ -49,7 +51,7 @@ export default function Home() {
     {
       wait: 1_000,
       trailing: true,
-    },
+    }
   );
 
   useEffect(() => {
@@ -58,24 +60,23 @@ export default function Home() {
   }, [resetCount]);
 
   useEffect(() => {
-    console.log("asdf", deviceProfile.id);
-    if (!canvasRef.current || !deviceProfile.id) return;
+    if (!canvasRef.current || !deviceProfile) return;
 
     toCanvas(canvasRef.current, deviceProfile.id).catch((error) => {
       toast.error(`QR Code error: ${String(error)}`, {
         duration: 30_000,
       });
     });
-  }, [deviceProfile.id]);
+  }, [deviceProfile]);
 
   return (
     <TopbarLayout
       title={`${platform} Settings`}
       buttons={[
         {
-          type: "link",
-          text: "Home",
-          href: "/notes",
+          type: "button",
+          text: "Back",
+          onClick: () => window.history.back(),
         },
         {
           type: "button",
@@ -132,15 +133,15 @@ export default function Home() {
                           ...note,
                           text,
                         };
-                      },
-                    ),
+                      }
+                    )
                   );
 
                   const json = JSON.stringify(data);
 
-                  console.log(json);
-
                   await writeText(json);
+
+                  console.log("backup done");
 
                   toast.success(`Copied to clipboard`);
                 }}
@@ -165,7 +166,7 @@ export default function Home() {
                       });
 
                     notesCb.updateNotesFromSync(
-                      notes.map(({ text, ...note }) => note),
+                      notes.map(({ text, ...note }) => note)
                     );
 
                     for (const note of notes) {
@@ -183,6 +184,10 @@ export default function Home() {
               </button>
             </>
           ) : null}
+
+          <Link href={"/"}>
+            <button className={buttonClass}>Home</button>
+          </Link>
 
           <button className={buttonClass} onClick={() => hardReset()}>
             HARD RESET ({resetCount} clicks to activate)

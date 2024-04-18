@@ -82,7 +82,7 @@ function NoteEditor() {
   );
 }
 
-export default function Home() {
+export default function Notes() {
   const { activeNote } = useNotesState(
     useShallow((state): { activeNote: string } => {
       const id = state.activeNote ?? uuid();
@@ -93,7 +93,7 @@ export default function Home() {
 
   return (
     <TopbarLayout
-      title={"Home"}
+      title={"Notes"}
       buttons={[
         {
           type: "link",
