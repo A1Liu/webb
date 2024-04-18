@@ -19,7 +19,7 @@ const NoteDateSchemaInternal = z.object({
 
 export type NoteData = z.infer<typeof NoteDataSchema>;
 export const NoteDataSchema = NoteDateSchemaInternal.extend({
-  merges: NoteDateSchemaInternal.array().optional(),
+  merges: NoteDateSchemaInternal.array().nullish(),
 });
 
 export interface NoteGlobalState {

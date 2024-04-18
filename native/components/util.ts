@@ -1,4 +1,4 @@
-import { createJSONStorage, StateStorage } from "zustand/middleware";
+import { PersistStorage, StorageValue } from "zustand/middleware";
 import { isNotNil } from "ramda";
 import { z } from "zod";
 import { toast } from "react-hot-toast";
@@ -20,18 +20,56 @@ export function includeIfExist<T>(...t: (T | null | undefined)[]): T[] {
   return t.filter(isNotNil);
 }
 
-// Custom storage object
-const storage: StateStorage = {
-  getItem: async (name: string): Promise<string | null> => {
-    return (await get(name)) ?? null;
-  },
-  setItem: async (name: string, value: string): Promise<void> => {
-    await set(name, value);
-  },
-  removeItem: async (name: string): Promise<void> => {
-    await del(name);
-  },
-};
+export class EncryptedText {
+  private _text: string = "";
+  private encrypted: boolean = false;
+  private rawEncryptionKey: CryptoKey | undefined = undefined;
+  private wrappedEncryptionKey: string;
+  private readonly iv: ArrayBuffer;
+
+  constructor(options: { wrappedEncryptionKey: string; iv?: ArrayBuffer }) {
+    this.wrappedEncryptionKey = options.wrappedEncryptionKey;
+    this.iv = options.iv ?? window.crypto.getRandomValues(new Uint8Array(12));
+  }
+
+  decryptKey(runner: (wrapped: string) => CryptoKey) {
+    this.rawEncryptionKey = runner(this.wrappedEncryptionKey);
+  }
+
+  async decryptText() {
+    if (!this.encrypted) {
+      return;
+    }
+
+    if (!this.rawEncryptionKey) {
+      throw new Error("Don't have the encryption key unwrapped yet");
+    }
+
+    const output = await window.crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: this.iv },
+      this.rawEncryptionKey,
+      new TextEncoder().encode(this._text),
+    );
+
+    this._text = new TextDecoder().decode(output);
+  }
+
+  set text(value: string) {
+    if (this.encrypted) {
+      throw new Error("Can't modify the data until it's decrypted");
+    }
+
+    this._text = value;
+  }
+
+  get text(): string {
+    if (this.encrypted) {
+      throw new Error("Can't modify the data until it's decrypted");
+    }
+
+    return this._text;
+  }
+}
 
 export function zustandJsonReviver(_key: string, value: unknown): unknown {
   try {
@@ -94,7 +132,17 @@ export function zustandJsonReplacer(
   return value;
 }
 
-export const ZustandJsonStorage = createJSONStorage(() => storage, {
-  reviver: zustandJsonReviver,
-  replacer: zustandJsonReplacer,
-});
+export const ZustandJsonStorage: PersistStorage<unknown> = {
+  getItem: async (name: string): Promise<StorageValue<unknown> | null> => {
+    return (await get(name)) ?? null;
+  },
+  setItem: async (
+    name: string,
+    value: StorageValue<unknown>,
+  ): Promise<void> => {
+    await set(name, value);
+  },
+  removeItem: async (name: string): Promise<void> => {
+    await del(name);
+  },
+};
