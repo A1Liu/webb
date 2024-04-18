@@ -71,7 +71,7 @@ NotesSyncInitGroup.registerInit("InitSyncWriter", async () => {
     for await (const { note } of stream) {
       toast.loading(
         `Syncing ... fetching notes (${notesToUpdate.length + 1})`,
-        { id: SYNC_STATUS_TOAST_ID }
+        { id: SYNC_STATUS_TOAST_ID },
       );
       notesToUpdate.push(note);
     }
@@ -181,7 +181,7 @@ export function SyncNotesButton() {
         });
       }
       cb.updateNotesFromSync(
-        notesToUpdate.map(({ peerId, ...noteData }) => noteData)
+        notesToUpdate.map(({ peerId, ...noteData }) => noteData),
       );
 
       for (const note of notesToUpdate) {
@@ -218,7 +218,7 @@ export function SyncNotesButton() {
         id: ACTIVE_SYNC_STATUS_TOAST_ID,
       });
     },
-    { manual: true }
+    { manual: true },
   );
 
   if (isMobile) return null;
