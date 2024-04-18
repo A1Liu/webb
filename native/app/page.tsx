@@ -1,35 +1,19 @@
 "use client";
 
+import { DeviceQr } from "@/components/DeviceQrCode";
 import { useUserProfile } from "@/components/state/userProfile";
 import { buttonClass, TopbarLayout } from "@/components/TopbarLayout";
 import Link from "next/link";
-import { toCanvas } from "qrcode";
-import { useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { useDeviceProfile } from "../components/state/deviceProfile";
 
 export const dynamic = "force-static";
 
-function DeviceQr({ deviceId }: { deviceId: string }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  useEffect(() => {
-    if (!canvasRef.current || !deviceId) return;
-
-    toCanvas(canvasRef.current, deviceId).catch((error) => {
-      toast.error(`QR Code error: ${String(error)}`, {
-        duration: 30_000,
-      });
-    });
-  }, [deviceId]);
-
-  return <canvas ref={canvasRef} />;
-}
-
 function UserProfileChoice() {
   const { isHydrated, deviceProfile } = useDeviceProfile();
   const {
     userProfile,
-    cb: { createUserProfile },
+    cb: { createUserProfile, logout },
   } = useUserProfile();
 
   if (!isHydrated || !deviceProfile) {
@@ -40,7 +24,7 @@ function UserProfileChoice() {
     return (
       <>
         <h3>Scan Device ID</h3>
-        <DeviceQr deviceId={deviceProfile.id} />
+        <DeviceQr />
 
         <button
           className={buttonClass}
@@ -65,9 +49,18 @@ function UserProfileChoice() {
         <button className={buttonClass}>Go to notes</button>
       </Link>
 
-      <h3>User ID</h3>
+      <button
+        className={buttonClass}
+        onClick={async () => {
+          logout();
+          toast("Created user profile");
+        }}
+      >
+        Logout
+      </button>
 
-      <DeviceQr deviceId={userProfile.publicAuthUserId} />
+      <h3>User ID</h3>
+      <DeviceQr />
     </>
   );
 }

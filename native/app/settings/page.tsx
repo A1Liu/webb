@@ -1,12 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
+import React, { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
-import { useGlobals } from "@/components/state/appGlobals";
 import { IncomingPeers } from "@/components/hooks/usePeer";
 import { usePlatform } from "@/components/hooks/usePlatform";
-import { toCanvas } from "qrcode";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { useDebounceFn, useMemoizedFn } from "ahooks";
 import { usePeers } from "@/components/state/peers";
@@ -18,8 +15,9 @@ import {
 } from "@/components/state/notes";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import md5 from "md5";
-import { getNetworkLayerGlobal } from "@/components/network";
 import Link from "next/link";
+import { DeviceQr, ScanAndConnectButton } from "@/components/DeviceQrCode";
+import { useUserProfile } from "@/components/state/userProfile";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 
 export const dynamic = "force-static";
@@ -28,12 +26,9 @@ const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 export default function Settings() {
   const { isMobile, platform } = usePlatform();
-  const { peers, cb } = usePeers();
-  const { deviceProfile } = useDeviceProfile();
+  const { peers } = usePeers();
   const notesCb = useNotesState((s) => s.cb);
-  const globals = useGlobals((s) => s.cb);
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [resetCount, setResetCounter] = useState(5);
   const hardReset = useMemoizedFn(async () => {
     if (resetCount > 1) {
@@ -43,6 +38,8 @@ export default function Settings() {
 
     usePeers.persist.clearStorage();
     useNotesState.persist.clearStorage();
+    useUserProfile.persist.clearStorage();
+    useDeviceProfile.persist.clearStorage();
     window.location.reload();
   });
 
@@ -51,23 +48,13 @@ export default function Settings() {
     {
       wait: 1_000,
       trailing: true,
-    }
+    },
   );
 
   useEffect(() => {
     if (resetCount >= 5) return;
     run();
   }, [resetCount]);
-
-  useEffect(() => {
-    if (!canvasRef.current || !deviceProfile) return;
-
-    toCanvas(canvasRef.current, deviceProfile.id).catch((error) => {
-      toast.error(`QR Code error: ${String(error)}`, {
-        duration: 30_000,
-      });
-    });
-  }, [deviceProfile]);
 
   return (
     <TopbarLayout
@@ -86,39 +73,10 @@ export default function Settings() {
       ]}
     >
       <div className={"flex gap-2 justify-center"}>
-        <canvas ref={canvasRef}></canvas>
+        <DeviceQr />
 
         <div className="flex flex-col gap-2">
-          {isMobile ? (
-            <button
-              className={buttonClass}
-              onTouchStart={async () => {
-                await globals.runBackgroundFlow(async () => {
-                  // `windowed: true` actually sets the webview to transparent
-                  // instead of opening a separate view for the camera
-                  // make sure your user interface is ready to show what is underneath with a transparent element
-                  const result = await scan({
-                    cameraDirection: "back",
-                    windowed: true,
-                    formats: [Format.QRCode],
-                  });
-
-                  toast(result.content);
-
-                  cb.updatePeer({ id: result.content });
-
-                  const network = await getNetworkLayerGlobal();
-                  network.sendData({
-                    peerId: result.content,
-                    channel: "debug",
-                    data: "peer connect",
-                  });
-                });
-              }}
-            >
-              scan
-            </button>
-          ) : null}
+          <ScanAndConnectButton />
 
           {!isMobile ? (
             <>
@@ -133,8 +91,8 @@ export default function Settings() {
                           ...note,
                           text,
                         };
-                      }
-                    )
+                      },
+                    ),
                   );
 
                   const json = JSON.stringify(data);
@@ -166,7 +124,7 @@ export default function Settings() {
                       });
 
                     notesCb.updateNotesFromSync(
-                      notes.map(({ text, ...note }) => note)
+                      notes.map(({ text, ...note }) => note),
                     );
 
                     for (const note of notes) {

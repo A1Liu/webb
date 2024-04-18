@@ -44,7 +44,7 @@ export class EncryptedText {
     const output = await window.crypto.subtle.decrypt(
       { name: "AES-GCM", iv: this.iv },
       this.rawEncryptionKey,
-      new TextEncoder().encode(this._text)
+      new TextEncoder().encode(this._text),
     );
 
     this._text = new TextDecoder().decode(output);
@@ -79,9 +79,30 @@ export interface UserKeys {
 
 function bytesToBase64(bytes: ArrayBuffer) {
   const binString = Array.from(new Uint8Array(bytes), (byte) =>
-    String.fromCodePoint(byte)
+    String.fromCodePoint(byte),
   ).join("");
   return btoa(binString);
+}
+
+export async function importUserPublicKey(keyData: unknown) {
+  const key = await window.crypto.subtle.importKey(
+    "jwk",
+    keyData as any,
+    {
+      name: "RSA-PSS",
+      hash: "SHA-512",
+    },
+    true,
+    ["verify"],
+  );
+
+  return key;
+}
+
+export async function exportUserPublickKey(key: CryptoKey) {
+  const keyJwk = await window.crypto.subtle.exportKey("jwk", key);
+
+  return keyJwk;
 }
 
 export async function createUserKeys(): Promise<UserKeys> {
@@ -94,13 +115,13 @@ export async function createUserKeys(): Promise<UserKeys> {
       publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
     },
     true,
-    ["sign", "verify"]
+    ["sign", "verify"],
   );
 
   const encrypt = await window.crypto.subtle.generateKey(
     { name: "AES-GCM", length: 256 },
     true,
-    ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
+    ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
   );
 
   const publicId = await getUserIdFromPublicKey(authKeyPair.publicKey);
@@ -115,7 +136,7 @@ export async function createUserKeys(): Promise<UserKeys> {
 
 export async function verifyUserKey(
   key: CryptoKey,
-  userId: string
+  userId: string,
 ): Promise<boolean> {
   if (key.algorithm.name !== "RSA-PSS") {
     return false;
@@ -133,7 +154,7 @@ export async function getUserIdFromPublicKey(key: CryptoKey): Promise<string> {
 
   const publicIdBytes = await window.crypto.subtle.digest(
     "SHA-256",
-    publicKeyBytes
+    publicKeyBytes,
   );
 
   const publicId = bytesToBase64(publicIdBytes);

@@ -74,7 +74,6 @@ PeerInitGroup.registerInit("networkLayer", async () => {
   return network;
 });
 
-
 interface PeersState {
   peers: Map<string, Peer>;
   cb: {
@@ -116,8 +115,8 @@ export const usePeers = create<PeersState>()(
       partialize: ({ cb, ...rest }) => ({
         ...rest,
       }),
-    }
-  )
+    },
+  ),
 );
 
 PeerInitGroup.registerValue({

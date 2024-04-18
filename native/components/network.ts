@@ -56,7 +56,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
               const result = input.safeParse(chunk.data);
               if (!result.success) {
                 toast.error(
-                  `${field} had invalid input: ${JSON.stringify(chunk)}`
+                  `${field} had invalid input: ${JSON.stringify(chunk)}`,
                 );
                 return;
               }
@@ -86,7 +86,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
           const result = output.safeParse(chunk.data);
           if (!result.success) {
             toast.error(
-              `${field} had invalid output: ${JSON.stringify(chunk)}`
+              `${field} had invalid output: ${JSON.stringify(chunk)}`,
             );
             return;
           }
@@ -102,6 +102,97 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
     call: (peerId: string, i: In): AsyncGenerator<Out> => {
       const rpcValue = getValue();
       return rpcValue(peerId, i);
+    },
+  };
+}
+
+interface Listener<T> {
+  send: (peerId: string, data: T) => Promise<void>;
+}
+
+function createListener<T>({
+  channel: userChannel,
+  schema,
+  listener,
+}: {
+  channel: string;
+  schema: z.ZodSchema<T>;
+  listener: (peerId: string, t: T) => Promise<void>;
+}): Listener<T> {
+  const channel = `chan-${userChannel}`;
+
+  async function task() {
+    const network = await getNetworkLayerGlobal();
+
+    while (true) {
+      try {
+        const chunk = await network.recv({ channel });
+
+        // TODO remove throw
+        const result = schema.safeParse(chunk.data);
+        if (!result.success) {
+          toast.error(
+            `channel ${userChannel} had invalid output: ${JSON.stringify(
+              chunk,
+            )}`,
+          );
+          throw new Error(
+            `channel ${userChannel} had invalid output: ${JSON.stringify(
+              chunk,
+            )}`,
+          );
+        }
+
+        await listener(chunk.peerId, result.data);
+      } catch (error) {
+        console.error(`Failed in Listener: ${channel}`, error);
+        toast.error(`Failed in Listener: ${channel}`);
+      }
+    }
+  }
+
+  task();
+
+  return {
+    send: async (peerId, data) => {
+      const network = await getNetworkLayerGlobal();
+      await network.sendData({
+        peerId,
+        channel,
+        ignorePeerIdForChannel: true,
+        data,
+      });
+    },
+  };
+}
+
+export function registerListener<T>({
+  group,
+  channel: userChannel,
+  schema,
+  listener,
+}: {
+  group: InitGroup;
+  channel: string;
+  schema: z.ZodSchema<T>;
+  listener: (peerId: string, t: T) => Promise<void>;
+}): Listener<T> {
+  const getValue = group.registerValue({
+    field: `chan-${userChannel}`,
+    eagerInit: true,
+    create: () => {
+      return createListener({
+        channel: userChannel,
+        schema,
+        listener,
+      });
+    },
+  });
+
+  return {
+    send: async (peerId, data) => {
+      const listener = getValue();
+      listener.send(peerId, data);
     },
   };
 }

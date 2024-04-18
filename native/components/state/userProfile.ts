@@ -17,6 +17,8 @@ export interface UserProfile {
 interface UserProfileState {
   userProfile?: UserProfile;
   cb: {
+    updateUserProfile: (useProfile: UserProfile) => void;
+    logout: () => void;
     createUserProfile: () => Promise<void>;
   };
 }
@@ -26,6 +28,12 @@ export const useUserProfile = create<UserProfileState>()(
     (set) => {
       return {
         cb: {
+          updateUserProfile: (userProfile) => {
+            set({ userProfile });
+          },
+          logout: () => {
+            set({ userProfile: undefined });
+          },
           createUserProfile: async () => {
             const keys = await createUserKeys();
 
@@ -48,8 +56,8 @@ export const useUserProfile = create<UserProfileState>()(
       storage: ZustandIdbStorage,
       skipHydration: true,
       partialize: ({ cb, ...rest }) => ({ ...rest }),
-    }
-  )
+    },
+  ),
 );
 
 GlobalInitGroup.registerInit("UserProfile", () => {

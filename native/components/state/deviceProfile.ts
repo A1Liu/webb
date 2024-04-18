@@ -56,8 +56,8 @@ export const useDeviceProfile = create<DeviceProfileState>()(
           hydrationPromise.resolve(true);
         };
       },
-    }
-  )
+    },
+  ),
 );
 
 GlobalInitGroup.registerInit("DeviceProfileState", () => {
