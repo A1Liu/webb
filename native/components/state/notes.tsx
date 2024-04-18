@@ -256,8 +256,8 @@ export const NoteContentStoreProvider = ({
     return () => {
       const storeRef = globalStoreRegistry.get(noteId);
       if (!storeRef) {
+        // This could mean that we left the page before editing a "new note"
         console.error(`storeRef didn't exist during cleanup`);
-        toast.error(`weird behavior in notes content store`);
         return;
       }
 
