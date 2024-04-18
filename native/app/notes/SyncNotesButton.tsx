@@ -2,7 +2,6 @@
 
 import React from "react";
 import { buttonClass } from "@/components/TopbarLayout";
-import md5 from "md5";
 import { useRequest } from "ahooks";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { z } from "zod";
@@ -12,7 +11,9 @@ import {
   NoteData,
   NoteDataSchema,
   NotesSyncInitGroup,
+  readNoteContents,
   useNotesState,
+  writeNoteContents,
 } from "@/components/state/notes";
 import { getNetworkLayerGlobal, usePeers } from "@/components/state/peers";
 
@@ -20,6 +21,24 @@ export const dynamic = "force-static";
 
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
+
+NotesSyncInitGroup.registerInit("InitContentsReadResponder", async () => {
+  const network = getNetworkLayerGlobal();
+  while (true) {
+    await network.rpcSingleExec("note-data-fetch", async function* (chunk) {
+      console.debug(`received note-data-fetch req`, chunk.peerId);
+      const result = z.object({ noteId: z.string() }).safeParse(chunk.data);
+      if (!result.success) {
+        toast.error(`Failed to fetch note data ${JSON.stringify(chunk)}`);
+        return;
+      }
+
+      const { noteId } = result.data;
+      const text = await readNoteContents(noteId);
+      yield { noteId, text };
+    });
+  }
+});
 
 NotesSyncInitGroup.registerInit("InitSyncFetchResponder", async () => {
   const network = getNetworkLayerGlobal();
@@ -67,6 +86,25 @@ NotesSyncInitGroup.registerInit("InitSyncWriter", async () => {
         { id: SYNC_STATUS_TOAST_ID },
       );
       notesToUpdate.push(result.data.note);
+
+      const dataFetchResult = network.rpcCall({
+        peerId: chunk.peerId,
+        channel: "note-data-fetch",
+        data: { noteId: result.data.note.id },
+      });
+
+      for await (const item of dataFetchResult) {
+        const parsedResult = z
+          .object({ noteId: z.string(), text: z.string() })
+          .safeParse(item.data);
+        if (!parsedResult.success) {
+          toast.error(`parse error ${String(parsedResult.error)}`);
+          continue;
+        }
+
+        const { noteId, text } = parsedResult.data;
+        await writeNoteContents(noteId, text);
+      }
     }
 
     toast.loading(`Syncing ... writing notes (${notesToUpdate.length})`, {
@@ -96,24 +134,21 @@ export function SyncNotesButton() {
       });
 
       const network = getNetworkLayerGlobal();
-      const noteVersions = new Map<string, NoteData[]>();
+      const noteVersions = new Map<
+        string,
+        (NoteData & { peerId?: string })[]
+      >();
       for (const [key, note] of (notes ?? new Map()).entries()) {
-        noteVersions.set(key, [
-          { ...note, merges: undefined },
-          ...(note.merges ?? []),
-        ]);
+        noteVersions.set(key, [{ ...note, merges: undefined }]);
       }
 
-      const rpcStreams = [...peers.values()].map((peer) =>
-        network.rpcCall({
+      let totalCount = 0;
+      for (const peer of peers.values()) {
+        const stream = network.rpcCall({
           peerId: peer.id,
           channel: "notes-fetch",
           data: "",
-        }),
-      );
-
-      let totalCount = 0;
-      for (const stream of rpcStreams) {
+        });
         for await (const chunk of stream) {
           const result = z
             .object({ note: NoteDataSchema })
@@ -125,7 +160,7 @@ export function SyncNotesButton() {
 
           const note = result.data.note;
           const versions = getOrCompute(noteVersions, note.id, () => []);
-          versions.push({ ...note, merges: undefined }, ...(note.merges ?? []));
+          versions.push({ ...note, merges: undefined, peerId: peer.id });
 
           toast.loading(`Syncing ... fetching notes (${++totalCount})`, {
             id: ACTIVE_SYNC_STATUS_TOAST_ID,
@@ -138,10 +173,15 @@ export function SyncNotesButton() {
       const notesToUpdate = [];
       for (const [_noteId, versions] of noteVersions.entries()) {
         const { ...maxSyncNote } = versions.reduce((maxNote, note) => {
+          if (maxNote.hash === note.hash) {
+            if (!note.peerId) return note;
+            return maxNote;
+          }
+
           // TODO: figure out why the timestamps are getting... rounded?
           // truncated? something is up with the timestamp math.
-          if (md5(maxNote.text) === note.lastSyncHash) return note;
-          if (md5(note.text) === maxNote.lastSyncHash) return maxNote;
+          if (maxNote.hash === note.lastSyncHash) return note;
+          if (note.hash === maxNote.lastSyncHash) return maxNote;
 
           if (note.lastSyncDate > maxNote.lastSyncDate) return note;
           if (note.lastSyncDate < maxNote.lastSyncDate) return maxNote;
@@ -150,8 +190,8 @@ export function SyncNotesButton() {
         });
 
         const relevantVersions = versions.filter((version) => {
-          if (version.text === maxSyncNote.text) return false;
-          if (md5(version.text) === maxSyncNote.lastSyncHash) return false;
+          if (version.hash === maxSyncNote.hash) return false;
+          if (version.hash === maxSyncNote.lastSyncHash) return false;
 
           return true;
         });
@@ -162,7 +202,7 @@ export function SyncNotesButton() {
         }
 
         if (!merges) {
-          maxSyncNote.lastSyncHash = md5(maxSyncNote.text);
+          maxSyncNote.lastSyncHash = maxSyncNote.hash;
           maxSyncNote.lastSyncDate = new Date();
         }
 
@@ -172,6 +212,31 @@ export function SyncNotesButton() {
         });
       }
       cb.updateNotesFromSync(notesToUpdate);
+
+      for (const note of notesToUpdate) {
+        if (!note.peerId) {
+          // it's our own note version
+          continue;
+        }
+
+        const result = network.rpcCall({
+          peerId: note.peerId,
+          channel: "note-data-fetch",
+          data: { noteId: note.id },
+        });
+
+        for await (const item of result) {
+          const parsedResult = z
+            .object({ noteId: z.string(), text: z.string() })
+            .safeParse(item.data);
+          if (!parsedResult.success) {
+            toast.error(`parse error ${String(parsedResult.error)}`);
+            continue;
+          }
+          const { noteId, text } = parsedResult.data;
+          await writeNoteContents(noteId, text);
+        }
+      }
 
       console.debug(`Finalized ${notesToUpdate.length} notes`);
       toast.loading(`Syncing ... resolved ${notesToUpdate.length} notes`, {

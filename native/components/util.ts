@@ -79,7 +79,7 @@ export function zustandJsonReplacer(
   return value;
 }
 
-export const ZustandJsonStorage: PersistStorage<unknown> = {
+export const ZustandIdbStorage: PersistStorage<unknown> = {
   getItem: async (name: string): Promise<StorageValue<unknown> | null> => {
     return (await get(name)) ?? null;
   },

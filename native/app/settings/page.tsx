@@ -12,8 +12,14 @@ import { getId } from "@a1liu/webb-ui-shared/util";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { useDebounceFn, useMemoizedFn } from "ahooks";
 import { getNetworkLayerGlobal, usePeers } from "@/components/state/peers";
-import { NoteDataSchema, useNotesState } from "@/components/state/notes";
+import {
+  NoteDateSchemaOld,
+  readNoteContents,
+  useNotesState,
+  writeNoteContents,
+} from "@/components/state/notes";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
+import md5 from "md5";
 
 export const dynamic = "force-static";
 
@@ -68,7 +74,7 @@ export default function Home() {
         {
           type: "link",
           text: "Home",
-          href: "/",
+          href: "/notes",
         },
         {
           type: "button",
@@ -116,7 +122,17 @@ export default function Home() {
               <button
                 className={buttonClass}
                 onClick={async () => {
-                  const data = [...useNotesState.getState().notes.values()];
+                  const data = await Promise.all(
+                    [...useNotesState.getState().notes.values()].map(
+                      async (note) => {
+                        const text = (await readNoteContents(note.id)) ?? "";
+                        return {
+                          ...note,
+                          text,
+                        };
+                      },
+                    ),
+                  );
 
                   const json = JSON.stringify(data);
 
@@ -136,9 +152,23 @@ export default function Home() {
                   try {
                     const text = await readText();
                     const data = JSON.parse(text);
-                    const parsedData = NoteDataSchema.array().parse(data);
+                    const notes = NoteDateSchemaOld.array()
+                      .parse(data)
+                      .map((note) => {
+                        return {
+                          ...note,
+                          hash: md5(note.text),
+                          preview: note.text.split("\n", 1)[0].slice(0, 20),
+                        };
+                      });
 
-                    notesCb.updateNotesFromSync(parsedData);
+                    notesCb.updateNotesFromSync(
+                      notes.map(({ text, ...note }) => note),
+                    );
+
+                    for (const note of notes) {
+                      await writeNoteContents(note.id, note.text);
+                    }
 
                     toast.success(`Restored from clipboard`);
                   } catch (e) {
