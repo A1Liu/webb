@@ -77,7 +77,6 @@ interface PeersState {
   cb: {
     addPeer: (peer: PeerData) => void;
     deletePeer: (peerId: string) => void;
-    login: (passPhrase: string) => Promise<void>;
   };
 }
 
@@ -101,35 +100,9 @@ export const usePeers = create<PeersState>()(
               return { peers };
             });
           },
-          login: async (passPhrase) => {
-            const signer = window.crypto.subtle.generateKey(
-              {
-                name: "RSA-PSS",
-                modulusLength: 4096,
-                hash: "SHA-512",
-                // https://developer.mozilla.org/en-US/docs/Web/API/RsaHashedKeyGenParams#publicexponent
-                publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
-              },
-              true,
-              ["sign", "verify"],
-            );
-
-            const encrypter = await window.crypto.subtle.generateKey(
-              {
-                name: "RSA-OAEP",
-                modulusLength: 4096,
-                hash: "SHA-512",
-                // https://developer.mozilla.org/en-US/docs/Web/API/RsaHashedKeyGenParams#publicexponent
-                publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
-              },
-              true,
-              ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
-            );
-          },
         },
       };
     },
-
     {
       name: "peers-storage",
       storage: ZustandJsonStorage,
