@@ -16,42 +16,39 @@ import {
   writeNoteContents,
 } from "@/components/state/notes";
 import { getNetworkLayerGlobal, usePeers } from "@/components/state/peers";
+import { registerRpc } from "@/components/network";
 
 export const dynamic = "force-static";
 
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
 
-NotesSyncInitGroup.registerInit("InitContentsReadResponder", async () => {
-  const network = getNetworkLayerGlobal();
-  while (true) {
-    await network.rpcSingleExec("note-data-fetch", async function* (chunk) {
-      console.debug(`received note-data-fetch req`, chunk.peerId);
-      const result = z.object({ noteId: z.string() }).safeParse(chunk.data);
-      if (!result.success) {
-        toast.error(`Failed to fetch note data ${JSON.stringify(chunk)}`);
-        return;
-      }
+const NoteDataFetch = registerRpc({
+  funcName: "NoteDataFetch",
+  group: NotesSyncInitGroup,
+  input: z.object({ noteId: z.string() }),
+  output: z.object({ noteId: z.string(), text: z.string() }),
+  rpc: async function* (peerId, { noteId }) {
+    console.debug(`received NoteDataFetch req`, peerId);
 
-      const { noteId } = result.data;
-      const text = await readNoteContents(noteId);
-      yield { noteId, text };
-    });
-  }
+    const text = (await readNoteContents(noteId)) ?? "";
+    yield { noteId, text };
+  },
 });
 
-NotesSyncInitGroup.registerInit("InitSyncFetchResponder", async () => {
-  const network = getNetworkLayerGlobal();
-  while (true) {
-    await network.rpcSingleExec("notes-list", async function* (chunk) {
-      console.debug(`received notes-list req`, chunk.peerId);
+const NoteListMetadata = registerRpc({
+  funcName: "NoteListMetadata",
+  group: NotesSyncInitGroup,
+  input: z.object({}),
+  output: z.object({ note: NoteDataSchema }),
+  rpc: async function* (peerId, _input) {
+    console.debug(`received NoteListMetadata req`, peerId);
 
-      const { notes } = useNotesState.getState();
-      for (const [_noteId, note] of notes.entries()) {
-        yield { note };
-      }
-    });
-  }
+    const { notes } = useNotesState.getState();
+    for (const [_noteId, note] of notes.entries()) {
+      yield { note };
+    }
+  },
 });
 
 NotesSyncInitGroup.registerInit("InitSyncWriter", async () => {
@@ -67,51 +64,32 @@ NotesSyncInitGroup.registerInit("InitSyncWriter", async () => {
       id: SYNC_STATUS_TOAST_ID,
     });
 
-    const stream = network.rpcCall({
-      peerId: countChunk.peerId,
-      channel: "notes-list",
-      data: "",
-    });
+    const stream = NoteListMetadata.call(countChunk.peerId, {});
 
     const notesToUpdate = [];
-    for await (const chunk of stream) {
-      const result = z.object({ note: NoteDataSchema }).safeParse(chunk.data);
-      if (!result.success) {
-        toast.error(`parse error ${String(result.error)}`);
-        continue;
-      }
-
+    for await (const { note } of stream) {
       toast.loading(
         `Syncing ... fetching notes (${notesToUpdate.length + 1})`,
         { id: SYNC_STATUS_TOAST_ID },
       );
-      notesToUpdate.push(result.data.note);
-
-      const dataFetchResult = network.rpcCall({
-        peerId: chunk.peerId,
-        channel: "note-data-fetch",
-        data: { noteId: result.data.note.id },
-      });
-
-      for await (const item of dataFetchResult) {
-        const parsedResult = z
-          .object({ noteId: z.string(), text: z.string() })
-          .safeParse(item.data);
-        if (!parsedResult.success) {
-          toast.error(`parse error ${String(parsedResult.error)}`);
-          continue;
-        }
-
-        const { noteId, text } = parsedResult.data;
-        await writeNoteContents(noteId, text);
-      }
+      notesToUpdate.push(note);
     }
 
     toast.loading(`Syncing ... writing notes (${notesToUpdate.length})`, {
       id: SYNC_STATUS_TOAST_ID,
     });
 
-    cb.updateNotesFromSync(notesToUpdate);
+    const { contentsChanged } = cb.updateNotesFromSync(notesToUpdate);
+    for (const note of contentsChanged) {
+      const dataFetchResult = NoteDataFetch.call(countChunk.peerId, {
+        noteId: note.id,
+      });
+
+      for await (const item of dataFetchResult) {
+        const { noteId, text } = item;
+        await writeNoteContents(noteId, text);
+      }
+    }
 
     console.debug(`executed notes-write`);
     toast.success(`Sync complete!`, {
@@ -146,21 +124,8 @@ export function SyncNotesButton() {
 
       let totalCount = 0;
       for (const peer of peers.values()) {
-        const stream = network.rpcCall({
-          peerId: peer.id,
-          channel: "notes-list",
-          data: "",
-        });
-        for await (const chunk of stream) {
-          const result = z
-            .object({ note: NoteDataSchema })
-            .safeParse(chunk.data);
-          if (!result.success) {
-            toast.error(`parse error ${String(result.error)}`);
-            continue;
-          }
-
-          const note = result.data.note;
+        const stream = NoteListMetadata.call(peer.id, {});
+        for await (const { note } of stream) {
           const versions = getOrCompute(noteVersions, note.id, () => []);
           versions.push({ ...note, merges: undefined, peerId: peer.id });
 
@@ -221,21 +186,12 @@ export function SyncNotesButton() {
           continue;
         }
 
-        const result = network.rpcCall({
-          peerId: note.peerId,
-          channel: "note-data-fetch",
-          data: { noteId: note.id },
+        const result = NoteDataFetch.call(note.peerId, {
+          noteId: note.id,
         });
 
         for await (const item of result) {
-          const parsedResult = z
-            .object({ noteId: z.string(), text: z.string() })
-            .safeParse(item.data);
-          if (!parsedResult.success) {
-            toast.error(`parse error ${String(parsedResult.error)}`);
-            continue;
-          }
-          const { noteId, text } = parsedResult.data;
+          const { noteId, text } = item;
           await writeNoteContents(noteId, text);
         }
       }

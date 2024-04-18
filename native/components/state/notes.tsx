@@ -43,14 +43,14 @@ export interface NoteGlobalState {
 
   cb: {
     updateNote: (id: string, updater: (prev: NoteData) => NoteData) => void;
-    updateNotesFromSync: (notes: NoteData[]) => void;
+    updateNotesFromSync: (notes: NoteData[]) => { contentsChanged: NoteData[] };
     setActiveNote: (id: string) => void;
   };
 }
 
 export const useNotesState = create<NoteGlobalState>()(
   persist(
-    (set) => {
+    (set, get) => {
       return {
         activeNote: uuid(),
         notes: new Map(),
@@ -76,35 +76,44 @@ export const useNotesState = create<NoteGlobalState>()(
           },
 
           updateNotesFromSync: (newNotes) => {
-            set((prev) => {
-              const mutableNotesMap = new Map(prev.notes);
-              for (const newNote of newNotes) {
-                if (!newNote.isTombstone) {
-                  mutableNotesMap.set(newNote.id, newNote);
-                }
-
-                const prevNote = prev.notes?.get(newNote.id);
-                if (!prevNote) continue;
-
-                if (prevNote.isTombstone) {
-                  mutableNotesMap.delete(newNote.id);
-                  continue;
-                }
-
+            const prev = get();
+            const mutableNotesMap = new Map(prev.notes);
+            for (const newNote of newNotes) {
+              if (!newNote.isTombstone) {
                 mutableNotesMap.set(newNote.id, newNote);
               }
 
-              const notes = new Map(
-                [...mutableNotesMap.entries()].sort((l, r) => {
-                  return (
-                    l[1].lastUpdateDate.getTime() -
-                    r[1].lastUpdateDate.getTime()
-                  );
-                }),
-              );
+              const prevNote = prev.notes?.get(newNote.id);
+              if (!prevNote) continue;
 
-              return { notes };
-            });
+              if (prevNote.isTombstone) {
+                mutableNotesMap.delete(newNote.id);
+                continue;
+              }
+
+              mutableNotesMap.set(newNote.id, newNote);
+            }
+
+            const notes = new Map(
+              [...mutableNotesMap.entries()].sort((l, r) => {
+                return (
+                  l[1].lastUpdateDate.getTime() - r[1].lastUpdateDate.getTime()
+                );
+              }),
+            );
+
+            set({ notes });
+
+            return {
+              contentsChanged: newNotes.filter((note) => {
+                const prevNote = prev.notes.get(note.id);
+                if (!prevNote) return true;
+
+                if (prevNote.hash !== note.hash) return true;
+
+                return false;
+              }),
+            };
           },
 
           setActiveNote: (id) =>

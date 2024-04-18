@@ -2,6 +2,8 @@
 
 import { memoize } from "@a1liu/webb-ui-shared/util";
 import toast from "react-hot-toast";
+import { z } from "zod";
+import { getNetworkLayerGlobal } from "./state/peers";
 
 export const EnvFlags = {
   registry: {} as Record<
