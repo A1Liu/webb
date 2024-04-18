@@ -10,7 +10,7 @@ interface TopbarLayoutProps {
     | { type: "button"; text: string; onClick: () => unknown }
     | { type: "link"; text: string; href: string }
   )[];
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 export const buttonClass =
