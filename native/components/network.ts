@@ -17,20 +17,25 @@ export const getNetworkLayerGlobal = NetworkInitGroup.registerValue({
   },
 });
 
+interface RpcHandler<In, Out> {
+  name: string;
+  call: (peerId: string, i: In) => AsyncGenerator<Out>;
+}
+
 export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
-  funcName,
+  name,
   rpc,
   group,
   input,
   output,
 }: {
-  funcName: string;
+  name: string;
   group: InitGroup;
   input: In;
   output: Out;
   rpc: (peerId: string, i: z.infer<In>) => AsyncGenerator<z.infer<Out>>;
-}): { call: (peerId: string, i: z.infer<In>) => AsyncGenerator<z.infer<Out>> } {
-  const field = `rpc-${funcName}`;
+}): RpcHandler<z.infer<In>, z.infer<Out>> {
+  const field = `rpc-${name}`;
 
   const getValue = group.registerValue({
     field,
@@ -86,6 +91,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
   });
 
   return {
+    name,
     call: (peerId: string, i: In): AsyncGenerator<Out> => {
       const rpcValue = getValue();
       return rpcValue(peerId, i);

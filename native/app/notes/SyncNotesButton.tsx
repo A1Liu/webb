@@ -19,13 +19,11 @@ import { usePeers } from "@/components/state/peers";
 import { getNetworkLayerGlobal } from "@/components/network";
 import { registerRpc } from "@/components/network";
 
-export const dynamic = "force-static";
-
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
 
 const NoteDataFetch = registerRpc({
-  funcName: "NoteDataFetch",
+  name: "NoteDataFetch",
   group: NotesSyncInitGroup,
   input: z.object({ noteId: z.string() }),
   output: z.object({ noteId: z.string(), text: z.string() }),
@@ -38,7 +36,7 @@ const NoteDataFetch = registerRpc({
 });
 
 const NoteListMetadata = registerRpc({
-  funcName: "NoteListMetadata",
+  name: "NoteListMetadata",
   group: NotesSyncInitGroup,
   input: z.object({}),
   output: z.object({ note: NoteDataSchema }),
