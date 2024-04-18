@@ -9,7 +9,7 @@ export const NetworkInitGroup = new InitGroup("network");
 export const getNetworkLayerGlobal = NetworkInitGroup.registerValue({
   field: "networkLayer",
   eagerInit: true,
-  create: () => {
+  create: async () => {
     const network = new NetworkLayer(getId());
     network.ensureInit();
 
@@ -42,7 +42,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
     eagerInit: true,
     create: () => {
       async function task() {
-        const network = getNetworkLayerGlobal();
+        const network = await getNetworkLayerGlobal();
         while (true) {
           try {
             await network.rpcSingleExec(field, async function* (chunk) {
@@ -67,7 +67,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
 
       // Call
       return async function* (peerId: string, data: In): AsyncGenerator<Out> {
-        const network = getNetworkLayerGlobal();
+        const network = await getNetworkLayerGlobal();
 
         const dataFetchResult = network.rpcCall({
           peerId,

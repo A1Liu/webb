@@ -243,11 +243,12 @@ export const NoteContentStoreProvider = ({
   children,
 }: NoteContentStoreProviderProps) => {
   const store = useCreation(() => {
-    const { store } = getOrCompute(globalStoreRegistry, noteId, () => ({
-      refCount: 1,
+    const storeRef = getOrCompute(globalStoreRegistry, noteId, () => ({
+      refCount: 0,
       store: createNoteContentStore(noteId),
     }));
-    return store;
+    storeRef.refCount += 1;
+    return storeRef.store;
   }, [noteId]);
 
   useEffect(() => {
@@ -261,7 +262,7 @@ export const NoteContentStoreProvider = ({
       }
 
       storeRef.refCount -= 1;
-      if (storeRef.refCount) {
+      if (storeRef.refCount <= 0) {
         globalStoreRegistry.delete(noteId);
       }
     };

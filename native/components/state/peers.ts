@@ -12,8 +12,8 @@ export interface Peer extends PeerData {
 
 export const PeerInitGroup = new InitGroup("peers");
 
-PeerInitGroup.registerInit("networkLayer", () => {
-  const network = getNetworkLayerGlobal();
+PeerInitGroup.registerInit("networkLayer", async () => {
+  const network = await getNetworkLayerGlobal();
   network.ensureInit();
   async function initListener() {
     let connected = false;

@@ -32,7 +32,7 @@ export function usePeer<T>(
     let run = true;
     const timeoutMs = 1000; // TODO: maybe this should vary
     async function runner() {
-      const network = getNetworkLayerGlobal();
+      const network = await getNetworkLayerGlobal();
       while (run) {
         const chunk = await Promise.race([
           network.recv({ peerId, channel }),
@@ -61,7 +61,7 @@ export function usePeer<T>(
   return {
     send: async (data) => {
       try {
-        const network = getNetworkLayerGlobal();
+        const network = await getNetworkLayerGlobal();
         await network.sendData({ peerId, data, channel });
       } catch (e) {
         toast.error(String(e));

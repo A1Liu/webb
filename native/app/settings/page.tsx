@@ -106,7 +106,8 @@ export default function Home() {
 
                   cb.updatePeer({ id: result.content });
 
-                  getNetworkLayerGlobal().sendData({
+                  const network = await getNetworkLayerGlobal();
+                  network.sendData({
                     peerId: result.content,
                     channel: "debug",
                     data: "peer connect",

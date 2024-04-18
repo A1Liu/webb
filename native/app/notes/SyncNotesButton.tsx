@@ -51,7 +51,7 @@ const NoteListMetadata = registerRpc({
 });
 
 NotesSyncInitGroup.registerInit("InitSyncWriter", async () => {
-  const network = getNetworkLayerGlobal();
+  const network = await getNetworkLayerGlobal();
   const { cb } = useNotesState.getState();
   while (true) {
     const countChunk = await network.recv({
@@ -110,7 +110,7 @@ export function SyncNotesButton() {
         id: ACTIVE_SYNC_STATUS_TOAST_ID,
       });
 
-      const network = getNetworkLayerGlobal();
+      const network = await getNetworkLayerGlobal();
       const noteVersions = new Map<
         string,
         (NoteData & { peerId?: string })[]
