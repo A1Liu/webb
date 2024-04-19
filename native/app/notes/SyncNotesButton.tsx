@@ -32,7 +32,9 @@ const NoteDataFetch = registerRpc({
   rpc: async function* (peerId, { noteId }) {
     console.debug(`received NoteDataFetch req`, peerId);
 
-    const text = (await readNoteContents(noteId)) ?? "";
+    const text = await readNoteContents(noteId);
+    if (!text) return;
+
     yield { noteId, text };
   },
 });
