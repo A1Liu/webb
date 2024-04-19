@@ -5,7 +5,7 @@ import { TopbarLayout } from "@/components/TopbarLayout";
 import { v4 as uuid } from "uuid";
 import { useNotesState } from "@/components/state/notes";
 import { usePlatform } from "@/components/hooks/usePlatform";
-import { ActiveNote } from "./active/page";
+import { ActiveNote } from "./active/ActiveNote";
 import clsx from "clsx";
 import { DefaultTimeFormatter } from "@/components/util";
 import { useRouter } from "next/navigation";
