@@ -54,11 +54,11 @@ interface ChunkData {
 
 export type NetworkUpdate =
   | {
-      type: "peerStatus";
+      type: "networkStatus";
       status: "disconnected" | "connecting" | "connected";
     }
   | {
-      type: "peerError";
+      type: "networkError";
       errorType: `${PeerErrorType}`;
     }
   | { type: "peerConnected"; peer: PeerData }
@@ -81,14 +81,17 @@ export class NetworkLayer {
   constructor(readonly id: string) {}
 
   static getPeer(network: NetworkLayer): UnwrappedPromise<Peer> {
-    network.statusChannel.send({ type: "peerStatus", status: "connecting" });
+    network.statusChannel.send({ type: "networkStatus", status: "connecting" });
     const fut = new Future<Peer>();
 
     getPeerjsCode().then((peerjs) => {
       const peer = new peerjs.Peer(network.id, { debug: 2 });
 
       peer.on("open", () => {
-        network.statusChannel.send({ type: "peerStatus", status: "connected" });
+        network.statusChannel.send({
+          type: "networkStatus",
+          status: "connected",
+        });
 
         fut.resolve(peer);
 
@@ -108,18 +111,18 @@ export class NetworkLayer {
         });
       });
       peer.on("error", (e) => {
-        network.statusChannel.send({ type: "peerError", errorType: e.type });
+        network.statusChannel.send({ type: "networkError", errorType: e.type });
       });
       peer.on("disconnected", () => {
         network.statusChannel.send({
-          type: "peerStatus",
+          type: "networkStatus",
           status: "disconnected",
         });
         network.reset();
       });
       peer.on("close", () => {
         network.statusChannel.send({
-          type: "peerStatus",
+          type: "networkStatus",
           status: "disconnected",
         });
         network.reset();

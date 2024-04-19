@@ -8,19 +8,11 @@ import md5 from "md5";
 import { ZustandIdbStorage } from "../util";
 import { InitGroup } from "../constants";
 
-export const NoteDateSchemaOld = z.object({
-  id: z.string(), // TODO: make this simpler
-  text: z.string(),
-  isTombstone: z.boolean().optional(),
-  lastUpdateDate: z.coerce.date(),
-  lastSyncDate: z.coerce.date(),
-  lastSyncHash: z.string(),
-});
-
-const NoteDateSchemaInternal = z.object({
+const NoteDataSchemaInternal = z.object({
   id: z.string(),
   preview: z.string(),
   hash: z.string(),
+  base64EncryptionIvParam: z.string().nullish(),
   isTombstone: z.boolean().optional(),
   lastUpdateDate: z.coerce.date(),
   lastSyncDate: z.coerce.date(),
@@ -28,8 +20,8 @@ const NoteDateSchemaInternal = z.object({
 });
 
 export type NoteData = z.infer<typeof NoteDataSchema>;
-export const NoteDataSchema = NoteDateSchemaInternal.extend({
-  merges: NoteDateSchemaInternal.array().nullish(),
+export const NoteDataSchema = NoteDataSchemaInternal.extend({
+  merges: NoteDataSchemaInternal.array().nullish(),
 });
 
 export interface NoteGlobalState {

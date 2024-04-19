@@ -8,19 +8,22 @@ import { getNetworkLayerGlobal } from "../network";
 
 export interface Peer extends PeerData {
   name?: string;
+  connected?: boolean;
+  lastConnected?: Date;
 }
 
 export const PeerInitGroup = new InitGroup("peers");
 
 PeerInitGroup.registerInit("networkLayer", async () => {
   const network = await getNetworkLayerGlobal();
+  const cb = usePeers.getState().cb;
   network.ensureInit();
   async function initListener() {
     let connected = false;
     while (true) {
       const update = await network.statusChannel.pop();
       switch (update.type) {
-        case "peerStatus": {
+        case "networkStatus": {
           switch (update.status) {
             case "connected":
               if (!connected) {
@@ -45,22 +48,27 @@ PeerInitGroup.registerInit("networkLayer", async () => {
           break;
         }
 
-        case "peerError":
+        case "networkError":
           toast.error(`Peer Error: ${update.errorType}`, { id: update.type });
           connected = false;
           break;
 
         case "peerConnected":
-          usePeers.getState().cb.updatePeer(update.peer);
+          cb.updatePeer({
+            ...update.peer,
+            connected: true,
+            lastConnected: new Date(),
+          });
           break;
 
         case "peerDisconnected":
           // TODO: Set this up with more info about peers
+          cb.updatePeer({ id: update.peerId, connected: false });
           break;
 
         case "connInfo":
           // TODO: Set this up with more info about peers
-          toast.error(`connInfo ${JSON.stringify(update)}`);
+          // toast.error(`connInfo ${JSON.stringify(update)}`);
           break;
 
         default:

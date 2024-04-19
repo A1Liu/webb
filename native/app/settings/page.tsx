@@ -2,14 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
-import { IncomingPeers } from "@/components/hooks/usePeer";
+import { IncomingPeers } from "@/app/settings/IncomingPeers";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { useDebounceFn, useMemoizedFn } from "ahooks";
 import { usePeers } from "@/components/state/peers";
-import { NoteDateSchemaOld, useNotesState } from "@/components/state/notes";
+import { NoteDataSchema, useNotesState } from "@/components/state/notes";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
-import md5 from "md5";
 import Link from "next/link";
 import { DeviceQr, ScanAndConnectButton } from "@/components/DeviceQrCode";
 import { useUserProfile } from "@/components/state/userProfile";
@@ -18,6 +17,7 @@ import {
   readNoteContents,
   writeNoteContents,
 } from "@/components/state/noteContents";
+import { z } from "zod";
 
 export const dynamic = "force-static";
 
@@ -95,11 +95,9 @@ export default function Settings() {
                   );
 
                   const json = JSON.stringify(data);
-
                   await writeText(json);
 
                   console.log("backup done");
-
                   toast.success(`Copied to clipboard`);
                 }}
               >
@@ -112,21 +110,18 @@ export default function Settings() {
                   try {
                     const text = await readText();
                     const data = JSON.parse(text);
-                    const notes = NoteDateSchemaOld.array()
-                      .parse(data)
-                      .map((note) => {
-                        return {
-                          ...note,
-                          hash: md5(note.text),
-                          preview: note.text.split("\n", 1)[0].slice(0, 20),
-                        };
-                      });
+                    const notes = NoteDataSchema.extend({
+                      text: z.string().nullish(),
+                    })
+                      .array()
+                      .parse(data);
 
                     notesCb.updateNotesFromSync(
                       notes.map(({ text, ...note }) => note),
                     );
 
                     for (const note of notes) {
+                      if (!note.text) continue;
                       await writeNoteContents(note.id, note.text);
                     }
 
@@ -147,7 +142,9 @@ export default function Settings() {
           </Link>
 
           <button className={buttonClass} onClick={() => hardReset()}>
-            HARD RESET ({resetCount} clicks to activate)
+            HARD RESET
+            <br />
+            (click {resetCount} times)
           </button>
         </div>
       </div>

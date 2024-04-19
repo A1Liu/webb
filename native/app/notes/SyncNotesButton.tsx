@@ -14,12 +14,12 @@ import {
   useNotesState,
 } from "@/components/state/notes";
 import { usePeers } from "@/components/state/peers";
-import { getNetworkLayerGlobal } from "@/components/network";
-import { registerRpc } from "@/components/network";
+import { registerRpc, registerListener } from "@/components/network";
 import {
   readNoteContents,
   writeNoteContents,
 } from "@/components/state/noteContents";
+import { useUserProfile } from "@/components/state/userProfile";
 
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
@@ -27,10 +27,21 @@ const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
 const NoteDataFetch = registerRpc({
   name: "NoteDataFetch",
   group: NotesSyncInitGroup,
-  input: z.object({ noteId: z.string() }),
+  input: z.object({ noteId: z.string(), base64Cert: z.string().nullish() }),
   output: z.object({ noteId: z.string(), text: z.string() }),
-  rpc: async function* (peerId, { noteId }) {
+  rpc: async function* (peerId, { noteId, base64Cert }) {
     console.debug(`received NoteDataFetch req`, peerId);
+    const noteMetadata = useNotesState.getState().notes.get(noteId);
+    if (!noteMetadata) return;
+
+    if (noteMetadata.base64EncryptionIvParam) {
+      if (!base64Cert) {
+        // missing cert
+        return;
+      }
+
+      // TODO: verify cert contents
+    }
 
     const text = await readNoteContents(noteId);
     if (!text) return;
@@ -39,35 +50,20 @@ const NoteDataFetch = registerRpc({
   },
 });
 
-const NoteListMetadata = registerRpc({
-  name: "NoteListMetadata",
+const NotePushListener = registerListener({
+  channel: "NotePushListener",
   group: NotesSyncInitGroup,
-  input: z.object({}),
-  output: z.object({ note: NoteDataSchema }),
-  rpc: async function* (peerId, _input) {
-    console.debug(`received NoteListMetadata req`, peerId);
+  schema: z.object({ base64Cert: z.string().nullish() }),
+  listener: async (peerId, { base64Cert: _cert }) => {
+    const { cb } = useNotesState.getState();
+    const { userProfile } = useUserProfile.getState();
 
-    const { notes } = useNotesState.getState();
-    for (const [_noteId, note] of notes.entries()) {
-      yield { note };
-    }
-  },
-});
-
-NotesSyncInitGroup.registerInit("InitSyncWriter", async () => {
-  const network = await getNetworkLayerGlobal();
-  const { cb } = useNotesState.getState();
-  while (true) {
-    const countChunk = await network.recv({
-      channel: "notes-write",
-    });
-
-    console.debug(`received notes-write req`);
+    console.debug(`received NotePush req`);
     toast.loading(`Syncing ... writing notes`, {
       id: SYNC_STATUS_TOAST_ID,
     });
 
-    const stream = NoteListMetadata.call(countChunk.peerId, {});
+    const stream = NoteListMetadata.call(peerId, {});
 
     const notesToUpdate = [];
     for await (const { note } of stream) {
@@ -84,8 +80,9 @@ NotesSyncInitGroup.registerInit("InitSyncWriter", async () => {
 
     const { contentsChanged } = cb.updateNotesFromSync(notesToUpdate);
     for (const note of contentsChanged) {
-      const dataFetchResult = NoteDataFetch.call(countChunk.peerId, {
+      const dataFetchResult = NoteDataFetch.call(peerId, {
         noteId: note.id,
+        base64Cert: userProfile?.secret ? "certData" : undefined,
       });
 
       for await (const item of dataFetchResult) {
@@ -94,17 +91,35 @@ NotesSyncInitGroup.registerInit("InitSyncWriter", async () => {
       }
     }
 
-    console.debug(`executed notes-write`);
+    console.debug(`executed NotePush`);
     toast.success(`Sync complete!`, {
       id: SYNC_STATUS_TOAST_ID,
     });
-  }
+  },
+});
+
+const NoteListMetadata = registerRpc({
+  name: "NoteListMetadata",
+  group: NotesSyncInitGroup,
+  input: z.object({}),
+  output: z.object({ note: NoteDataSchema }),
+  rpc: async function* (peerId, _input) {
+    console.debug(`received NoteListMetadata req`, peerId);
+
+    const { notes } = useNotesState.getState();
+    for (const [_noteId, note] of notes.entries()) {
+      yield {
+        note: { ...note, base64EncryptionIvParam: undefined },
+      };
+    }
+  },
 });
 
 export function SyncNotesButton() {
   const { peers } = usePeers();
   const { notes, cb } = useNotesState();
   const { isMobile } = usePlatform();
+  const { userProfile } = useUserProfile();
   const { runAsync, loading } = useRequest(
     async () => {
       if (!peers) return;
@@ -114,7 +129,6 @@ export function SyncNotesButton() {
         id: ACTIVE_SYNC_STATUS_TOAST_ID,
       });
 
-      const network = await getNetworkLayerGlobal();
       const noteVersions = new Map<
         string,
         (NoteData & { peerId?: string })[]
@@ -194,6 +208,7 @@ export function SyncNotesButton() {
 
         const result = NoteDataFetch.call(note.peerId, {
           noteId: note.id,
+          base64Cert: userProfile?.secret ? "certData" : undefined,
         });
 
         for await (const item of result) {
@@ -208,11 +223,8 @@ export function SyncNotesButton() {
       });
 
       for (const [peerId, _peer] of peers.entries()) {
-        await network.sendData({
-          peerId,
-          channel: "notes-write",
-          ignorePeerIdForChannel: true,
-          data: {},
+        await NotePushListener.send(peerId, {
+          base64Cert: userProfile?.secret ? "certData" : undefined,
         });
       }
 
