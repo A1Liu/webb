@@ -4,11 +4,17 @@ import { ZustandIdbStorage } from "../util";
 import { GlobalInitGroup } from "../constants";
 import {
   PermissionKey,
+  PermissionKeySchema,
   PermissionLock,
   PermissionLockHelpers,
 } from "../crypto";
 import { useUserProfile } from "./userProfile";
 import toast from "react-hot-toast";
+import { useDeviceProfile } from "./deviceProfile";
+import { registerRpc } from "../network";
+import { z } from "zod";
+import { useGlobals } from "./appGlobals";
+import { Future } from "@/../ui-shared/dist/util";
 
 // Only 1 lock ID for now
 
@@ -17,10 +23,17 @@ interface LockStoreState {
     string,
     { key: Omit<PermissionKey, "base64Signature">; pass: boolean }
   >;
+  thisDeviceKeyCache: Map<string, PermissionKey>;
+  thisDeviceKeyCacheRunning: Map<string, Promise<PermissionKey>>;
   locks: Map<string, PermissionLock>;
   cb: {
-    getLock: () => PermissionLock;
+    getLock: () => PermissionLock | undefined;
     createLock: (name: string) => Promise<PermissionLock>;
+    addKey: (key: PermissionKey) => void;
+    createKey: (
+      lockId: string,
+      deviceId?: string,
+    ) => Promise<PermissionKey | undefined>;
     addLock: (lock: PermissionLock) => Promise<boolean>;
     verifyKey: (
       key: PermissionKey,
@@ -34,6 +47,8 @@ export const useLocks = create<LockStoreState>()(
       return {
         keyCache: new Map(),
         locks: new Map(),
+        thisDeviceKeyCache: new Map(),
+        thisDeviceKeyCacheRunning: new Map(),
         cb: {
           getLock: () => {
             for (const lock of get().locks.values()) {
@@ -41,7 +56,7 @@ export const useLocks = create<LockStoreState>()(
             }
 
             // TODO: this is dumb
-            throw new Error("No locks!");
+            return undefined;
           },
           createLock: async (name) => {
             const userProfile = useUserProfile.getState().userProfile;
@@ -97,6 +112,71 @@ export const useLocks = create<LockStoreState>()(
 
             return true;
           },
+          addKey: (key) => {
+            const { thisDeviceKeyCache } = get();
+            const prevKey = thisDeviceKeyCache.get(key.lockId);
+            if (prevKey) {
+              return;
+            }
+
+            const deviceId = useDeviceProfile.getState().deviceProfile?.id;
+            if (!deviceId) {
+              throw new Error("Don't have device ID to create key with");
+            }
+
+            if (deviceId !== key.deviceId) {
+              throw new Error("Key doesn't match this device's ID");
+            }
+
+            // TODO: verify key validity
+            thisDeviceKeyCache.set(key.lockId, key);
+          },
+          createKey: async (lockId, inputDeviceId) => {
+            const { thisDeviceKeyCache, thisDeviceKeyCacheRunning, locks } =
+              get();
+            const prevKey = thisDeviceKeyCache.get(lockId);
+            if (prevKey) {
+              return prevKey;
+            }
+            const prevKeyRunning = thisDeviceKeyCacheRunning.get(lockId);
+            if (prevKeyRunning) {
+              return await prevKeyRunning;
+            }
+
+            const deviceId =
+              inputDeviceId ?? useDeviceProfile.getState().deviceProfile?.id;
+            if (!deviceId) {
+              return undefined;
+              // throw new Error("Don't have device ID to create key with");
+            }
+
+            const lock = locks.get(lockId);
+            if (!lock) {
+              return undefined;
+              // throw new Error(`Don't have lockId=${lockId} to create key with`);
+            }
+            const secret = lock.secret;
+            if (!secret) {
+              return undefined;
+              // throw new Error(
+              //   `Don't have secret for Lock(${lock.name}) to create key with`
+              // );
+            }
+
+            const fut = new Future<PermissionKey>();
+            thisDeviceKeyCacheRunning.set(lockId, fut.promise);
+
+            const key = await PermissionLockHelpers.createKey(deviceId, {
+              ...lock,
+              secret,
+            });
+
+            fut.resolve(key);
+            thisDeviceKeyCacheRunning.delete(lockId);
+            thisDeviceKeyCache.set(lockId, key);
+
+            return key;
+          },
           verifyKey: async (key) => {
             const { locks, keyCache } = get();
             const cachedKey = keyCache.get(key.keyId);
@@ -139,7 +219,7 @@ export const useLocks = create<LockStoreState>()(
       name: "lock-storage",
       storage: ZustandIdbStorage,
       skipHydration: true,
-      partialize: ({ cb, ...rest }) => ({
+      partialize: ({ cb, thisDeviceKeyCacheRunning, ...rest }) => ({
         ...rest,
       }),
     },
@@ -148,4 +228,24 @@ export const useLocks = create<LockStoreState>()(
 
 GlobalInitGroup.registerInit("LockStoreState", () => {
   useLocks.persist.rehydrate();
+});
+
+export const RequestKeyForLock = registerRpc({
+  name: "RequestKeyForLock",
+  group: GlobalInitGroup,
+  input: z.object({ lockId: z.string() }),
+  output: z.object({ key: PermissionKeySchema.nullish() }),
+  rpc: async function* (peerId, { lockId }) {
+    console.debug(`received GetKeyAuth req`, peerId);
+
+    const perm = await useGlobals.getState().cb.runPermissionFlow({
+      title: "Grant device a key?",
+      description: `Device=${peerId}, lock=${lockId}`,
+    });
+    if (!perm) return;
+
+    const key = await useLocks.getState().cb.createKey(lockId, peerId);
+
+    yield { key };
+  },
 });

@@ -3,30 +3,28 @@
 import React from "react";
 import { useNoteMetadata, useNotesState } from "@/components/state/notes";
 import md5 from "md5";
-import { useDebounceFn } from "ahooks";
+import { useDebounceFn, useRequest } from "ahooks";
 import {
   NoteContentStoreProvider,
   useNoteContents,
 } from "@/components/state/noteContents";
-import { useUserProfile } from "@/components/state/userProfile";
 import { SyncNotesButton } from "./SyncNotesButton";
 import { buttonClass } from "@/components/TopbarLayout";
-import { bytesToBase64 } from "@/components/crypto";
+import { useLocks } from "@/components/state/locks";
 
 export const dynamic = "force-static";
 
 function EnableLockingButton({ noteId }: { noteId: string }) {
   const cb = useNotesState((s) => s.cb);
-  const hasAuth = useUserProfile((s) => !!s.userProfile?.secret);
-  const { base64EncryptionIvParam } = useNoteMetadata(noteId);
+  const { lockId } = useNoteMetadata(noteId);
+  const {
+    cb: { getLock },
+  } = useLocks();
+  const lock = getLock();
 
-  if (!hasAuth) {
+  if (!lock) {
     return null;
   }
-
-  const encrypted =
-    base64EncryptionIvParam?.__typename === "Lock" &&
-    !!base64EncryptionIvParam.key;
 
   return (
     <button
@@ -34,18 +32,11 @@ function EnableLockingButton({ noteId }: { noteId: string }) {
       onClick={() =>
         cb.updateNote(noteId, (prev) => ({
           ...prev,
-          base64EncryptionIvParam: encrypted
-            ? { __typename: "NoLock" as const }
-            : {
-                __typename: "Lock" as const,
-                key: bytesToBase64(
-                  window.crypto.getRandomValues(new Uint8Array(12)),
-                ),
-              },
+          lockId: lockId ? undefined : lock.id,
         }))
       }
     >
-      {encrypted ? "Locked" : "Unlocked"}
+      {lockId ? "Locked" : "Unlocked"}
     </button>
   );
 }
@@ -76,11 +67,15 @@ function NoteContentEditor() {
       onChange={(evt) => {
         const text = evt.target.value;
         updateText(text);
-        cb.updateNote(noteId, (prev) => ({
-          ...prev,
-          lastUpdateDate: new Date(),
-          preview: text.split("\n", 1)[0].slice(0, 20),
-        }));
+        cb.updateNote(
+          noteId,
+          (prev) => ({
+            ...prev,
+            lastUpdateDate: new Date(),
+            preview: text.split("\n", 1)[0].slice(0, 20),
+          }),
+          true,
+        );
         updateNoteHash(text);
       }}
     />
@@ -88,8 +83,29 @@ function NoteContentEditor() {
 }
 
 export function NoteEditor({ noteId }: { noteId: string }) {
-  const hasAuth = useUserProfile((s) => !!s.userProfile?.secret);
-  const { base64EncryptionIvParam } = useNoteMetadata(noteId);
+  const { lockId } = useNoteMetadata(noteId);
+  const { data: hasAuth, loading } = useRequest(
+    async () => {
+      if (!lockId) return true;
+      const key = await useLocks.getState().cb.createKey(lockId);
+      if (!key) return false;
+
+      return true;
+    },
+    {
+      refreshDeps: [lockId],
+    },
+  );
+
+  if (loading) {
+    return (
+      <div className="flex justify-stretch relative flex-grow">
+        <div className="flex grow items-center justify-center">
+          <p className="text-lg font-bold">LOADING</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex justify-stretch relative flex-grow">
@@ -98,7 +114,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         <EnableLockingButton noteId={noteId} />
       </div>
 
-      {!hasAuth && base64EncryptionIvParam ? (
+      {!hasAuth ? (
         <div className="flex grow items-center justify-center">
           <p className="text-lg">~~ LOCKED ~~</p>
         </div>

@@ -255,7 +255,7 @@ export default function Settings() {
             }}
             writeData={async (notes) => {
               notesCb.updateNotesFromSync(
-                notes.map(({ text, base64EncryptionIvParam, ...note }) => note),
+                notes.map(({ text, ...note }) => note),
               );
 
               for (const note of notes) {

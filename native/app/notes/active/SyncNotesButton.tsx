@@ -19,7 +19,8 @@ import {
   readNoteContents,
   writeNoteContents,
 } from "@/components/state/noteContents";
-import { useUserProfile } from "@/components/state/userProfile";
+import { PermissionKeySchema } from "@/components/crypto";
+import { useLocks } from "@/components/state/locks";
 
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
@@ -27,20 +28,29 @@ const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
 const NoteDataFetch = registerRpc({
   name: "NoteDataFetch",
   group: NotesSyncInitGroup,
-  input: z.object({ noteId: z.string(), base64Cert: z.string().nullish() }),
+  input: z.object({
+    noteId: z.string(),
+    permissionKey: PermissionKeySchema.nullish(),
+  }),
   output: z.object({ noteId: z.string(), text: z.string() }),
-  rpc: async function* (peerId, { noteId, base64Cert }) {
+  rpc: async function* (peerId, { noteId, permissionKey }) {
     console.debug(`received NoteDataFetch req`, peerId);
+
     const noteMetadata = useNotesState.getState().notes.get(noteId);
     if (!noteMetadata) return;
 
-    if (noteMetadata.base64EncryptionIvParam?.__typename === "Lock") {
-      if (!base64Cert) {
-        // missing cert
-        return;
+    if (noteMetadata.lockId) {
+      if (permissionKey?.lockId !== noteMetadata.lockId) {
+        return; // missing cert, or wrong key
+      }
+      if (peerId !== permissionKey.deviceId) {
+        return; // Using a key not given to them
       }
 
-      // TODO: verify cert contents
+      const verified = await useLocks.getState().cb.verifyKey(permissionKey);
+      if (!verified) return;
+
+      // OK we're verififed
     }
 
     const text = await readNoteContents(noteId);
@@ -54,12 +64,12 @@ const NotePushListener = registerListener({
   channel: "NotePushListener",
   group: NotesSyncInitGroup,
   schema: z.object({
-    base64Cert: z.string().nullish(),
-    notes: NoteDataSchema.array(),
+    notes: NoteDataSchema.extend({
+      key: PermissionKeySchema.nullish(),
+    }).array(),
   }),
-  listener: async (peerId, { base64Cert: _cert, notes }) => {
+  listener: async (peerId, { notes }) => {
     const { cb } = useNotesState.getState();
-    const { userProfile } = useUserProfile.getState();
 
     console.debug(`received NotePush req`);
     toast.loading(`Syncing ... writing notes`, {
@@ -79,7 +89,9 @@ const NotePushListener = registerListener({
 
       const dataFetchResult = NoteDataFetch.call(peerId, {
         noteId: note.id,
-        base64Cert: userProfile?.secret ? "certData" : undefined,
+        permissionKey: note.lockId
+          ? await useLocks.getState().cb.createKey(note.lockId)
+          : undefined,
       });
 
       for await (const item of dataFetchResult) {
@@ -99,21 +111,20 @@ const NoteListMetadata = registerRpc({
   name: "NoteListMetadata",
   group: NotesSyncInitGroup,
   input: z.object({}),
-  output: z.object({ note: NoteDataSchema }),
+  output: z.object({
+    note: NoteDataSchema,
+    permissionKey: PermissionKeySchema.nullish(),
+  }),
   rpc: async function* (peerId, _input) {
     console.debug(`received NoteListMetadata req`, peerId);
 
     const { notes } = useNotesState.getState();
     for (const [_noteId, note] of notes.entries()) {
       yield {
-        note: {
-          ...note,
-          base64EncryptionIvParam: !note.base64EncryptionIvParam
-            ? undefined
-            : note.base64EncryptionIvParam?.__typename === "NoLock"
-            ? undefined
-            : { __typename: "Lock" as const },
-        },
+        note: { ...note },
+        permissionKey: note.lockId
+          ? await useLocks.getState().cb.createKey(note.lockId)
+          : undefined,
       };
     }
   },
@@ -123,7 +134,6 @@ export function SyncNotesButton() {
   const { peers } = usePeers();
   const { notes, cb } = useNotesState();
   const { isMobile } = usePlatform();
-  const { userProfile } = useUserProfile();
   const { runAsync, loading } = useRequest(
     async () => {
       if (!peers) return;
@@ -159,12 +169,6 @@ export function SyncNotesButton() {
       const notesToUpdate = [];
       for (const [_noteId, versions] of noteVersions.entries()) {
         const { ...maxSyncNote } = versions.reduce((maxNote, note) => {
-          if (maxNote.base64EncryptionIvParam?.__typename === "Lock") {
-            // TODO: Need to setup real permissions
-
-            return maxNote;
-          }
-
           if (maxNote.hash === note.hash) {
             if (!note.peerId) return note;
             return maxNote;
@@ -218,7 +222,9 @@ export function SyncNotesButton() {
 
         const result = NoteDataFetch.call(note.peerId, {
           noteId: note.id,
-          base64Cert: userProfile?.secret ? "certData" : undefined,
+          permissionKey: note.lockId
+            ? await useLocks.getState().cb.createKey(note.lockId)
+            : undefined,
         });
 
         for await (const item of result) {
@@ -232,18 +238,17 @@ export function SyncNotesButton() {
         id: ACTIVE_SYNC_STATUS_TOAST_ID,
       });
 
+      const notesToSend = await Promise.all(
+        notesToUpdate.map(async ({ peerId, ...noteData }) => ({
+          ...noteData,
+          permissionKey: noteData.lockId
+            ? await useLocks.getState().cb.createKey(noteData.lockId)
+            : undefined,
+        })),
+      );
+
       for (const [peerId, _peer] of peers.entries()) {
-        await NotePushListener.send(peerId, {
-          base64Cert: userProfile?.secret ? "certData" : undefined,
-          notes: notesToUpdate.map(({ peerId, ...noteData }) => ({
-            ...noteData,
-            base64EncryptionIvParam: !noteData.base64EncryptionIvParam
-              ? undefined
-              : noteData.base64EncryptionIvParam?.__typename === "NoLock"
-              ? undefined
-              : { __typename: "Lock" as const },
-          })),
-        });
+        await NotePushListener.send(peerId, { notes: notesToSend });
       }
 
       toast.success(`Sync complete!`, {

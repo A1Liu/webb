@@ -3,21 +3,64 @@
 import React from "react";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { v4 as uuid } from "uuid";
-import { useNotesState } from "@/components/state/notes";
+import { NoteData, useNotesState } from "@/components/state/notes";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import clsx from "clsx";
 import { DefaultTimeFormatter } from "@/components/util";
 import { useRouter } from "next/navigation";
-import { useUserProfile } from "@/components/state/userProfile";
 import { NoteEditor } from "./active/NoteEditor";
+import { useLocks } from "@/components/state/locks";
+import { useRequest } from "ahooks";
 
 export const dynamic = "force-static";
 
-function SelectActiveNote() {
-  const { notes, activeNote, cb } = useNotesState();
+function ActiveNoteButton({ note }: { note: NoteData }) {
+  const cb = useNotesState((s) => s.cb);
+  const activeNote = useNotesState((s) => s.activeNote);
   const { isMobile } = usePlatform();
-  const hasAuth = useUserProfile((s) => !!s.userProfile?.secret);
+  const { lockId } = note;
   const router = useRouter();
+  const { data: hasAuth, loading } = useRequest(
+    async () => {
+      if (!lockId) return true;
+      const key = await useLocks.getState().cb.createKey(lockId);
+      if (!key) return false;
+
+      return true;
+    },
+    {
+      refreshDeps: [lockId],
+    },
+  );
+
+  return (
+    <button
+      className={clsx(
+        activeNote === note.id && !isMobile ? "bg-yellow-700" : "bg-slate-700",
+        "disabled:bg-slate-900",
+        "text-white rounded-md p-6 flex flex-col gap-2",
+      )}
+      disabled={!hasAuth || loading}
+      onClick={() => {
+        cb.setActiveNote(note.id);
+        if (isMobile) {
+          router.push("/notes/active");
+        }
+      }}
+    >
+      <p>
+        {note.merges ? "*" : ""}
+        {note.preview}
+      </p>
+
+      <p>{DefaultTimeFormatter.format(note.lastUpdateDate)}</p>
+    </button>
+  );
+}
+
+function SelectActiveNote() {
+  const notes = useNotesState((s) => s.notes);
+  const { isMobile } = usePlatform();
 
   return (
     <div
@@ -29,34 +72,9 @@ function SelectActiveNote() {
       {[...(notes ? notes?.values() : [])]
         .reverse()
         .filter((note) => !note.isTombstone)
-        .map((note) => {
-          return (
-            <button
-              key={note.id}
-              className={clsx(
-                activeNote === note.id && !isMobile
-                  ? "bg-yellow-700"
-                  : "bg-slate-700",
-                "disabled:bg-slate-900",
-                "text-white rounded-md p-6 flex flex-col gap-2",
-              )}
-              disabled={!hasAuth && !!note.base64EncryptionIvParam}
-              onClick={() => {
-                cb.setActiveNote(note.id);
-                if (isMobile) {
-                  router.push("/notes/active");
-                }
-              }}
-            >
-              <p>
-                {note.merges ? "*" : ""}
-                {note.preview}
-              </p>
-
-              <p>{DefaultTimeFormatter.format(note.lastUpdateDate)}</p>
-            </button>
-          );
-        })}
+        .map((note) => (
+          <ActiveNoteButton key={note.id} note={note} />
+        ))}
     </div>
   );
 }

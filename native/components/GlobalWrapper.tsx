@@ -9,11 +9,10 @@ import { AppStateKind, useGlobals } from "./state/appGlobals";
 import { NotesSyncInitGroup } from "./state/notes";
 import { PeerInitGroup } from "./state/peers";
 import { NetworkInitGroup } from "./network";
+import { buttonClass } from "./TopbarLayout";
 
 export function GlobalWrapper({ children }: { children: React.ReactNode }) {
-  const {
-    state: { kind },
-  } = useGlobals();
+  const { state } = useGlobals();
 
   useEffect(() => {
     GlobalInitGroup.init();
@@ -28,10 +27,39 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
         <meta name="theme-color" content="#39ff14" />
       </Head>
 
+      {state.kind === AppStateKind.PermissionFlow ? (
+        <div
+          className="fixed top-0 bottom-0 left-0 right-0 flex items-center
+        justify-center bg-opacity-30 bg-slate-500"
+        >
+          <div className="flex flex-col gap-2 bg-black border-white rounded-md text-white">
+            <h3 className="font-bold text-lg">{state.title}</h3>
+
+            <p className="text-sm">{state.description}</p>
+
+            <div className="flex gap-2">
+              <button
+                className={buttonClass}
+                onClick={() => state.completion(false)}
+              >
+                Cancel
+              </button>
+
+              <button
+                className={buttonClass}
+                onClick={() => state.completion(true)}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : undefined}
+
       <div
         className={clsx(
           "h-full w-full",
-          kind === AppStateKind.BackgroundFlow && "hidden",
+          state.kind === AppStateKind.BackgroundFlow && "hidden",
         )}
       >
         {children}
