@@ -5,9 +5,8 @@ import { persist, StorageValue } from "zustand/middleware";
 import { z } from "zod";
 import { ZustandIdbStorage } from "../util";
 import { createContext, useContext, useEffect } from "react";
+import { del, get, set } from "idb-keyval";
 import { useCreation } from "ahooks";
-import { get, set } from "idb-keyval";
-import { getOrCompute } from "@a1liu/webb-ui-shared/util";
 
 export type NoteContents = z.infer<typeof NoteContentsSchema>;
 export const NoteContentsSchema = z.object({
@@ -22,17 +21,26 @@ interface NoteContentState extends NoteContents {
   };
 }
 
-const globalStoreRegistry = new Map<
-  string,
-  { refCount: number; store: ReturnType<typeof createNoteContentStore> }
->();
+// TODO: support multiple
+const runningEditor: {
+  current?: ReturnType<typeof createNoteContentStore>;
+} = {};
 
 const VERSION = 0;
 
+export async function deleteNoteContents(noteId: string) {
+  if (runningEditor.current?.getState().noteId === noteId) {
+    runningEditor.current.setState({ text: "" });
+    runningEditor.current.persist.clearStorage();
+    return;
+  }
+
+  await del(`webb-note-contents-${noteId}`);
+}
+
 export async function writeNoteContents(noteId: string, text: string) {
-  const runningStore = globalStoreRegistry.get(noteId);
-  if (runningStore) {
-    runningStore.store.setState({ text });
+  if (runningEditor.current?.getState().noteId === noteId) {
+    runningEditor.current.setState({ text });
     return;
   }
 
@@ -92,30 +100,19 @@ export const NoteContentStoreProvider = ({
   children,
 }: NoteContentStoreProviderProps) => {
   const store = useCreation(() => {
-    const storeRef = getOrCompute(globalStoreRegistry, noteId, () => ({
-      refCount: 0,
-      store: createNoteContentStore(noteId),
-    }));
-    storeRef.refCount += 1;
-    return storeRef.store;
+    return createNoteContentStore(noteId);
   }, [noteId]);
 
   useEffect(() => {
     store.persist.rehydrate();
-    return () => {
-      const storeRef = globalStoreRegistry.get(noteId);
-      if (!storeRef) {
-        // Not sure how this would happen.
-        console.error(`storeRef didn't exist during cleanup`);
-        return;
-      }
+    runningEditor.current = store;
 
-      storeRef.refCount -= 1;
-      if (storeRef.refCount <= 0) {
-        globalStoreRegistry.delete(noteId);
+    return () => {
+      if (store === runningEditor.current) {
+        runningEditor.current = undefined;
       }
     };
-  }, [store, noteId]);
+  }, [store]);
 
   return (
     <NoteContentContext.Provider value={store}>

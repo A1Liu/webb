@@ -7,12 +7,22 @@ import { z } from "zod";
 import md5 from "md5";
 import { ZustandIdbStorage } from "../util";
 import { InitGroup } from "../constants";
+import { useShallow } from "zustand/react/shallow";
+import { bytesToBase64 } from "../crypto";
+import { useUserProfile } from "./userProfile";
 
 const NoteDataSchemaInternal = z.object({
   id: z.string(),
   preview: z.string(),
   hash: z.string(),
-  base64EncryptionIvParam: z.string().nullish(),
+  base64EncryptionIvParam: z
+    .discriminatedUnion("__typename", [
+      z.object({ __typename: z.literal("NoLock") }),
+
+      // Both of these mean it's locked
+      z.object({ __typename: z.literal("Lock"), key: z.string().nullish() }),
+    ])
+    .nullish(),
   isTombstone: z.boolean().optional(),
   lastUpdateDate: z.coerce.date(),
   lastSyncDate: z.coerce.date(),
@@ -32,6 +42,27 @@ export interface NoteGlobalState {
     updateNote: (id: string, updater: (prev: NoteData) => NoteData) => void;
     updateNotesFromSync: (notes: NoteData[]) => { contentsChanged: NoteData[] };
     setActiveNote: (id: string) => void;
+    lockAll: () => void;
+  };
+}
+
+const ZERO_TIME = new Date(0);
+
+function createEmptyNote(id: string): NoteData {
+  const hasAuth = !!useUserProfile.getState().userProfile?.secret;
+  return {
+    id,
+    hash: md5(""),
+    preview: "",
+    lastUpdateDate: ZERO_TIME,
+    lastSyncDate: ZERO_TIME,
+    lastSyncHash: md5(""),
+    base64EncryptionIvParam: hasAuth
+      ? {
+          __typename: "Lock",
+          key: bytesToBase64(window.crypto.getRandomValues(new Uint8Array(12))),
+        }
+      : undefined,
   };
 }
 
@@ -45,15 +76,8 @@ export const useNotesState = create<NoteGlobalState>()(
           updateNote: (noteId, updater) => {
             set((prev) => {
               const notes = new Map(prev.notes);
-              const now = new Date();
-              const prevNote: NoteData = notes.get(noteId) ?? {
-                id: noteId,
-                hash: md5(""),
-                preview: "",
-                lastUpdateDate: now,
-                lastSyncDate: now,
-                lastSyncHash: md5(""),
-              };
+              const prevNote: NoteData =
+                notes.get(noteId) ?? createEmptyNote(noteId);
 
               notes.delete(noteId);
               notes.set(noteId, updater(prevNote));
@@ -102,13 +126,32 @@ export const useNotesState = create<NoteGlobalState>()(
               }),
             };
           },
+          lockAll: () => {
+            if (!useUserProfile.getState().userProfile?.secret) return;
 
+            set((prev) => {
+              const notes = new Map<string, NoteData>();
+              for (const note of prev.notes.values()) {
+                notes.set(note.id, {
+                  ...note,
+                  base64EncryptionIvParam: {
+                    __typename: "Lock",
+                    key: bytesToBase64(
+                      window.crypto.getRandomValues(new Uint8Array(12)),
+                    ),
+                  },
+                });
+              }
+
+              return { notes };
+            });
+          },
           setActiveNote: (id) =>
             set((prev) => {
               if (prev.activeNote === id) {
                 return prev;
               }
-              const prevActive = prev.notes?.get(prev.activeNote ?? "");
+              const prevActive = prev.notes.get(prev.activeNote ?? "");
               if (prevActive && prevActive.hash === md5("")) {
                 const notes = new Map(prev.notes);
                 notes.set(prevActive.id, {
@@ -132,6 +175,15 @@ export const useNotesState = create<NoteGlobalState>()(
     },
   ),
 );
+
+export function useActiveNote(): NoteData {
+  return useNotesState(
+    useShallow(
+      (state) =>
+        state.notes.get(state.activeNote) ?? createEmptyNote(state.activeNote),
+    ),
+  );
+}
 
 export const NotesSyncInitGroup = new InitGroup("notesSync");
 

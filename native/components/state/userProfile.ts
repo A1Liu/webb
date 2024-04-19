@@ -60,6 +60,11 @@ export const useUserProfile = create<UserProfileState>()(
   ),
 );
 
-GlobalInitGroup.registerInit("UserProfile", () => {
-  useUserProfile.persist.rehydrate();
+GlobalInitGroup.registerValue({
+  field: "UserProfile",
+  eagerInit: true,
+  create: () => {
+    useUserProfile.persist.rehydrate();
+    return useUserProfile;
+  },
 });

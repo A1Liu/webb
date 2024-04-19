@@ -146,6 +146,10 @@ export default function Settings() {
             <br />
             (click {resetCount} times)
           </button>
+
+          <button className={buttonClass} onClick={() => notesCb.lockAll()}>
+            Lock All
+          </button>
         </div>
       </div>
 
