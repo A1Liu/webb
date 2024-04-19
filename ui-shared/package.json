@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "format": "prettier --write .",
+    "ts-check": "tsc",
     "build": "tsc"
   },
   "exports": {
