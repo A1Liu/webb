@@ -5,7 +5,7 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
 - Visidata - https://visidata.org
 - LibreOffice plugins - https://www.libreoffice.org/discover/calc
 - WebRTC considerations - https://bloggeek.me/webrtc-rtcpeerconnection-one-per-stream/
-- WebRTC Leaks (public IP leak via STUN server)
+- WebRTC Leaks (public IP leak via STUN server/ICE exchange)
   - https://www.security.org/vpn/webrtc-leak/
   - https://nordvpn.com/blog/webrtc/
 - iOS setup - https://dev.to/adimac93/tauri-mobile-for-ios-4dp6
@@ -24,13 +24,10 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
 
 - Model is:
   - UserProfile - Person
-  - Device - a UserProfile requires platform auth, otherwise they're guest user
-  - Network - connected set of devices, owned by a single UserProfile
+  - Device - Device. Devices only support 1 user each right now.
 - Auth model for:
-  - UserProfile is allowed to do X on this device - Someone steals a phone and tries to add the phone to their network
   - Person is authenticated to this UserProfile - Someone steals a device and tries to use it to run code on other devices in the network
-  - Device with claim to UserProfile is actually used by UserProfile - Someone tries to spoof a user to gain access to devices on their network
-  - Device is authenticated as member of network - Work laptop with spyware tries to snoop into other computers on the network
+  - Device with claim to UserProfile is actually used by UserProfile - Someone tries to spoof a user to gain access to their devices
 
 ## Debugging iOS
 - Some initial stuff - https://dev.to/adimac93/tauri-mobile-for-ios-4dp6
@@ -49,4 +46,4 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
 - NWConnection - https://developer.apple.com/documentation/network/nwconnection
 - https://www.browserstack.com/blog/building-secure-native-apps-with-self-signed-ssl-certificates-using-certificate-pinning/
 - https://stackoverflow.com/questions/54452129/how-to-create-ios-nwconnection-for-tls-with-self-signed-cert
-- qp2p? - https://github.com/maidsafe/qp2p
+- qp2p? (supposedly works on mobile) - https://github.com/maidsafe/qp2p
