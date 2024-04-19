@@ -19,7 +19,7 @@ import { buttonClass } from "./TopbarLayout";
 const JoinMe = registerRpc({
   name: "JoinMe",
   group: GlobalInitGroup,
-  input: z.object({ userId: z.string(), userPublicKey: z.unknown() }),
+  input: z.object({ userId: z.string(), userPublicKey: z.string() }),
   output: z.object({ success: z.boolean() }),
   rpc: async function* (_peerId, input) {
     const publicAuthKey = await importUserPublicKey(input.userPublicKey);

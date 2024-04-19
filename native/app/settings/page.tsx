@@ -21,6 +21,8 @@ import { z } from "zod";
 import {
   base64ToBytes,
   bytesToBase64,
+  exportUserPublickKey,
+  importUserPublicKey,
   verifyUserKey,
 } from "@/components/crypto";
 
@@ -101,21 +103,18 @@ function BackupUser() {
           throw new Error("no UserProfile");
         }
 
-        const pubKey = await window.crypto.subtle.exportKey(
-          "spki",
-          userProfile.publicAuthKey,
-        );
+        const pubKey = await exportUserPublickKey(userProfile.publicAuthKey);
 
         const secret = await (async () => {
           if (!userProfile.secret) return undefined;
 
           const privAuthKey = await window.crypto.subtle.exportKey(
             "pkcs8",
-            userProfile.secret.privateAuthKey,
+            userProfile.secret.privateAuthKey
           );
           const privEncryptKey = await window.crypto.subtle.exportKey(
             "raw",
-            userProfile.secret.privateEncryptKey,
+            userProfile.secret.privateEncryptKey
           );
 
           return {
@@ -126,20 +125,13 @@ function BackupUser() {
 
         return {
           publicAuthUserId: userProfile.publicAuthUserId,
-          publicAuthKeyBase64: bytesToBase64(pubKey),
+          publicAuthKeyBase64: pubKey,
           secret,
         };
       }}
       writeData={async (userProfileData) => {
-        const pubKey = await window.crypto.subtle.importKey(
-          "spki",
-          base64ToBytes(userProfileData.publicAuthKeyBase64),
-          {
-            name: "RSA-PSS",
-            hash: "SHA-512",
-          },
-          true,
-          ["verify"],
+        const pubKey = await importUserPublicKey(
+          userProfileData.publicAuthKeyBase64
         );
 
         const secret = await (async () => {
@@ -153,14 +145,14 @@ function BackupUser() {
               hash: "SHA-512",
             },
             true,
-            ["sign"],
+            ["sign"]
           );
           const privateEncryptKey = await window.crypto.subtle.importKey(
             "raw",
             base64ToBytes(userProfileData.secret.privateEncryptKeyBase64),
             { name: "AES-GCM", length: 256 },
             true,
-            ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
+            ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
           );
 
           return {
@@ -171,7 +163,7 @@ function BackupUser() {
 
         const verified = await verifyUserKey(
           pubKey,
-          userProfileData.publicAuthUserId,
+          userProfileData.publicAuthUserId
         );
         if (!verified) {
           throw new Error("User profile failed verification");
@@ -212,7 +204,7 @@ export default function Settings() {
     {
       wait: 1_000,
       trailing: true,
-    },
+    }
   );
 
   useEffect(() => {
@@ -256,13 +248,13 @@ export default function Settings() {
                       ...note,
                       text,
                     };
-                  },
-                ),
+                  }
+                )
               );
             }}
             writeData={async (notes) => {
               notesCb.updateNotesFromSync(
-                notes.map(({ text, base64EncryptionIvParam, ...note }) => note),
+                notes.map(({ text, base64EncryptionIvParam, ...note }) => note)
               );
 
               for (const note of notes) {
