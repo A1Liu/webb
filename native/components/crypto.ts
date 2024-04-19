@@ -5,7 +5,9 @@ import { v4 as uuid } from "uuid";
 export interface PermissionLock {
   __typename: "PermLock";
   id: string;
+  name: string;
   publicKey: CryptoKey;
+  base64Signature: string;
   secret?: {
     privateKey: CryptoKey;
   };
@@ -20,7 +22,7 @@ export interface PermissionKey {
   base64Signature: string;
 }
 
-export class Permissions {
+export class PermissionLockHelpers {
   static async unlock(
     lock: PermissionLock,
     key: PermissionKey,
@@ -62,7 +64,7 @@ export class Permissions {
     };
   }
 
-  static async hashLockKey(key: CryptoKey): Promise<string> {
+  static async hashLockId(key: CryptoKey): Promise<string> {
     const publicKeyJSON = await window.crypto.subtle.exportKey("jwk", key);
 
     const publicKeyString = stringify(publicKeyJSON);
@@ -79,7 +81,35 @@ export class Permissions {
     return publicId;
   }
 
-  static async createLock(): Promise<Required<PermissionLock>> {
+  static async verifyLock(lock: PermissionLock, publicAuthKey: CryptoKey) {
+    const publicKeyJson = await window.crypto.subtle.exportKey(
+      "jwk",
+      lock.publicKey,
+    );
+
+    const signingData: Omit<
+      PermissionLock,
+      "id" | "secret" | "base64Signature" | "publicKey"
+    > & { publicKey: JsonWebKey } = {
+      __typename: "PermLock",
+      name: lock.name,
+      publicKey: publicKeyJson,
+    };
+
+    const valid = await window.crypto.subtle.verify(
+      { name: "RSA-PSS", saltLength: 32 },
+      publicAuthKey,
+      base64ToBytes(lock.base64Signature),
+      new TextEncoder().encode(stringify(signingData)),
+    );
+
+    return valid;
+  }
+
+  static async createLock(
+    name: string,
+    privateSigningAuth: CryptoKey,
+  ): Promise<Required<PermissionLock>> {
     const authKeyPair = await window.crypto.subtle.generateKey(
       {
         name: "RSA-PSS",
@@ -92,11 +122,33 @@ export class Permissions {
       ["sign", "verify"],
     );
 
-    const id = await this.hashLockKey(authKeyPair.publicKey);
+    const id = await this.hashLockId(authKeyPair.publicKey);
+
+    const publicKeyJson = await window.crypto.subtle.exportKey(
+      "jwk",
+      authKeyPair.publicKey,
+    );
+
+    const signingData: Omit<
+      PermissionLock,
+      "id" | "secret" | "base64Signature" | "publicKey"
+    > & { publicKey: JsonWebKey } = {
+      __typename: "PermLock",
+      name,
+      publicKey: publicKeyJson,
+    };
+
+    const signature = await window.crypto.subtle.sign(
+      { name: "RSA-PSS", saltLength: 32 },
+      privateSigningAuth,
+      new TextEncoder().encode(stringify(signingData)),
+    );
 
     return {
       __typename: "PermLock",
       id,
+      name,
+      base64Signature: bytesToBase64(signature),
       publicKey: authKeyPair.publicKey,
       secret: {
         privateKey: authKeyPair.privateKey,
