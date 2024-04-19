@@ -93,7 +93,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
 
   return (
     <div className="flex justify-stretch relative flex-grow">
-      <div className="absolute top-12 right-4 flex flex-col gap-2 items-end">
+      <div className="absolute top-2 right-2 flex flex-col gap-2 items-end">
         <SyncNotesButton />
         <EnableLockingButton noteId={noteId} />
       </div>
