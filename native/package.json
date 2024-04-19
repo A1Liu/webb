@@ -10,7 +10,8 @@
     "build:web": "next build",
     "start:web": "next start",
     "format": "prettier --write .",
-    "lint:web": "next lint"
+    "lint:web": "next lint",
+    "ts-check": "tsc"
   },
   "dependencies": {
     "@a1liu/webb-ui-shared": "workspace:*",
