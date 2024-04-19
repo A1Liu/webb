@@ -68,13 +68,27 @@ const NotePushListener = registerListener({
       key: PermissionKeySchema.nullish(),
     }).array(),
   }),
-  listener: async (peerId, { notes }) => {
-    const { cb } = useNotesState.getState();
+  listener: async (peerId, { notes: inputNotes }) => {
+    // TODO: auth here
+    const { notes: prevNotes, cb } = useNotesState.getState();
 
     console.debug(`received NotePush req`);
     toast.loading(`Syncing ... writing notes`, {
       id: SYNC_STATUS_TOAST_ID,
     });
+
+    const notes = [];
+    for (const note of inputNotes) {
+      const prevNote = prevNotes.get(note.id);
+
+      if (prevNote?.lockId) {
+        console.log("found Lock ID, big oof");
+      }
+
+      // TODO: DEADLOCK DEADLOCK DEADLOCK
+
+      notes.push(note);
+    }
 
     let written = 0;
 
