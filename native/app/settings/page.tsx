@@ -5,7 +5,7 @@ import { toast } from "react-hot-toast";
 import { IncomingPeers } from "@/app/settings/IncomingPeers";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { TopbarLayout } from "@/components/TopbarLayout";
-import { useMemoizedFn } from "ahooks";
+import { useLockFn, useMemoizedFn } from "ahooks";
 import { usePeers } from "@/components/state/peers";
 import { NoteDataSchema, useNotesState } from "@/components/state/notes";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -188,7 +188,7 @@ export default function Settings() {
   const notesCb = useNotesState((s) => s.cb);
   const {
     userProfile,
-    cb: { logout },
+    cb: { logout, createUserProfile },
   } = useUserProfile();
 
   const router = useRouter();
@@ -201,6 +201,8 @@ export default function Settings() {
     useLocks.persist.clearStorage();
     window.location.reload();
   });
+
+  const createUser = useLockFn(createUserProfile);
 
   return (
     <TopbarLayout
@@ -291,19 +293,29 @@ export default function Settings() {
         </div>
       </div>
 
-      <h4>USER: {userProfile?.publicAuthUserId}</h4>
+      {userProfile ? (
+        <h4>USER: {userProfile?.publicAuthUserId}</h4>
+      ) : (
+        <h4>NO USER</h4>
+      )}
 
       <div className="flex gap-2">
-        <TapCounterButton
-          counterLimit={5}
-          className={buttonClass}
-          onClick={() => {
-            logout();
-            toast("Created user profile");
-          }}
-        >
-          Logout
-        </TapCounterButton>
+        {userProfile ? (
+          <TapCounterButton
+            counterLimit={5}
+            className={buttonClass}
+            onClick={() => {
+              logout();
+              toast("Created user profile");
+            }}
+          >
+            Logout
+          </TapCounterButton>
+        ) : (
+          <button className={buttonClass} onClick={createUser}>
+            Create User
+          </button>
+        )}
       </div>
 
       <IncomingPeers peers={[...(peers ? peers?.values() : [])]} />
