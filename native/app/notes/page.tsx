@@ -1,89 +1,85 @@
 "use client";
 
 import React from "react";
-import { buttonClass, TopbarLayout } from "@/components/TopbarLayout";
+import { TopbarLayout } from "@/components/TopbarLayout";
 import { v4 as uuid } from "uuid";
-import { useActiveNote, useNotesState } from "@/components/state/notes";
-import { SyncNotesButton } from "./SyncNotesButton";
-import { NoteEditor } from "./NoteEditor";
+import { useNotesState } from "@/components/state/notes";
+import { usePlatform } from "@/components/hooks/usePlatform";
+import { ActiveNote } from "./active/page";
+import clsx from "clsx";
+import { DefaultTimeFormatter } from "@/components/util";
+import { useRouter } from "next/navigation";
 import { useUserProfile } from "@/components/state/userProfile";
-import { bytesToBase64 } from "@/components/crypto";
 
 export const dynamic = "force-static";
 
-function EnableLockingButton({ noteId }: { noteId: string }) {
-  const cb = useNotesState((s) => s.cb);
-  const hasAuth = useUserProfile((s) => !!s.userProfile?.secret);
-  const { base64EncryptionIvParam } = useActiveNote();
-
-  if (!hasAuth) {
-    return null;
-  }
-
-  const encrypted =
-    base64EncryptionIvParam?.__typename === "Lock" &&
-    !!base64EncryptionIvParam.key;
-
-  return (
-    <button
-      className={buttonClass}
-      onClick={() =>
-        cb.updateNote(noteId, (prev) => ({
-          ...prev,
-          base64EncryptionIvParam: encrypted
-            ? { __typename: "NoLock" as const }
-            : {
-                __typename: "Lock" as const,
-                key: bytesToBase64(
-                  window.crypto.getRandomValues(new Uint8Array(12)),
-                ),
-              },
-        }))
-      }
-    >
-      {encrypted ? "Locked" : "Unlocked"}
-    </button>
-  );
-}
-
 function SelectActiveNote() {
   const { notes, activeNote, cb } = useNotesState();
+  const { isMobile } = usePlatform();
+  const hasAuth = useUserProfile((s) => !!s.userProfile?.secret);
+  const router = useRouter();
 
   return (
-    <select
-      className="bg-slate-800"
-      value={activeNote}
-      onChange={(evt) => {
-        cb.setActiveNote(evt.target.value);
-      }}
+    <div
+      className={clsx(
+        "flex flex-col gap-2 overflow-y-scroll",
+        isMobile && "flex-grow",
+      )}
     >
-      <option key={"dummy"} value={uuid()}>
-        -- New note --
-      </option>
-
       {[...(notes ? notes?.values() : [])]
         .reverse()
         .filter((note) => !note.isTombstone)
         .map((note) => {
           return (
-            <option key={note.id} value={note.id}>
-              {note.merges ? "*" : ""}
-              {note.preview}
-            </option>
+            <button
+              key={note.id}
+              className={clsx(
+                activeNote === note.id && !isMobile
+                  ? "bg-yellow-700"
+                  : "bg-slate-700",
+                "disabled:bg-slate-900",
+                "text-white rounded-md p-6 flex flex-col gap-2",
+              )}
+              disabled={!hasAuth && !!note.base64EncryptionIvParam}
+              onClick={() => {
+                cb.setActiveNote(note.id);
+                if (isMobile) {
+                  router.push("/notes/active");
+                }
+              }}
+            >
+              <p>
+                {note.merges ? "*" : ""}
+                {note.preview}
+              </p>
+
+              <p>{DefaultTimeFormatter.format(note.lastUpdateDate)}</p>
+            </button>
           );
         })}
-    </select>
+    </div>
   );
 }
 
 export default function Notes() {
-  const hasAuth = useUserProfile((s) => !!s.userProfile?.secret);
-  const { id: activeNote, base64EncryptionIvParam } = useActiveNote();
+  const { isMobile } = usePlatform();
+  const cb = useNotesState((s) => s.cb);
+  const router = useRouter();
 
   return (
     <TopbarLayout
       title={"Notes"}
       buttons={[
+        {
+          type: "button",
+          text: "New Note",
+          onClick: () => {
+            cb.setActiveNote(uuid());
+            if (isMobile) {
+              router.push("/notes/active");
+            }
+          },
+        },
         {
           type: "link",
           text: "Settings",
@@ -96,19 +92,15 @@ export default function Notes() {
         },
       ]}
     >
-      <div className="absolute top-12 right-4 flex flex-col gap-2 items-end">
+      <div className="flex h-full w-full gap-2 flex-grow justify-stretch">
         <SelectActiveNote />
-        <SyncNotesButton />
-        <EnableLockingButton noteId={activeNote} />
-      </div>
 
-      {!hasAuth && base64EncryptionIvParam ? (
-        <div className="flex grow items-center justify-center">
-          <p className="text-lg">~~ LOCKED ~~</p>
-        </div>
-      ) : (
-        <NoteEditor noteId={activeNote} />
-      )}
+        {!isMobile ? (
+          <div className="flex flex-col gap-2 flex-grow">
+            <ActiveNote />
+          </div>
+        ) : null}
+      </div>
     </TopbarLayout>
   );
 }

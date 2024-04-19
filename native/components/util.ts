@@ -4,6 +4,11 @@ import { z } from "zod";
 import { toast } from "react-hot-toast";
 import { get, set, del } from "idb-keyval";
 
+export const DefaultTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "short",
+  timeStyle: "medium",
+});
+
 // Not sure how I feel about this yet, but the idea is at least interesting.
 // There is some argument to be made that this kind of thing should not be
 // necessary, but at the same time the optional array spread syntax can be

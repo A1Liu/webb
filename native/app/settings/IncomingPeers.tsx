@@ -1,5 +1,6 @@
 "use client";
 
+import { DefaultTimeFormatter } from "@/components/util";
 import clsx from "clsx";
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -7,11 +8,6 @@ import { z } from "zod";
 import { GlobalInitGroup } from "../../components/constants";
 import { registerListener, registerRpc } from "../../components/network";
 import { Peer, usePeers } from "../../components/state/peers";
-
-const Formatter = new Intl.DateTimeFormat("en-US", {
-  dateStyle: "short",
-  timeStyle: "medium",
-});
 
 const DebugListener = registerListener({
   group: GlobalInitGroup,
@@ -93,7 +89,7 @@ function IncomingPeer({ peer }: { peer: Peer }) {
 
         {peer.lastConnected ? (
           <p className="p-2">
-            Last conn: {Formatter.format(peer.lastConnected)}
+            Last conn: {DefaultTimeFormatter.format(peer.lastConnected)}
           </p>
         ) : null}
       </div>
