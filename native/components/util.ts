@@ -98,3 +98,22 @@ export const ZustandIdbStorage: PersistStorage<unknown> = {
     await del(name);
   },
 };
+
+export async function getFirstSuccess<T>(promises: Promise<T>[]): Promise<
+  | {
+      success: true;
+      value: T;
+    }
+  | { success: false }
+> {
+  const neverResolve = new Promise<T>(() => {});
+
+  const firstSuccess = Promise.race(
+    promises.map((p) => p.catch(() => neverResolve)),
+  ).then((value) => ({ success: true as const, value }));
+  const allFailed = Promise.allSettled(promises).then(() => ({
+    success: false as const,
+  }));
+
+  return Promise.race([firstSuccess, allFailed]);
+}

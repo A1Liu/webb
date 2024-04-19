@@ -26,6 +26,7 @@ import {
   verifyUserKey,
 } from "@/components/crypto";
 import { useLocks } from "@/components/state/locks";
+import { useRouter } from "next/navigation";
 
 export const dynamic = "force-static";
 
@@ -186,6 +187,8 @@ export default function Settings() {
   const notesCb = useNotesState((s) => s.cb);
   const { userProfile } = useUserProfile();
 
+  const router = useRouter();
+
   const [resetCount, setResetCounter] = useState(5);
   const hardReset = useMemoizedFn(async () => {
     if (resetCount > 1) {
@@ -220,7 +223,7 @@ export default function Settings() {
         {
           type: "button",
           text: "Back",
-          onClick: () => window.history.back(),
+          onClick: () => router.back(),
         },
         {
           type: "button",

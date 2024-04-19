@@ -3,14 +3,19 @@
 import React from "react";
 import { useNoteMetadata, useNotesState } from "@/components/state/notes";
 import md5 from "md5";
-import { useDebounceFn, useRequest } from "ahooks";
+import { useDebounceFn, useLockFn, useRequest } from "ahooks";
 import {
   NoteContentStoreProvider,
   useNoteContents,
+  writeNoteContents,
 } from "@/components/state/noteContents";
-import { SyncNotesButton } from "./SyncNotesButton";
+import { NoteDataFetch, SyncNotesButton } from "./SyncNotesButton";
 import { buttonClass } from "@/components/TopbarLayout";
-import { useLocks } from "@/components/state/locks";
+import { RequestKeyForLock, useLocks } from "@/components/state/locks";
+import { usePeers } from "@/components/state/peers";
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
+import { getFirstSuccess } from "@/components/util";
 
 export const dynamic = "force-static";
 
@@ -82,9 +87,83 @@ function NoteContentEditor() {
   );
 }
 
+function useNoteKeyRequest(
+  noteId: string,
+  lockId?: string,
+): { loading: boolean; requestKey: () => Promise<boolean | undefined> } {
+  const { loading, runAsync: requestKey } = useRequest(
+    async () => {
+      const toastId = toast.loading(`Requesting key...`);
+
+      const firstResult = await getFirstSuccess(
+        [...usePeers.getState().peers.values()].map(async (peer) => {
+          // cheating here to always get the first successful result
+          // if one exists
+          if (!lockId) throw new Error(``);
+          const result = RequestKeyForLock.call(peer.id, { lockId });
+          for await (const { key } of result) {
+            if (!key) continue;
+            return { peerId: peer.id, key };
+          }
+
+          throw new Error(``);
+        }),
+      );
+
+      if (!firstResult.success) {
+        toast.error(`Couldn't get key to unlock file`, {
+          id: toastId,
+        });
+        return false;
+      }
+
+      const { key, peerId } = firstResult.value;
+
+      useLocks.getState().cb.addKey(key);
+      toast.success(`Successfully added key!`);
+      toast.loading(`Fetching latest data...`, {
+        id: toastId,
+      });
+
+      const dataFetchResult = NoteDataFetch.call(peerId, {
+        noteId: noteId,
+        permissionKey: key,
+      });
+
+      for await (const { noteId, text } of dataFetchResult) {
+        await writeNoteContents(noteId, text);
+
+        toast.success(`Fetched and unlocked note!`, {
+          id: toastId,
+        });
+
+        return true;
+      }
+
+      toast.error(`Failed somehow`, { id: toastId });
+
+      return false;
+    },
+    {
+      manual: true,
+    },
+  );
+
+  const requestKeyHandler = useLockFn(requestKey);
+
+  return {
+    loading,
+    requestKey: requestKeyHandler,
+  };
+}
+
 export function NoteEditor({ noteId }: { noteId: string }) {
   const { lockId } = useNoteMetadata(noteId);
-  const { data: hasAuth, loading } = useRequest(
+  const {
+    data: hasAuth,
+    loading,
+    refresh,
+  } = useRequest(
     async () => {
       if (!lockId) return true;
       const key = await useLocks.getState().cb.createKey(lockId);
@@ -96,6 +175,11 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       refreshDeps: [lockId],
     },
   );
+  const { loading: requestKeyLoading, requestKey } = useNoteKeyRequest(
+    noteId,
+    lockId ?? undefined,
+  );
+  const router = useRouter();
 
   if (loading) {
     return (
@@ -115,8 +199,26 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       </div>
 
       {!hasAuth ? (
-        <div className="flex grow items-center justify-center">
+        <div className="flex flex-col gap-2 grow items-center justify-center">
           <p className="text-lg">~~ LOCKED ~~</p>
+
+          <div className="flex gap-2">
+            <button
+              className={buttonClass}
+              disabled={requestKeyLoading}
+              onClick={() => router.back()}
+            >
+              Go back
+            </button>
+
+            <button
+              className={buttonClass}
+              disabled={requestKeyLoading}
+              onClick={() => requestKey().then(() => refresh())}
+            >
+              Request Key
+            </button>
+          </div>
         </div>
       ) : (
         <NoteContentStoreProvider noteId={noteId}>

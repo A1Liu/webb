@@ -36,11 +36,15 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
   return (
     <button
       className={clsx(
-        activeNote === note.id && !isMobile ? "bg-yellow-700" : "bg-slate-700",
+        !hasAuth
+          ? "bg-slate-900"
+          : activeNote === note.id && !isMobile
+          ? "bg-yellow-700"
+          : "bg-slate-700",
         "disabled:bg-slate-900",
         "text-white rounded-md p-6 flex flex-col gap-2",
       )}
-      disabled={!hasAuth || loading}
+      disabled={loading}
       onClick={() => {
         cb.setActiveNote(note.id);
         if (isMobile) {

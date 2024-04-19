@@ -30,12 +30,12 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
       {state.kind === AppStateKind.PermissionFlow ? (
         <div
           className="fixed top-0 bottom-0 left-0 right-0 flex items-center
-        justify-center bg-opacity-30 bg-slate-500"
+        justify-center bg-opacity-30 bg-slate-500 z-50"
         >
-          <div className="flex flex-col gap-2 bg-black border-white rounded-md text-white">
+          <div className="p-4 flex flex-col gap-2 bg-black border border-white rounded-md text-white">
             <h3 className="font-bold text-lg">{state.title}</h3>
 
-            <p className="text-sm">{state.description}</p>
+            <pre className="text-sm">{state.description}</pre>
 
             <div className="flex gap-2">
               <button

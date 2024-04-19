@@ -129,6 +129,7 @@ export const useLocks = create<LockStoreState>()(
             }
 
             // TODO: verify key validity
+
             thisDeviceKeyCache.set(key.lockId, key);
           },
           createKey: async (lockId, inputDeviceId) => {
@@ -236,15 +237,23 @@ export const RequestKeyForLock = registerRpc({
   input: z.object({ lockId: z.string() }),
   output: z.object({ key: PermissionKeySchema.nullish() }),
   rpc: async function* (peerId, { lockId }) {
-    console.debug(`received GetKeyAuth req`, peerId);
+    console.debug(`received RequestKeyForLock req`, peerId);
+
+    const { locks, cb } = useLocks.getState();
+
+    const lock = locks.get(lockId);
+    if (!lock) {
+      console.debug(`RequestKeyForLock failed, don't have lock info`);
+      return;
+    }
 
     const perm = await useGlobals.getState().cb.runPermissionFlow({
       title: "Grant device a key?",
-      description: `Device=${peerId}, lock=${lockId}`,
+      description: `DEVICE=${peerId}\nLOCK=${lock.name} (${lockId})`,
     });
     if (!perm) return;
 
-    const key = await useLocks.getState().cb.createKey(lockId, peerId);
+    const key = await cb.createKey(lockId, peerId);
 
     yield { key };
   },

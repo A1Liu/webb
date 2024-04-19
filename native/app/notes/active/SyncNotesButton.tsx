@@ -25,7 +25,7 @@ import { useLocks } from "@/components/state/locks";
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
 
-const NoteDataFetch = registerRpc({
+export const NoteDataFetch = registerRpc({
   name: "NoteDataFetch",
   group: NotesSyncInitGroup,
   input: z.object({
