@@ -1,5 +1,5 @@
 packages:
-  - "./native"
-  - "./web"
   - "./ui-shared"
   - "./networking"
+  - "./native"
+  - "./web"
