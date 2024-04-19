@@ -19,6 +19,7 @@ interface LockStoreState {
   >;
   locks: Map<string, PermissionLock>;
   cb: {
+    getLock: () => PermissionLock;
     createLock: (name: string) => Promise<PermissionLock>;
     addLock: (lock: PermissionLock) => Promise<boolean>;
     verifyKey: (
@@ -34,6 +35,14 @@ export const useLocks = create<LockStoreState>()(
         keyCache: new Map(),
         locks: new Map(),
         cb: {
+          getLock: () => {
+            for (const lock of get().locks.values()) {
+              return lock;
+            }
+
+            // TODO: this is dumb
+            throw new Error("No locks!");
+          },
           createLock: async (name) => {
             const userProfile = useUserProfile.getState().userProfile;
             if (!userProfile) {

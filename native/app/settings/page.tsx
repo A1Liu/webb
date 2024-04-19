@@ -25,6 +25,7 @@ import {
   importUserPublicKey,
   verifyUserKey,
 } from "@/components/crypto";
+import { useLocks } from "@/components/state/locks";
 
 export const dynamic = "force-static";
 
@@ -110,11 +111,11 @@ function BackupUser() {
 
           const privAuthKey = await window.crypto.subtle.exportKey(
             "pkcs8",
-            userProfile.secret.privateAuthKey
+            userProfile.secret.privateAuthKey,
           );
           const privEncryptKey = await window.crypto.subtle.exportKey(
             "raw",
-            userProfile.secret.privateEncryptKey
+            userProfile.secret.privateEncryptKey,
           );
 
           return {
@@ -131,7 +132,7 @@ function BackupUser() {
       }}
       writeData={async (userProfileData) => {
         const pubKey = await importUserPublicKey(
-          userProfileData.publicAuthKeyBase64
+          userProfileData.publicAuthKeyBase64,
         );
 
         const secret = await (async () => {
@@ -145,14 +146,14 @@ function BackupUser() {
               hash: "SHA-512",
             },
             true,
-            ["sign"]
+            ["sign"],
           );
           const privateEncryptKey = await window.crypto.subtle.importKey(
             "raw",
             base64ToBytes(userProfileData.secret.privateEncryptKeyBase64),
             { name: "AES-GCM", length: 256 },
             true,
-            ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
+            ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
           );
 
           return {
@@ -163,7 +164,7 @@ function BackupUser() {
 
         const verified = await verifyUserKey(
           pubKey,
-          userProfileData.publicAuthUserId
+          userProfileData.publicAuthUserId,
         );
         if (!verified) {
           throw new Error("User profile failed verification");
@@ -204,7 +205,7 @@ export default function Settings() {
     {
       wait: 1_000,
       trailing: true,
-    }
+    },
   );
 
   useEffect(() => {
@@ -248,13 +249,13 @@ export default function Settings() {
                       ...note,
                       text,
                     };
-                  }
-                )
+                  },
+                ),
               );
             }}
             writeData={async (notes) => {
               notesCb.updateNotesFromSync(
-                notes.map(({ text, base64EncryptionIvParam, ...note }) => note)
+                notes.map(({ text, base64EncryptionIvParam, ...note }) => note),
               );
 
               for (const note of notes) {
@@ -278,6 +279,23 @@ export default function Settings() {
 
           <button className={buttonClass} onClick={() => notesCb.lockAll()}>
             Lock All
+          </button>
+
+          <button
+            className={buttonClass}
+            onClick={async () => {
+              const { locks, cb } = useLocks.getState();
+              if (locks.size > 0) {
+                toast("Already have lock", {});
+                return;
+              }
+
+              await cb.createLock("main");
+
+              toast("created lock", {});
+            }}
+          >
+            Create lock
           </button>
         </div>
       </div>
