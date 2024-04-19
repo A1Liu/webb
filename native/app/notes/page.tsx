@@ -5,11 +5,11 @@ import { TopbarLayout } from "@/components/TopbarLayout";
 import { v4 as uuid } from "uuid";
 import { useNotesState } from "@/components/state/notes";
 import { usePlatform } from "@/components/hooks/usePlatform";
-import { ActiveNote } from "./active/ActiveNote";
 import clsx from "clsx";
 import { DefaultTimeFormatter } from "@/components/util";
 import { useRouter } from "next/navigation";
 import { useUserProfile } from "@/components/state/userProfile";
+import { NoteEditor } from "./active/NoteEditor";
 
 export const dynamic = "force-static";
 
@@ -63,6 +63,7 @@ function SelectActiveNote() {
 
 export default function Notes() {
   const { isMobile } = usePlatform();
+  const activeNote = useNotesState((s) => s.activeNote);
   const cb = useNotesState((s) => s.cb);
   const router = useRouter();
 
@@ -97,7 +98,7 @@ export default function Notes() {
 
         {!isMobile ? (
           <div className="flex flex-col gap-2 flex-grow">
-            <ActiveNote />
+            <NoteEditor noteId={activeNote} />
           </div>
         ) : null}
       </div>

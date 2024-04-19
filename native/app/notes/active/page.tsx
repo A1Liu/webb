@@ -3,12 +3,12 @@
 import React from "react";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { useActiveNote } from "@/components/state/notes";
-import { ActiveNote } from "./ActiveNote";
+import { NoteEditor } from "./NoteEditor";
 
 export const dynamic = "force-static";
 
 export default function Notes() {
-  const { preview } = useActiveNote();
+  const { id, preview } = useActiveNote();
   return (
     <TopbarLayout
       title={preview}
@@ -25,7 +25,7 @@ export default function Notes() {
         },
       ]}
     >
-      <ActiveNote />
+      <NoteEditor noteId={id} />
     </TopbarLayout>
   );
 }

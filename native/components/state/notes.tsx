@@ -176,13 +176,16 @@ export const useNotesState = create<NoteGlobalState>()(
   ),
 );
 
-export function useActiveNote(): NoteData {
+export function useNoteMetadata(noteId: string): NoteData {
   return useNotesState(
-    useShallow(
-      (state) =>
-        state.notes.get(state.activeNote) ?? createEmptyNote(state.activeNote),
-    ),
+    useShallow((state) => state.notes.get(noteId) ?? createEmptyNote(noteId)),
   );
+}
+
+const selector = (state: NoteGlobalState) =>
+  state.notes.get(state.activeNote) ?? createEmptyNote(state.activeNote);
+export function useActiveNote(): NoteData {
+  return useNotesState(useShallow(selector));
 }
 
 export const NotesSyncInitGroup = new InitGroup("notesSync");
