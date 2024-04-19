@@ -1,12 +1,108 @@
 import stringify from "fast-json-stable-stringify";
+import { v4 as uuid } from "uuid";
 
-export interface AesGcmEncryptedTextData {
-  __typename: "EncryptedText";
-  iv: number[];
-  wrappedEncryptionKey: string;
+// RSA-PSS-based lock to prevent unauthorized usage of a resource.
+export interface PermissionLock {
+  __typename: "PermLock";
+  id: string;
+  publicKey: CryptoKey;
+  secret?: {
+    privateKey: CryptoKey;
+  };
+}
 
-  // base64 encoded
-  encryptedData: string;
+export interface PermissionKey {
+  __typename: "PermKey";
+  lockId: string;
+  keyId: string;
+  deviceId: string;
+  expirationDate: Date;
+  base64Signature: string;
+}
+
+export class Permissions {
+  static async unlock(
+    lock: PermissionLock,
+    key: PermissionKey,
+  ): Promise<boolean> {
+    const { base64Signature, ...permKeyData } = key;
+    const valid = await window.crypto.subtle.verify(
+      { name: "RSA-PSS", saltLength: 32 },
+      lock.publicKey,
+      base64ToBytes(base64Signature),
+      new TextEncoder().encode(stringify(permKeyData)),
+    );
+
+    return valid;
+  }
+
+  static async createKey(
+    deviceId: string,
+    lock: Required<PermissionLock>,
+  ): Promise<PermissionKey> {
+    const expirationDate = new Date();
+    expirationDate.setFullYear(new Date().getFullYear() + 1);
+    const permKey: Omit<PermissionKey, "base64Signature"> = {
+      __typename: "PermKey",
+      lockId: lock.id,
+      keyId: uuid(),
+      deviceId,
+      expirationDate,
+    };
+
+    const signature = await window.crypto.subtle.sign(
+      { name: "RSA-PSS", saltLength: 32 },
+      lock.secret.privateKey,
+      new TextEncoder().encode(stringify(permKey)),
+    );
+
+    return {
+      ...permKey,
+      base64Signature: bytesToBase64(signature),
+    };
+  }
+
+  static async hashLockKey(key: CryptoKey): Promise<string> {
+    const publicKeyJSON = await window.crypto.subtle.exportKey("jwk", key);
+
+    const publicKeyString = stringify(publicKeyJSON);
+
+    const publicKeyBytes = new TextEncoder().encode(publicKeyString);
+
+    const publicIdBytes = await window.crypto.subtle.digest(
+      "SHA-1",
+      publicKeyBytes,
+    );
+
+    const publicId = bytesToBase64(publicIdBytes);
+
+    return publicId;
+  }
+
+  static async createLock(): Promise<Required<PermissionLock>> {
+    const authKeyPair = await window.crypto.subtle.generateKey(
+      {
+        name: "RSA-PSS",
+        modulusLength: 4096,
+        hash: "SHA-256",
+        // https://developer.mozilla.org/en-US/docs/Web/API/RsaHashedKeyGenParams#publicexponent
+        publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
+      },
+      true,
+      ["sign", "verify"],
+    );
+
+    const id = await this.hashLockKey(authKeyPair.publicKey);
+
+    return {
+      __typename: "PermLock",
+      id,
+      publicKey: authKeyPair.publicKey,
+      secret: {
+        privateKey: authKeyPair.privateKey,
+      },
+    };
+  }
 }
 
 // Requirements
@@ -15,57 +111,6 @@ export interface AesGcmEncryptedTextData {
 // 3. Hide information from disk reads - symmetric encryption at rest per-note
 // 4. Wrap encryption key for each note using user's public key
 export function getKey() {}
-
-export class EncryptedText {
-  private _text: string = "";
-  private encrypted: boolean = false;
-  private rawEncryptionKey: CryptoKey | undefined = undefined;
-  private wrappedEncryptionKey: string;
-  private readonly iv: ArrayBuffer;
-
-  constructor(options: { wrappedEncryptionKey: string; iv?: ArrayBuffer }) {
-    this.wrappedEncryptionKey = options.wrappedEncryptionKey;
-    this.iv = options.iv ?? window.crypto.getRandomValues(new Uint8Array(12));
-  }
-
-  decryptKey(runner: (wrapped: string) => CryptoKey) {
-    this.rawEncryptionKey = runner(this.wrappedEncryptionKey);
-  }
-
-  async decryptText() {
-    if (!this.encrypted) {
-      return;
-    }
-
-    if (!this.rawEncryptionKey) {
-      throw new Error("Don't have the encryption key unwrapped yet");
-    }
-
-    const output = await window.crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: this.iv },
-      this.rawEncryptionKey,
-      new TextEncoder().encode(this._text),
-    );
-
-    this._text = new TextDecoder().decode(output);
-  }
-
-  set text(value: string) {
-    if (this.encrypted) {
-      throw new Error("Can't modify the data until it's decrypted");
-    }
-
-    this._text = value;
-  }
-
-  get text(): string {
-    if (this.encrypted) {
-      throw new Error("Can't modify the data until it's decrypted");
-    }
-
-    return this._text;
-  }
-}
 
 export interface UserKeys {
   // Using RSA-PSS
