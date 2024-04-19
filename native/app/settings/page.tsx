@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { toast } from "react-hot-toast";
 import { IncomingPeers } from "@/app/settings/IncomingPeers";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { TopbarLayout } from "@/components/TopbarLayout";
-import { useDebounceFn, useMemoizedFn } from "ahooks";
+import { useMemoizedFn } from "ahooks";
 import { usePeers } from "@/components/state/peers";
 import { NoteDataSchema, useNotesState } from "@/components/state/notes";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -27,6 +27,7 @@ import {
 } from "@/components/crypto";
 import { useLocks } from "@/components/state/locks";
 import { useRouter } from "next/navigation";
+import { TapCounterButton } from "@/components/Button";
 
 export const dynamic = "force-static";
 
@@ -185,36 +186,20 @@ export default function Settings() {
   const { platform } = usePlatform();
   const { peers } = usePeers();
   const notesCb = useNotesState((s) => s.cb);
-  const { userProfile } = useUserProfile();
+  const {
+    userProfile,
+    cb: { logout },
+  } = useUserProfile();
 
   const router = useRouter();
 
-  const [resetCount, setResetCounter] = useState(5);
   const hardReset = useMemoizedFn(async () => {
-    if (resetCount > 1) {
-      setResetCounter((prev) => prev - 1);
-      return;
-    }
-
     usePeers.persist.clearStorage();
     useNotesState.persist.clearStorage();
     useUserProfile.persist.clearStorage();
     useDeviceProfile.persist.clearStorage();
     window.location.reload();
   });
-
-  const { run } = useDebounceFn(
-    (): void => setResetCounter((prev) => Math.min(5, prev + 1)),
-    {
-      wait: 1_000,
-      trailing: true,
-    },
-  );
-
-  useEffect(() => {
-    if (resetCount >= 5) return;
-    run();
-  }, [resetCount, run]);
 
   return (
     <TopbarLayout
@@ -274,11 +259,13 @@ export default function Settings() {
             <button className={buttonClass}>Home</button>
           </Link>
 
-          <button className={buttonClass} onClick={() => hardReset()}>
+          <TapCounterButton
+            counterLimit={5}
+            className={buttonClass}
+            onClick={() => hardReset()}
+          >
             HARD RESET
-            <br />
-            (click {resetCount} times)
-          </button>
+          </TapCounterButton>
 
           <button className={buttonClass} onClick={() => notesCb.lockAll()}>
             Lock All
@@ -304,6 +291,19 @@ export default function Settings() {
       </div>
 
       <h4>USER: {userProfile?.publicAuthUserId}</h4>
+
+      <div className="flex gap-2">
+        <TapCounterButton
+          counterLimit={5}
+          className={buttonClass}
+          onClick={() => {
+            logout();
+            toast("Created user profile");
+          }}
+        >
+          Logout
+        </TapCounterButton>
+      </div>
 
       <IncomingPeers peers={[...(peers ? peers?.values() : [])]} />
     </TopbarLayout>
