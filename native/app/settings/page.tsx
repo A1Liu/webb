@@ -113,11 +113,11 @@ function BackupUser() {
 
           const privAuthKey = await window.crypto.subtle.exportKey(
             "pkcs8",
-            userProfile.secret.privateAuthKey,
+            userProfile.secret.privateAuthKey
           );
           const privEncryptKey = await window.crypto.subtle.exportKey(
             "raw",
-            userProfile.secret.privateEncryptKey,
+            userProfile.secret.privateEncryptKey
           );
 
           return {
@@ -134,7 +134,7 @@ function BackupUser() {
       }}
       writeData={async (userProfileData) => {
         const pubKey = await importUserPublicKey(
-          userProfileData.publicAuthKeyBase64,
+          userProfileData.publicAuthKeyBase64
         );
 
         const secret = await (async () => {
@@ -148,14 +148,14 @@ function BackupUser() {
               hash: "SHA-512",
             },
             true,
-            ["sign"],
+            ["sign"]
           );
           const privateEncryptKey = await window.crypto.subtle.importKey(
             "raw",
             base64ToBytes(userProfileData.secret.privateEncryptKeyBase64),
             { name: "AES-GCM", length: 256 },
             true,
-            ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
+            ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
           );
 
           return {
@@ -166,7 +166,7 @@ function BackupUser() {
 
         const verified = await verifyUserKey(
           pubKey,
-          userProfileData.publicAuthUserId,
+          userProfileData.publicAuthUserId
         );
         if (!verified) {
           throw new Error("User profile failed verification");
@@ -198,6 +198,7 @@ export default function Settings() {
     useNotesState.persist.clearStorage();
     useUserProfile.persist.clearStorage();
     useDeviceProfile.persist.clearStorage();
+    useLocks.persist.clearStorage();
     window.location.reload();
   });
 
@@ -237,13 +238,13 @@ export default function Settings() {
                       ...note,
                       text,
                     };
-                  },
-                ),
+                  }
+                )
               );
             }}
             writeData={async (notes) => {
               notesCb.updateNotesFromSync(
-                notes.map(({ text, ...note }) => note),
+                notes.map(({ text, ...note }) => note)
               );
 
               for (const note of notes) {
