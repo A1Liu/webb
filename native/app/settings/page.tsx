@@ -297,7 +297,9 @@ export default function Settings() {
       </div>
 
       {userProfile ? (
-        <h4>USER: {userProfile?.publicAuthUserId}</h4>
+        <h4 className="text-left text-wrap break-words overflow-hidden">
+          USER: {userProfile?.publicAuthUserId}
+        </h4>
       ) : (
         <h4>NO USER</h4>
       )}

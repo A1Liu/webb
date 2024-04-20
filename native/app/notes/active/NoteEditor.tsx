@@ -111,7 +111,7 @@ function useNoteKeyRequest(
       );
 
       if (!firstResult.success) {
-        toast.error(`Couldn't get key to unlock file`, {
+        toast.error(`Couldn't fetch key to unlock file`, {
           id: toastId,
         });
         return false;

@@ -14,16 +14,14 @@ import { useDeviceProfile } from "./deviceProfile";
 import { registerRpc } from "../network";
 import { z } from "zod";
 import { useGlobals } from "./appGlobals";
-import { Future } from "@/../ui-shared/dist/util";
+import { Future } from "@a1liu/webb-ui-shared/util";
+import stringify from "fast-json-stable-stringify";
+import { isEqual } from "lodash";
 
 // Only 1 lock ID for now
 
 interface LockStoreState {
-  keyCache: Map<
-    string,
-    { key: Omit<PermissionKey, "base64Signature">; pass: boolean }
-  >;
-  thisDeviceKeyCache: Map<string, PermissionKey>;
+  keyCache: Map<string, { key: PermissionKey; pass: boolean }>;
   thisDeviceKeyCacheRunning: Map<string, Promise<PermissionKey>>;
   locks: Map<string, PermissionLock>;
   cb: {
@@ -44,10 +42,19 @@ interface LockStoreState {
 export const useLocks = create<LockStoreState>()(
   persist(
     (set, get) => {
+      function getCacheKeyForPermKey({
+        deviceId,
+        lockId,
+      }: {
+        deviceId: string;
+        lockId: string;
+      }) {
+        return stringify({ deviceId, lockId });
+      }
+
       return {
         keyCache: new Map(),
         locks: new Map(),
-        thisDeviceKeyCache: new Map(),
         thisDeviceKeyCacheRunning: new Map(),
         cb: {
           getLock: () => {
@@ -113,8 +120,9 @@ export const useLocks = create<LockStoreState>()(
             return true;
           },
           addKey: (key) => {
-            const { thisDeviceKeyCache } = get();
-            const prevKey = thisDeviceKeyCache.get(key.lockId);
+            const { keyCache } = get();
+            const keyCacheKey = getCacheKeyForPermKey(key);
+            const prevKey = keyCache.get(keyCacheKey);
             if (prevKey) {
               return;
             }
@@ -125,30 +133,33 @@ export const useLocks = create<LockStoreState>()(
             }
 
             if (deviceId !== key.deviceId) {
+              toast.error(`device ${deviceId}`);
+              toast.error(`key ${key.deviceId}`);
               throw new Error("Key doesn't match this device's ID");
             }
 
             // TODO: verify key validity
 
-            thisDeviceKeyCache.set(key.lockId, key);
+            keyCache.set(keyCacheKey, { key, pass: true });
           },
           createKey: async (lockId, inputDeviceId) => {
-            const { thisDeviceKeyCache, thisDeviceKeyCacheRunning, locks } =
-              get();
-            const prevKey = thisDeviceKeyCache.get(lockId);
-            if (prevKey) {
-              return prevKey;
-            }
-            const prevKeyRunning = thisDeviceKeyCacheRunning.get(lockId);
-            if (prevKeyRunning) {
-              return await prevKeyRunning;
-            }
-
             const deviceId =
               inputDeviceId ?? useDeviceProfile.getState().deviceProfile?.id;
             if (!deviceId) {
               return undefined;
               // throw new Error("Don't have device ID to create key with");
+            }
+
+            const { keyCache, thisDeviceKeyCacheRunning, locks } = get();
+
+            const keyCacheKey = getCacheKeyForPermKey({ deviceId, lockId });
+            const prevKey = keyCache.get(keyCacheKey);
+            if (prevKey) {
+              return prevKey.key;
+            }
+            const prevKeyRunning = thisDeviceKeyCacheRunning.get(lockId);
+            if (prevKeyRunning) {
+              return await prevKeyRunning;
             }
 
             const lock = locks.get(lockId);
@@ -174,39 +185,30 @@ export const useLocks = create<LockStoreState>()(
 
             fut.resolve(key);
             thisDeviceKeyCacheRunning.delete(lockId);
-            thisDeviceKeyCache.set(lockId, key);
+            keyCache.set(lockId, { key, pass: true });
 
             return key;
           },
-          verifyKey: async (key) => {
+          verifyKey: async (key: PermissionKey) => {
             const { locks, keyCache } = get();
-            const cachedKey = keyCache.get(key.keyId);
-            if (
-              !!cachedKey &&
-              cachedKey.key.lockId === key.lockId &&
-              cachedKey.key.deviceId === key.deviceId &&
-              cachedKey.key.expirationDate === key.expirationDate
-            ) {
-              return { type: "done", valid: cachedKey.pass };
+            const keyCacheKey = getCacheKeyForPermKey(key);
+            const cachedKey = keyCache.get(keyCacheKey);
+
+            if (cachedKey && isEqual(cachedKey.key, key)) {
+              return { type: "done" as const, valid: cachedKey.pass };
             }
             const lock = locks.get(key.lockId);
             if (!lock) {
-              return { type: "missingLock" };
+              return { type: "missingLock" as const };
             }
 
             const pass = await PermissionLockHelpers.unlock(lock, key);
 
-            const newKeyCache = new Map(keyCache);
-            newKeyCache.set(key.keyId, {
-              pass,
-              key: {
-                __typename: key.__typename,
-                keyId: key.keyId,
-                lockId: key.lockId,
-                deviceId: key.deviceId,
-                expirationDate: key.expirationDate,
-              },
-            });
+            const newKeyCache = new Map<
+              string,
+              { key: PermissionKey; pass: boolean }
+            >(keyCache);
+            newKeyCache.set(key.keyId, { pass, key });
             set({
               keyCache: newKeyCache,
             });

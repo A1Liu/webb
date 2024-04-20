@@ -4,7 +4,11 @@ import { useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { z } from "zod";
 import { GlobalInitGroup } from "./constants";
-import { exportUserPublickKey, importUserPublicKey } from "./crypto";
+import {
+  exportUserPublickKey,
+  importUserPublicKey,
+  verifyUserKey,
+} from "./crypto";
 import { usePlatform } from "./hooks/usePlatform";
 import {
   getNetworkLayerGlobal,
@@ -21,13 +25,17 @@ const JoinMe = registerRpc({
   group: GlobalInitGroup,
   input: z.object({ userId: z.string(), userPublicKey: z.string() }),
   output: z.object({ success: z.boolean() }),
-  rpc: async function* (_peerId, input) {
-    const publicAuthKey = await importUserPublicKey(input.userPublicKey);
+  rpc: async function* (_peerId, { userId, userPublicKey }) {
+    const publicAuthKey = await importUserPublicKey(userPublicKey);
 
-    // TODO: verification
+    const verified = await verifyUserKey(publicAuthKey, userId);
+    if (!verified) {
+      toast.error(`Failed to verify during join`);
+      return;
+    }
 
     useUserProfile.getState().cb.updateUserProfile({
-      publicAuthUserId: input.userId,
+      publicAuthUserId: userId,
       publicAuthKey,
     });
 

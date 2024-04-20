@@ -196,11 +196,13 @@ export function SyncNotesButton() {
         return;
       }
 
+      const timestamp = new Date();
+      timestamp.setMilliseconds(0);
       const adminAuth = await signValue({
         privateKey: userSecret.privateAuthKey,
         value: {
           deviceId: deviceProfile.id,
-          timestamp: new Date(),
+          timestamp,
         },
       });
 

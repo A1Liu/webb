@@ -9,6 +9,9 @@ export const AdminKeySchema = z.object({
   base64Signature: z.string(),
 });
 
+// TODO: Is there some kind of value in making locks generic? i.e.
+// Lock<Target> means the lock only can be locked on values with type=Target
+
 // RSA-PSS-based lock to prevent unauthorized usage of a resource.
 export interface PermissionLock {
   __typename: "PermLock";
@@ -38,10 +41,11 @@ export async function signValue<T>({
   privateKey: CryptoKey;
   value: T;
 }): Promise<T & { base64Signature: string }> {
+  const json = stringify(value);
   const signature = await window.crypto.subtle.sign(
     { name: "RSA-PSS", saltLength: 32 },
     privateKey,
-    new TextEncoder().encode(stringify(value)),
+    new TextEncoder().encode(json),
   );
 
   return {
@@ -59,11 +63,12 @@ export async function verifyValue({
   signature: string;
   value: unknown;
 }): Promise<boolean> {
+  const json = stringify(value);
   const valid = await window.crypto.subtle.verify(
     { name: "RSA-PSS", saltLength: 32 },
     publicKey,
     base64ToBytes(signature),
-    new TextEncoder().encode(stringify(value)),
+    new TextEncoder().encode(json),
   );
 
   return valid;
@@ -89,6 +94,7 @@ export class PermissionLockHelpers {
     lock: Required<PermissionLock>,
   ): Promise<PermissionKey> {
     const expirationDate = new Date();
+    expirationDate.setMilliseconds(0);
     expirationDate.setFullYear(new Date().getFullYear() + 1);
     const permKey = {
       __typename: "PermKey" as const,

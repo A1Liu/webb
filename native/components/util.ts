@@ -3,6 +3,7 @@ import { isNotNil } from "ramda";
 import { z } from "zod";
 import { toast } from "react-hot-toast";
 import { get, set, del } from "idb-keyval";
+import { timeout } from "@a1liu/webb-ui-shared/util";
 
 export const DefaultTimeFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "short",
@@ -111,9 +112,11 @@ export async function getFirstSuccess<T>(promises: Promise<T>[]): Promise<
   const firstSuccess = Promise.race(
     promises.map((p) => p.catch(() => neverResolve)),
   ).then((value) => ({ success: true as const, value }));
-  const allFailed = Promise.allSettled(promises).then(() => ({
-    success: false as const,
-  }));
+  const allFailed = Promise.allSettled(promises)
+    .then(() => timeout(10))
+    .then(() => ({
+      success: false as const,
+    }));
 
   return Promise.race([firstSuccess, allFailed]);
 }
