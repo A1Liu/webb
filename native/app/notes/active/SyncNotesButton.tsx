@@ -2,7 +2,7 @@
 
 import React from "react";
 import { buttonClass } from "@/components/TopbarLayout";
-import { useRequest } from "ahooks";
+import { useLockFn, useRequest } from "ahooks";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { z } from "zod";
 import toast from "react-hot-toast";
@@ -19,8 +19,15 @@ import {
   readNoteContents,
   writeNoteContents,
 } from "@/components/state/noteContents";
-import { PermissionKeySchema } from "@/components/crypto";
+import {
+  AdminKeySchema,
+  PermissionKeySchema,
+  signValue,
+  verifyValue,
+} from "@/components/crypto";
 import { useLocks } from "@/components/state/locks";
+import { useUserProfile } from "@/components/state/userProfile";
+import { useDeviceProfile } from "@/components/state/deviceProfile";
 
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
@@ -64,31 +71,55 @@ const NotePushListener = registerListener({
   channel: "NotePushListener",
   group: NotesSyncInitGroup,
   schema: z.object({
-    notes: NoteDataSchema.extend({
-      key: PermissionKeySchema.nullish(),
-    }).array(),
+    notes: NoteDataSchema.array(),
+    adminAuth: AdminKeySchema,
   }),
-  listener: async (peerId, { notes: inputNotes }) => {
-    // TODO: auth here
-    const { notes: prevNotes, cb } = useNotesState.getState();
+  listener: async (
+    peerId,
+    { notes, adminAuth: { base64Signature: adminSignature, ...adminAuth } },
+  ) => {
+    if (adminAuth.deviceId !== peerId) {
+      toast.error(`Received synchronization request with mismatched deviceId`);
+      return;
+    }
+
+    const now = new Date().getTime();
+    if (adminAuth.timestamp.getTime() > now) {
+      toast.error(`Received synchronization request with future auth`);
+      return;
+    }
+
+    const fifteenMinutes = 1000 * 60 * 15;
+    const stalenessThreshold = now - fifteenMinutes;
+    if (stalenessThreshold > adminAuth.timestamp.getTime()) {
+      toast.error(`Received synchronization request with outdated auth`);
+      return;
+    }
+
+    const userProfile = useUserProfile.getState().userProfile;
+    if (!userProfile) {
+      console.debug(`Device has no user, refusing to sync`);
+      return;
+    }
+
+    const adminAuthValid = await verifyValue({
+      publicKey: userProfile.publicAuthKey,
+      signature: adminSignature,
+      value: adminAuth,
+    });
+    if (!adminAuthValid) {
+      toast.error(
+        `Received synchronization request from unauthorized requester`,
+      );
+      return;
+    }
 
     console.debug(`received NotePush req`);
     toast.loading(`Syncing ... writing notes`, {
       id: SYNC_STATUS_TOAST_ID,
     });
 
-    const notes = [];
-    for (const note of inputNotes) {
-      const prevNote = prevNotes.get(note.id);
-
-      if (prevNote?.lockId) {
-        console.log("found Lock ID, big oof");
-      }
-
-      // TODO: DEADLOCK DEADLOCK DEADLOCK
-
-      notes.push(note);
-    }
+    const { cb } = useNotesState.getState();
 
     let written = 0;
 
@@ -96,9 +127,7 @@ const NotePushListener = registerListener({
     for (const note of contentsChanged) {
       toast.loading(
         `Syncing - updating notes (${++written}/${contentsChanged.length})`,
-        {
-          id: SYNC_STATUS_TOAST_ID,
-        },
+        { id: SYNC_STATUS_TOAST_ID },
       );
 
       const dataFetchResult = NoteDataFetch.call(peerId, {
@@ -129,7 +158,7 @@ const NoteListMetadata = registerRpc({
     note: NoteDataSchema,
     permissionKey: PermissionKeySchema.nullish(),
   }),
-  rpc: async function* (peerId, _input) {
+  rpc: async function* (peerId, {}) {
     console.debug(`received NoteListMetadata req`, peerId);
 
     const { notes } = useNotesState.getState();
@@ -148,9 +177,32 @@ export function SyncNotesButton() {
   const { peers } = usePeers();
   const { notes, cb } = useNotesState();
   const { isMobile } = usePlatform();
+  const { userProfile } = useUserProfile();
   const { runAsync, loading } = useRequest(
     async () => {
-      if (!peers) return;
+      if (!peers) {
+        toast.error(`No peers to synchronize with!`);
+        return;
+      }
+      const userSecret = userProfile?.secret;
+      if (!userSecret) {
+        toast.error(`No UserProfile to synchronize with!`);
+        return;
+      }
+
+      const deviceProfile = useDeviceProfile.getState().deviceProfile;
+      if (!deviceProfile) {
+        toast.error(`No Device ID to synchronize with!`);
+        return;
+      }
+
+      const adminAuth = await signValue({
+        privateKey: userSecret.privateAuthKey,
+        value: {
+          deviceId: deviceProfile.id,
+          timestamp: new Date(),
+        },
+      });
 
       console.debug("Sync starting...");
       toast.loading(`Syncing ... fetching notes`, {
@@ -159,19 +211,41 @@ export function SyncNotesButton() {
 
       const noteVersions = new Map<
         string,
-        (NoteData & { peerId?: string })[]
+        {
+          localVersion?: NoteData;
+          versions: (NoteData & { peerId?: string })[];
+        }
       >();
-      for (const note of notes.values()) {
-        noteVersions.set(note.id, [
-          { ...note, merges: undefined, peerId: undefined },
-        ]);
+      for (const { merges, ...note } of notes.values()) {
+        noteVersions.set(note.id, {
+          localVersion: note,
+          versions: [note],
+        });
       }
 
       let totalCount = 0;
       for (const peer of peers.values()) {
         const stream = NoteListMetadata.call(peer.id, {});
-        for await (const { note } of stream) {
-          const versions = getOrCompute(noteVersions, note.id, () => []);
+        for await (const { note, permissionKey } of stream) {
+          const { localVersion, versions } = getOrCompute(
+            noteVersions,
+            note.id,
+            () => ({ versions: [] }),
+          );
+          if (localVersion?.lockId) {
+            if (permissionKey?.lockId !== localVersion.lockId) {
+              continue; // missing cert, or wrong key
+            }
+            if (peer.id !== permissionKey.deviceId) {
+              continue; // Using a key not given to them
+            }
+
+            const verified = await useLocks
+              .getState()
+              .cb.verifyKey(permissionKey);
+            if (!verified) continue;
+          }
+
           versions.push({ ...note, merges: undefined, peerId: peer.id });
 
           toast.loading(`Syncing ... fetching notes (${++totalCount})`, {
@@ -181,8 +255,9 @@ export function SyncNotesButton() {
       }
 
       const notesToUpdate = [];
-      for (const [_noteId, versions] of noteVersions.entries()) {
+      for (const [_noteId, { versions }] of noteVersions.entries()) {
         const { ...maxSyncNote } = versions.reduce((maxNote, note) => {
+          // TODO: Figure out what to do with locks here
           if (maxNote.hash === note.hash) {
             if (!note.peerId) return note;
             return maxNote;
@@ -252,17 +327,11 @@ export function SyncNotesButton() {
         id: ACTIVE_SYNC_STATUS_TOAST_ID,
       });
 
-      const notesToSend = await Promise.all(
-        notesToUpdate.map(async ({ peerId, ...noteData }) => ({
-          ...noteData,
-          permissionKey: noteData.lockId
-            ? await useLocks.getState().cb.createKey(noteData.lockId)
-            : undefined,
-        })),
-      );
-
       for (const [peerId, _peer] of peers.entries()) {
-        await NotePushListener.send(peerId, { notes: notesToSend });
+        await NotePushListener.send(peerId, {
+          adminAuth,
+          notes: notesToUpdate.map(({ peerId, ...note }) => ({ ...note })),
+        });
       }
 
       toast.success(`Sync complete!`, {
@@ -272,14 +341,16 @@ export function SyncNotesButton() {
     { manual: true },
   );
 
+  const runSynchronization = useLockFn(runAsync);
+
   if (isMobile) return null;
 
   return (
     <button
       className={buttonClass}
-      disabled={!peers.size || loading}
+      disabled={!peers.size || !userProfile || loading}
       onClick={() => {
-        runAsync();
+        runSynchronization();
       }}
     >
       Sync

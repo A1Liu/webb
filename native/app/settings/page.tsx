@@ -245,6 +245,9 @@ export default function Settings() {
               );
             }}
             writeData={async (notes) => {
+              // TODO: Eventually, maybe locks should be included.
+              // Or it should be easier to lock and unlock things,
+              // and categorize them.
               notesCb.updateNotesFromSync(
                 notes.map(({ text, lockId, ...note }) => note),
               );

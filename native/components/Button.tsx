@@ -39,7 +39,7 @@ export function TapCounterButton({
   return (
     <button {...props} type={type as any} onClick={clickHandler}>
       {children}
-      <br />({counter} / {counterLimit})
+      <br />({counterLimit - counter} / {counterLimit})
     </button>
   );
 }

@@ -9,6 +9,7 @@ import { ZustandIdbStorage } from "../util";
 import { InitGroup } from "../constants";
 import { useShallow } from "zustand/react/shallow";
 import { useLocks } from "./locks";
+import isEqual from "lodash/isEqual";
 
 const NoteDataSchemaInternal = z.object({
   id: z.string(),
@@ -115,7 +116,23 @@ export const useNotesState = create<NoteGlobalState>()(
                 const prevNote = prev.notes.get(note.id);
                 if (!prevNote) return true;
 
-                if (prevNote.hash !== note.hash) return true;
+                // We don't want merges because that's just noise.
+                // We ALSO don't want lastSyncDate, because that updates
+                // on every sync. Last sync hash is pretty likely to not have
+                // changed since last time though. Unless there's new content
+                // which is a true positive anyways.
+                const {
+                  merges: _a,
+                  lastSyncDate: _b,
+                  ...prevNoteData
+                } = prevNote;
+                const { merges: _w, lastSyncDate: _x, ...newNoteData } = note;
+
+                // NOTE: Technically, we might be able to get away with
+                // only updating when the `hash` field changes. However,
+                // we'd need to fix any inconsistencies caused by mismatches
+                // between the content store and the metadata store.
+                if (isEqual(prevNoteData, newNoteData)) return true;
 
                 return false;
               }),

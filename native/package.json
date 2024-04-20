@@ -26,6 +26,7 @@
     "fast-json-stable-stringify": "^2.1.0",
     "idb-keyval": "^6.2.1",
     "launchdarkly-js-client-sdk": "^3.1.4",
+    "lodash": "^4.17.21",
     "md5": "^2.3.0",
     "monaco-editor": "^0.44.0",
     "next": "14.0.3",
@@ -44,6 +45,7 @@
     "zustand": "^4.4.6"
   },
   "devDependencies": {
+    "@types/lodash": "^4.17.0",
     "@types/md5": "^2.3.5",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.5",

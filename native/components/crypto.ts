@@ -2,6 +2,13 @@ import stringify from "fast-json-stable-stringify";
 import { v4 as uuid } from "uuid";
 import { z } from "zod";
 
+export type AdminKey = z.infer<typeof AdminKeySchema>;
+export const AdminKeySchema = z.object({
+  deviceId: z.string(),
+  timestamp: z.coerce.date(),
+  base64Signature: z.string(),
+});
+
 // RSA-PSS-based lock to prevent unauthorized usage of a resource.
 export interface PermissionLock {
   __typename: "PermLock";
@@ -24,18 +31,55 @@ export const PermissionKeySchema = z.object({
   base64Signature: z.string(),
 });
 
+export async function signValue<T>({
+  privateKey,
+  value,
+}: {
+  privateKey: CryptoKey;
+  value: T;
+}): Promise<T & { base64Signature: string }> {
+  const signature = await window.crypto.subtle.sign(
+    { name: "RSA-PSS", saltLength: 32 },
+    privateKey,
+    new TextEncoder().encode(stringify(value)),
+  );
+
+  return {
+    ...value,
+    base64Signature: bytesToBase64(signature),
+  };
+}
+
+export async function verifyValue({
+  publicKey,
+  signature,
+  value,
+}: {
+  publicKey: CryptoKey;
+  signature: string;
+  value: unknown;
+}): Promise<boolean> {
+  const valid = await window.crypto.subtle.verify(
+    { name: "RSA-PSS", saltLength: 32 },
+    publicKey,
+    base64ToBytes(signature),
+    new TextEncoder().encode(stringify(value)),
+  );
+
+  return valid;
+}
+
 export class PermissionLockHelpers {
   static async unlock(
     lock: PermissionLock,
     key: PermissionKey,
   ): Promise<boolean> {
     const { base64Signature, ...permKeyData } = key;
-    const valid = await window.crypto.subtle.verify(
-      { name: "RSA-PSS", saltLength: 32 },
-      lock.publicKey,
-      base64ToBytes(base64Signature),
-      new TextEncoder().encode(stringify(permKeyData)),
-    );
+    const valid = await verifyValue({
+      publicKey: lock.publicKey,
+      signature: base64Signature,
+      value: permKeyData,
+    });
 
     return valid;
   }
@@ -46,24 +90,20 @@ export class PermissionLockHelpers {
   ): Promise<PermissionKey> {
     const expirationDate = new Date();
     expirationDate.setFullYear(new Date().getFullYear() + 1);
-    const permKey: Omit<PermissionKey, "base64Signature"> = {
-      __typename: "PermKey",
+    const permKey = {
+      __typename: "PermKey" as const,
       lockId: lock.id,
       keyId: uuid(),
       deviceId,
       expirationDate,
     };
 
-    const signature = await window.crypto.subtle.sign(
-      { name: "RSA-PSS", saltLength: 32 },
-      lock.secret.privateKey,
-      new TextEncoder().encode(stringify(permKey)),
-    );
+    const key = await signValue({
+      privateKey: lock.secret.privateKey,
+      value: permKey,
+    });
 
-    return {
-      ...permKey,
-      base64Signature: bytesToBase64(signature),
-    };
+    return key;
   }
 
   static async hashLockId(key: CryptoKey): Promise<string> {

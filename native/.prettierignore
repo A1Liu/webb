@@ -26,3 +26,4 @@ yarn.lock
 /components/handlers.ts
 
 gen/**/*.json
+gen/**/*.yml
