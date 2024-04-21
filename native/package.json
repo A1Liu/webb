@@ -11,8 +11,9 @@
     "start:web": "next start",
     "format": "prettier --write .",
     "lint:web": "next lint",
-    "bundle:desktop": "CI=true pnpm tauri build && rm -f desktop.zip && zip desktop.zip -j target/aarch64-apple-darwin/release/bundle/dmg/webb_0.1.0_aarch64.dmg && open .",
-    "bundle:ios": "CI=true pnpm tauri ios build && rm -f ios.zip && zip ios.zip -j gen/apple/build/arm64/webb.ipa && open .",
+    "bundle": "pnpm run bundle:desktop && pnpm run bundle:ios",
+    "bundle:desktop": "CI=true pnpm tauri build && rm -f desktop.zip && zip desktop.zip -j target/aarch64-apple-darwin/release/bundle/dmg/webb_0.1.0_aarch64.dmg",
+    "bundle:ios": "CI=true pnpm tauri ios build && rm -f ios.zip && zip ios.zip -j gen/apple/build/arm64/webb.ipa",
     "ts-check": "tsc"
   },
   "dependencies": {
