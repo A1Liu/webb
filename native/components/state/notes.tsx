@@ -132,7 +132,7 @@ export const useNotesState = create<NoteGlobalState>()(
                 // only updating when the `hash` field changes. However,
                 // we'd need to fix any inconsistencies caused by mismatches
                 // between the content store and the metadata store.
-                if (isEqual(prevNoteData, newNoteData)) return true;
+                if (!isEqual(prevNoteData, newNoteData)) return true;
 
                 return false;
               }),

@@ -9,6 +9,7 @@ export const dynamic = "force-static";
 
 export default function Notes() {
   const { id, preview } = useActiveNote();
+
   return (
     <TopbarLayout
       title={preview}
