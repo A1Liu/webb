@@ -41,12 +41,12 @@ export interface UnwrappedPromise<T> {
 export class Future<T> {
   readonly promise: Promise<T>;
   readonly resolve: (t: T) => unknown;
-  readonly reject: (err: Error) => unknown;
+  readonly reject: (err: unknown) => unknown;
   private _valueSlot: T | undefined;
 
   constructor() {
     let resolve: (t: T) => unknown = () => {};
-    let reject: (err: Error) => unknown = () => {};
+    let reject: (err: unknown) => unknown = () => {};
     const promise = new Promise<T>((res, rej) => {
       resolve = res;
       reject = rej;
@@ -57,6 +57,19 @@ export class Future<T> {
     this.promise = promise;
     this.resolve = resolve;
     this.reject = reject;
+  }
+
+  static unwrapPromise<K>(promise: Promise<K>): UnwrappedPromise<K> {
+    let _valueSlot: K | undefined = undefined;
+    promise.then((k) => {
+      _valueSlot = k;
+    });
+    return {
+      promise,
+      get value(): K | undefined {
+        return _valueSlot;
+      },
+    };
   }
 
   get value(): T | undefined {

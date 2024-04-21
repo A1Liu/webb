@@ -54,6 +54,7 @@ export async function writeNoteContents(noteId: string, text: string) {
   };
   await set(`webb-note-contents-${noteId}`, value);
 }
+
 export async function readNoteContents(
   noteId: string,
 ): Promise<string | undefined> {

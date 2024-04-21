@@ -3,7 +3,8 @@ import { isNotNil } from "ramda";
 import { z } from "zod";
 import { toast } from "react-hot-toast";
 import { get, set, del } from "idb-keyval";
-import { timeout } from "@a1liu/webb-ui-shared/util";
+import { Future, getOrCompute, timeout } from "@a1liu/webb-ui-shared/util";
+import { debounce } from "lodash";
 
 export const DefaultTimeFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "short",
@@ -85,20 +86,67 @@ export function zustandJsonReplacer(
   return value;
 }
 
-export const ZustandIdbStorage: PersistStorage<unknown> = {
-  getItem: async (name: string): Promise<StorageValue<unknown> | null> => {
-    return (await get(name)) ?? null;
-  },
-  setItem: async (
-    name: string,
-    value: StorageValue<unknown>,
-  ): Promise<void> => {
-    await set(name, value);
-  },
-  removeItem: async (name: string): Promise<void> => {
-    await del(name);
-  },
-};
+// operations should be linearized
+// set operations and remove operations should be debounced
+class IdbStorage implements PersistStorage<unknown> {
+  private readonly mutexes = new Map<string, Mutex>();
+  private readonly debouncers = new Map<
+    string,
+    (r: () => Promise<void>) => Promise<void> | undefined
+  >();
+
+  mutex(name: string) {
+    return getOrCompute(this.mutexes, name, () => new Mutex());
+  }
+
+  debouncer(name: string) {
+    const debouncer = getOrCompute(this.debouncers, name, () => {
+      return debounce(
+        (r: () => Promise<void>) => {
+          return r();
+        },
+        333,
+        {
+          trailing: true,
+          maxWait: 10_000,
+        },
+      );
+    });
+    return {
+      async debounce(r: () => Promise<void>) {
+        await debouncer(r);
+      },
+    };
+  }
+
+  async getItem(name: string): Promise<StorageValue<unknown> | null> {
+    return this.mutex(name).run(async () => {
+      const value = (await get(name)) ?? null;
+      console.log(`Read ${name}`);
+      return value;
+    });
+  }
+
+  async setItem(name: string, value: StorageValue<unknown>): Promise<void> {
+    await this.debouncer(name).debounce(() => {
+      return this.mutex(name).run(async () => {
+        await set(name, value);
+        console.log(`Wrote ${name}`);
+      });
+    });
+  }
+
+  async removeItem(name: string): Promise<void> {
+    await this.debouncer(name).debounce(() => {
+      return this.mutex(name).run(async () => {
+        await del(name);
+        console.log(`Deleted ${name}`);
+      });
+    });
+  }
+}
+
+export const ZustandIdbStorage: PersistStorage<unknown> = new IdbStorage();
 
 export async function getFirstSuccess<T>(promises: Promise<T>[]): Promise<
   | {
@@ -119,4 +167,42 @@ export async function getFirstSuccess<T>(promises: Promise<T>[]): Promise<
     }));
 
   return Promise.race([firstSuccess, allFailed]);
+}
+
+class Mutex {
+  private isRunning = false;
+  private readonly listeners: (() => unknown)[] = [];
+
+  async run<T>(run: () => Promise<T>): Promise<T> {
+    const this_ = this;
+
+    const fut = new Future<T>();
+
+    async function mutexRunner() {
+      try {
+        const returnValue = await run();
+        fut.resolve(returnValue);
+      } catch (error) {
+        fut.reject(error);
+        toast.error(`Error in storage ${String(error)}`);
+        console.error(`Error in storage`, error);
+      } finally {
+        const nextListener = this_.listeners.shift();
+        if (!nextListener) {
+          this_.isRunning = false;
+          return;
+        }
+
+        nextListener();
+      }
+    }
+    if (!this_.isRunning) {
+      this_.isRunning = true;
+      mutexRunner();
+    } else {
+      this_.listeners.push(mutexRunner);
+    }
+
+    return fut.promise;
+  }
 }
