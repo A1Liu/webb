@@ -2,19 +2,18 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useShallow } from "zustand/react/shallow";
 import { v4 as uuid } from "uuid";
 import { z } from "zod";
 import md5 from "md5";
-import { ZustandIdbStorage } from "../util";
-import { InitGroup } from "../constants";
-import { useShallow } from "zustand/react/shallow";
-import { useLocks } from "./locks";
 import isEqual from "lodash/isEqual";
+import { InitGroup } from "../constants";
+import { useLocks } from "./locks";
+import { ZustandIdbStorage } from "../util";
 
 const NoteDataSchemaInternal = z.object({
   id: z.string(),
   preview: z.string(),
-  hash: z.string(),
   lockId: z.string().nullish(),
   isTombstone: z.boolean().optional(),
   lastUpdateDate: z.coerce.date(),
@@ -49,7 +48,6 @@ function createEmptyNote(id: string): NoteData {
   const lock = useLocks.getState().cb.getLock();
   return {
     id,
-    hash: md5(""),
     lockId: lock?.id,
     preview: "",
     lastUpdateDate: ZERO_TIME,
@@ -156,8 +154,9 @@ export const useNotesState = create<NoteGlobalState>()(
               if (prev.activeNote === id) {
                 return prev;
               }
+
               const prevActive = prev.notes.get(prev.activeNote ?? "");
-              if (prevActive && prevActive.hash === md5("")) {
+              if (prevActive && prevActive.preview === "") {
                 const notes = new Map(prev.notes);
                 notes.set(prevActive.id, {
                   ...prevActive,

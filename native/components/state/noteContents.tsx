@@ -6,6 +6,40 @@ import { z } from "zod";
 import { ZustandIdbStorage } from "../util";
 import { createContext, useContext, useEffect } from "react";
 import { useCreation } from "ahooks";
+import { GlobalInitGroup } from "../constants";
+import { debounce } from "lodash";
+import md5 from "md5";
+
+export const EMPTY_HASH = md5("");
+
+export const useNoteHashStore = createStore<{
+  hashes: Map<string, string>;
+  setHash: (noteId: string, hash: string) => void;
+}>()(
+  persist(
+    (set) => {
+      return {
+        hashes: new Map(),
+        setHash: (noteId, hash) => {
+          set(({ hashes }) => {
+            const newHashes = new Map(hashes);
+            newHashes.set(noteId, hash);
+
+            return {
+              hashes: newHashes,
+            };
+          });
+        },
+      };
+    },
+    {
+      name: "webb-note-hashes",
+      storage: ZustandIdbStorage,
+      skipHydration: true,
+      partialize: ({ setHash, ...rest }) => ({ ...rest }),
+    },
+  ),
+);
 
 export type NoteContents = z.infer<typeof NoteContentsSchema>;
 export const NoteContentsSchema = z.object({
@@ -33,7 +67,7 @@ function getIdbKey(noteId: string) {
 
 export async function deleteNoteContents(noteId: string) {
   if (runningEditor.current?.getState().noteId === noteId) {
-    runningEditor.current.setState({ text: "" });
+    runningEditor.current.getState().cb.updateText("");
     runningEditor.current.persist.clearStorage();
     return;
   }
@@ -43,7 +77,7 @@ export async function deleteNoteContents(noteId: string) {
 
 export async function writeNoteContents(noteId: string, text: string) {
   if (runningEditor.current?.getState().noteId === noteId) {
-    runningEditor.current.setState({ text });
+    runningEditor.current.getState().cb.updateText(text);
     return;
   }
 
@@ -57,6 +91,7 @@ export async function writeNoteContents(noteId: string, text: string) {
   };
 
   await ZustandIdbStorage.setItem(getIdbKey(noteId), value);
+  useNoteHashStore.getState().setHash(noteId, md5(text));
 }
 
 export async function readNoteContents(
@@ -70,6 +105,16 @@ export async function readNoteContents(
 }
 
 function createNoteContentStore(noteId: string) {
+  const { setHash } = useNoteHashStore.getState();
+  const updateHash = debounce(
+    (text: string) => {
+      const hash = md5(text);
+      setHash(noteId, hash);
+    },
+    500,
+    { trailing: true },
+  );
+
   return createStore<NoteContentState>()(
     persist(
       (set) => ({
@@ -79,6 +124,7 @@ function createNoteContentStore(noteId: string) {
         cb: {
           updateText: (text) => {
             set({ text });
+            updateHash(text);
           },
         },
       }),
@@ -88,6 +134,13 @@ function createNoteContentStore(noteId: string) {
         version: VERSION,
         skipHydration: true,
         partialize: ({ cb, ...rest }) => ({ ...rest }),
+        onRehydrateStorage: (_prevState) => {
+          return (newState) => {
+            if (newState) {
+              updateHash(newState.text);
+            }
+          };
+        },
       },
     ),
   );
@@ -140,3 +193,11 @@ export function useNoteContents<T>(
 
   return useStore(noteContentContext, selector);
 }
+
+GlobalInitGroup.registerValue({
+  field: "noteHashes",
+  eagerInit: true,
+  create: () => {
+    useNoteHashStore.persist.rehydrate();
+  },
+});

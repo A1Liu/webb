@@ -2,8 +2,7 @@
 
 import React from "react";
 import { useNoteMetadata, useNotesState } from "@/components/state/notes";
-import md5 from "md5";
-import { useDebounceFn, useLockFn, useRequest } from "ahooks";
+import { useLockFn, useRequest } from "ahooks";
 import {
   NoteContentStoreProvider,
   useNoteContents,
@@ -51,19 +50,6 @@ function NoteContentEditor() {
   const noteId = useNoteContents((s) => s.noteId);
   const { updateText } = useNoteContents((s) => s.cb);
   const cb = useNotesState((s) => s.cb);
-  const { run: updateNoteHash } = useDebounceFn(
-    (text: string) => {
-      const hash = md5(text);
-      cb.updateNote(noteId, (prev) => ({
-        ...prev,
-        hash,
-      }));
-    },
-    {
-      wait: 500,
-      trailing: true,
-    },
-  );
 
   return (
     <textarea
@@ -81,7 +67,6 @@ function NoteContentEditor() {
           }),
           true,
         );
-        updateNoteHash(text);
       }}
     />
   );
