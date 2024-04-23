@@ -12,7 +12,6 @@ import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import Link from "next/link";
 import { DeviceQr, ScanAndConnectButton } from "@/components/DeviceQrCode";
 import { useUserProfile } from "@/components/state/userProfile";
-import { useDeviceProfile } from "@/components/state/deviceProfile";
 import {
   readNoteContents,
   writeNoteContents,
@@ -28,6 +27,7 @@ import {
 import { useLocks } from "@/components/state/locks";
 import { useRouter } from "next/navigation";
 import { TapCounterButton } from "@/components/Button";
+import { clear } from "idb-keyval";
 
 export const dynamic = "force-static";
 
@@ -194,11 +194,8 @@ export default function Settings() {
   const router = useRouter();
 
   const hardReset = useMemoizedFn(async () => {
-    usePeers.persist.clearStorage();
-    useNotesState.persist.clearStorage();
-    useUserProfile.persist.clearStorage();
-    useDeviceProfile.persist.clearStorage();
-    useLocks.persist.clearStorage();
+    await clear();
+
     window.location.reload();
   });
 

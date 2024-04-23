@@ -137,11 +137,9 @@ class IdbStorage implements PersistStorage<unknown> {
   }
 
   async removeItem(name: string): Promise<void> {
-    await this.debouncer(name).debounce(() => {
-      return this.mutex(name).run(async () => {
-        await del(name);
-        console.log(`Deleted ${name}`);
-      });
+    return this.mutex(name).run(async () => {
+      await del(name);
+      console.log(`Deleted ${name}`);
     });
   }
 }

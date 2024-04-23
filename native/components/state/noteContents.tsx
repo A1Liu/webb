@@ -5,7 +5,6 @@ import { persist, StorageValue } from "zustand/middleware";
 import { z } from "zod";
 import { ZustandIdbStorage } from "../util";
 import { createContext, useContext, useEffect } from "react";
-import { del, get, set } from "idb-keyval";
 import { useCreation } from "ahooks";
 
 export type NoteContents = z.infer<typeof NoteContentsSchema>;
@@ -28,6 +27,10 @@ const runningEditor: {
 
 const VERSION = 0;
 
+function getIdbKey(noteId: string) {
+  return `webb-note-contents-${noteId}`;
+}
+
 export async function deleteNoteContents(noteId: string) {
   if (runningEditor.current?.getState().noteId === noteId) {
     runningEditor.current.setState({ text: "" });
@@ -35,7 +38,7 @@ export async function deleteNoteContents(noteId: string) {
     return;
   }
 
-  await del(`webb-note-contents-${noteId}`);
+  await ZustandIdbStorage.removeItem(getIdbKey(noteId));
 }
 
 export async function writeNoteContents(noteId: string, text: string) {
@@ -52,16 +55,18 @@ export async function writeNoteContents(noteId: string, text: string) {
     },
     version: VERSION,
   };
-  await set(`webb-note-contents-${noteId}`, value);
+
+  await ZustandIdbStorage.setItem(getIdbKey(noteId), value);
 }
 
 export async function readNoteContents(
   noteId: string,
 ): Promise<string | undefined> {
-  const value = await get<StorageValue<NoteContents>>(
-    `webb-note-contents-${noteId}`,
-  );
-  return value?.state.text;
+  const output = await ZustandIdbStorage.getItem(getIdbKey(noteId));
+
+  const state = output?.state as NoteContents;
+
+  return state.text;
 }
 
 function createNoteContentStore(noteId: string) {
@@ -78,7 +83,7 @@ function createNoteContentStore(noteId: string) {
         },
       }),
       {
-        name: `webb-note-contents-${noteId}`,
+        name: getIdbKey(noteId),
         storage: ZustandIdbStorage,
         version: VERSION,
         skipHydration: true,
