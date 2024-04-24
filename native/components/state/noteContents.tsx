@@ -9,6 +9,7 @@ import { useCreation } from "ahooks";
 import { GlobalInitGroup } from "../constants";
 import { debounce } from "lodash";
 import md5 from "md5";
+import toast from "react-hot-toast";
 
 export const EMPTY_HASH = md5("");
 
@@ -77,6 +78,7 @@ export async function deleteNoteContents(noteId: string) {
 
 export async function writeNoteContents(noteId: string, text: string) {
   if (runningEditor.current?.getState().noteId === noteId) {
+    toast(`writing to current contents`);
     runningEditor.current.getState().cb.updateText(text);
     return;
   }
@@ -98,8 +100,11 @@ export async function readNoteContents(
   noteId: string,
 ): Promise<string | undefined> {
   const output = await ZustandIdbStorage.getItem(getIdbKey(noteId));
+  if (!output) {
+    return undefined;
+  }
 
-  const state = output?.state as NoteContents;
+  const state = output.state as NoteContents;
 
   return state.text;
 }

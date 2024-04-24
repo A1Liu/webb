@@ -64,7 +64,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
             });
           } catch (error) {
             console.error(`Failed during RPC: ${field}`, error);
-            toast.error(`Failed during RPC: ${field}`);
+            toast.error(`Failed during RPC: ${field} ${error}`);
           }
         }
       }

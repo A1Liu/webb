@@ -50,7 +50,9 @@ export const NoteDataFetch = registerRpc({
   rpc: async function* (peerId, { noteId, permissionKey }) {
     console.debug(`received NoteDataFetch req`, peerId);
 
-    const noteMetadata = useNotesState.getState().notes.get(noteId);
+    const { cb: locksCb } = useLocks.getState();
+    const { notes } = useNotesState.getState();
+    const noteMetadata = notes.get(noteId);
     if (!noteMetadata) return;
 
     if (noteMetadata.lockId) {
@@ -61,7 +63,7 @@ export const NoteDataFetch = registerRpc({
         return; // Using a key not given to them
       }
 
-      const verified = await useLocks.getState().cb.verifyKey(permissionKey);
+      const verified = await locksCb.verifyKey(permissionKey);
       if (!verified) return;
 
       // OK we're verififed
@@ -138,7 +140,8 @@ const NotePushListener = registerListener({
         id: SYNC_STATUS_TOAST_ID,
       });
 
-      if (hashes.get(note.id) === hash) {
+      const prevHash = hashes.get(note.id);
+      if (prevHash === hash) {
         continue;
       }
 
@@ -188,190 +191,193 @@ const NoteListMetadata = registerRpc({
   },
 });
 
+async function requestLock() {
+  const { peers } = usePeers.getState();
+  if (!peers) {
+    toast.error(`No peers to synchronize with!`);
+    return;
+  }
+
+  const { userProfile } = useUserProfile.getState();
+  const userSecret = userProfile?.secret;
+  if (!userSecret) {
+    toast.error(`No UserProfile to synchronize with!`);
+    return;
+  }
+
+  const { deviceProfile } = useDeviceProfile.getState();
+  if (!deviceProfile) {
+    toast.error(`No Device ID to synchronize with!`);
+    return;
+  }
+
+  const timestamp = new Date();
+  timestamp.setMilliseconds(0);
+  const adminAuth = await signValue({
+    privateKey: userSecret.privateAuthKey,
+    value: {
+      deviceId: deviceProfile.id,
+      timestamp,
+    },
+  });
+
+  console.debug("Sync starting...");
+  toast.loading(`Syncing ... fetching notes`, {
+    id: ACTIVE_SYNC_STATUS_TOAST_ID,
+  });
+
+  const { hashes } = useNoteHashStore.getState();
+  const { notes, cb } = useNotesState.getState();
+
+  const noteVersions = new Map<
+    string,
+    {
+      localVersion?: NoteData;
+      versions: { peerId?: string; note: NoteData; hash: string }[];
+    }
+  >();
+  for (const { merges, ...note } of notes.values()) {
+    noteVersions.set(note.id, {
+      localVersion: note,
+      versions: [{ note, hash: hashes.get(note.id) ?? EMPTY_HASH }],
+    });
+  }
+
+  const { cb: locksCb } = useLocks.getState();
+
+  let totalCount = 0;
+  for (const peer of peers.values()) {
+    const stream = NoteListMetadata.call(peer.id, {});
+    for await (const { hash, note, permissionKey } of stream) {
+      const { localVersion, versions } = getOrCompute(
+        noteVersions,
+        note.id,
+        () => ({ versions: [] }),
+      );
+      if (localVersion?.lockId) {
+        if (permissionKey?.lockId !== localVersion.lockId) {
+          continue; // missing cert, or wrong key
+        }
+        if (peer.id !== permissionKey.deviceId) {
+          continue; // Using a key not given to them
+        }
+
+        const verified = await locksCb.verifyKey(permissionKey);
+        if (!verified) continue;
+      }
+
+      versions.push({
+        peerId: peer.id,
+        hash,
+        note: { ...note, merges: undefined },
+      });
+
+      toast.loading(`Syncing ... fetching notes (${++totalCount})`, {
+        id: ACTIVE_SYNC_STATUS_TOAST_ID,
+      });
+    }
+  }
+
+  const notesToUpdate = [];
+  for (const [_noteId, { versions }] of noteVersions.entries()) {
+    const {
+      note: maxSyncNote,
+      hash: maxHash,
+      peerId,
+    } = versions.reduce((maxNoteInfo, noteInfo) => {
+      // TODO: Figure out what to do with locks here
+      if (maxNoteInfo.hash === noteInfo.hash) {
+        if (!noteInfo.peerId) return noteInfo;
+        return maxNoteInfo;
+      }
+
+      const { note: maxNote } = maxNoteInfo;
+      const { note: note } = noteInfo;
+
+      if (noteInfo.hash === maxNote.lastSyncHash) return maxNoteInfo;
+      if (maxNoteInfo.hash === note.lastSyncHash) return noteInfo;
+
+      if (note.lastSyncDate > maxNote.lastSyncDate) return noteInfo;
+      if (note.lastSyncDate < maxNote.lastSyncDate) return maxNoteInfo;
+
+      // TODO: figure out why the timestamps are getting... rounded?
+      // truncated? something is up with the timestamp math.
+      if (note.lastUpdateDate > maxNote.lastUpdateDate) return noteInfo;
+      if (note.lastUpdateDate < maxNote.lastUpdateDate) return maxNoteInfo;
+
+      return maxNoteInfo;
+    });
+
+    const relevantVersions = versions.filter((version) => {
+      if (version.hash === maxHash) return false;
+      if (version.hash === maxSyncNote.lastSyncHash) return false;
+
+      return true;
+    });
+
+    let merges: NoteData["merges"] = undefined;
+    if (relevantVersions.length > 0) {
+      merges = relevantVersions.map(({ note }) => note);
+    }
+
+    if (!merges) {
+      maxSyncNote.lastSyncHash = maxHash;
+      maxSyncNote.lastSyncDate = new Date();
+    }
+
+    notesToUpdate.push({
+      peerId,
+      hash: maxHash,
+      note: { ...maxSyncNote },
+      merges,
+    });
+  }
+  cb.updateNotesFromSync(notesToUpdate.map(({ note }) => note));
+
+  for (const { peerId, note } of notesToUpdate) {
+    if (!peerId) {
+      // it's our own note version
+      continue;
+    }
+
+    const result = NoteDataFetch.call(peerId, {
+      noteId: note.id,
+      permissionKey: note.lockId
+        ? await locksCb.createKey(note.lockId)
+        : undefined,
+    });
+
+    for await (const item of result) {
+      const { noteId, text } = item;
+      await writeNoteContents(noteId, text);
+    }
+  }
+
+  console.debug(`Finalized ${notesToUpdate.length} notes`);
+  toast.loading(`Syncing ... resolved ${notesToUpdate.length} notes`, {
+    id: ACTIVE_SYNC_STATUS_TOAST_ID,
+  });
+
+  for (const [peerId, _peer] of peers.entries()) {
+    await NotePushListener.send(peerId, {
+      adminAuth,
+      notes: notesToUpdate.map(({ hash, note }) => ({
+        note,
+        hash,
+      })),
+    });
+  }
+
+  toast.success(`Sync complete!`, {
+    id: ACTIVE_SYNC_STATUS_TOAST_ID,
+  });
+}
+
 export function SyncNotesButton() {
   const { peers } = usePeers();
-  const { notes, cb } = useNotesState();
   const { isMobile } = usePlatform();
   const { userProfile } = useUserProfile();
-  const { runAsync, loading } = useRequest(
-    async () => {
-      if (!peers) {
-        toast.error(`No peers to synchronize with!`);
-        return;
-      }
-      const userSecret = userProfile?.secret;
-      if (!userSecret) {
-        toast.error(`No UserProfile to synchronize with!`);
-        return;
-      }
-
-      const deviceProfile = useDeviceProfile.getState().deviceProfile;
-      if (!deviceProfile) {
-        toast.error(`No Device ID to synchronize with!`);
-        return;
-      }
-
-      const timestamp = new Date();
-      timestamp.setMilliseconds(0);
-      const adminAuth = await signValue({
-        privateKey: userSecret.privateAuthKey,
-        value: {
-          deviceId: deviceProfile.id,
-          timestamp,
-        },
-      });
-
-      console.debug("Sync starting...");
-      toast.loading(`Syncing ... fetching notes`, {
-        id: ACTIVE_SYNC_STATUS_TOAST_ID,
-      });
-
-      const { hashes } = useNoteHashStore.getState();
-
-      const noteVersions = new Map<
-        string,
-        {
-          localVersion?: NoteData;
-          versions: { peerId?: string; note: NoteData; hash: string }[];
-        }
-      >();
-      for (const { merges, ...note } of notes.values()) {
-        noteVersions.set(note.id, {
-          localVersion: note,
-          versions: [{ note, hash: hashes.get(note.id) ?? EMPTY_HASH }],
-        });
-      }
-
-      const { cb: locksCb } = useLocks.getState();
-
-      let totalCount = 0;
-      for (const peer of peers.values()) {
-        const stream = NoteListMetadata.call(peer.id, {});
-        for await (const { hash, note, permissionKey } of stream) {
-          const { localVersion, versions } = getOrCompute(
-            noteVersions,
-            note.id,
-            () => ({ versions: [] }),
-          );
-          if (localVersion?.lockId) {
-            if (permissionKey?.lockId !== localVersion.lockId) {
-              continue; // missing cert, or wrong key
-            }
-            if (peer.id !== permissionKey.deviceId) {
-              continue; // Using a key not given to them
-            }
-
-            const verified = await locksCb.verifyKey(permissionKey);
-            if (!verified) continue;
-          }
-
-          versions.push({
-            peerId: peer.id,
-            hash,
-            note: { ...note, merges: undefined },
-          });
-
-          toast.loading(`Syncing ... fetching notes (${++totalCount})`, {
-            id: ACTIVE_SYNC_STATUS_TOAST_ID,
-          });
-        }
-      }
-
-      const notesToUpdate = [];
-      for (const [_noteId, { versions }] of noteVersions.entries()) {
-        const {
-          note: maxSyncNote,
-          hash: maxHash,
-          peerId,
-        } = versions.reduce((maxNoteInfo, noteInfo) => {
-          // TODO: Figure out what to do with locks here
-          if (maxNoteInfo.hash === noteInfo.hash) {
-            if (!noteInfo.peerId) return noteInfo;
-            return maxNoteInfo;
-          }
-
-          const { note: maxNote } = maxNoteInfo;
-          const { note: note } = noteInfo;
-
-          if (noteInfo.hash === maxNote.lastSyncHash) return maxNoteInfo;
-          if (maxNoteInfo.hash === note.lastSyncHash) return noteInfo;
-
-          if (note.lastSyncDate > maxNote.lastSyncDate) return noteInfo;
-          if (note.lastSyncDate < maxNote.lastSyncDate) return maxNoteInfo;
-
-          // TODO: figure out why the timestamps are getting... rounded?
-          // truncated? something is up with the timestamp math.
-          if (note.lastUpdateDate > maxNote.lastUpdateDate) return noteInfo;
-          if (note.lastUpdateDate < maxNote.lastUpdateDate) return maxNoteInfo;
-
-          return maxNoteInfo;
-        });
-
-        const relevantVersions = versions.filter((version) => {
-          if (version.hash === maxHash) return false;
-          if (version.hash === maxSyncNote.lastSyncHash) return false;
-
-          return true;
-        });
-
-        let merges: NoteData["merges"] = undefined;
-        if (relevantVersions.length > 0) {
-          merges = relevantVersions.map(({ note }) => note);
-        }
-
-        if (!merges) {
-          maxSyncNote.lastSyncHash = maxHash;
-          maxSyncNote.lastSyncDate = new Date();
-        }
-
-        notesToUpdate.push({
-          peerId,
-          note: { ...maxSyncNote },
-          merges,
-        });
-      }
-      cb.updateNotesFromSync(notesToUpdate.map(({ note }) => note));
-
-      for (const { peerId, note } of notesToUpdate) {
-        if (!peerId) {
-          // it's our own note version
-          continue;
-        }
-
-        const result = NoteDataFetch.call(peerId, {
-          noteId: note.id,
-          permissionKey: note.lockId
-            ? await locksCb.createKey(note.lockId)
-            : undefined,
-        });
-
-        for await (const item of result) {
-          const { noteId, text } = item;
-          await writeNoteContents(noteId, text);
-        }
-      }
-
-      console.debug(`Finalized ${notesToUpdate.length} notes`);
-      toast.loading(`Syncing ... resolved ${notesToUpdate.length} notes`, {
-        id: ACTIVE_SYNC_STATUS_TOAST_ID,
-      });
-
-      for (const [peerId, _peer] of peers.entries()) {
-        await NotePushListener.send(peerId, {
-          adminAuth,
-          notes: notesToUpdate.map(({ note }) => ({
-            note,
-            hash: "",
-          })),
-        });
-      }
-
-      toast.success(`Sync complete!`, {
-        id: ACTIVE_SYNC_STATUS_TOAST_ID,
-      });
-    },
-    { manual: true },
-  );
+  const { runAsync, loading } = useRequest(requestLock, { manual: true });
 
   const runSynchronization = useLockFn(runAsync);
 

@@ -22,7 +22,7 @@ import { isEqual } from "lodash";
 
 interface LockStoreState {
   keyCache: Map<string, { key: PermissionKey; pass: boolean }>;
-  thisDeviceKeyCacheRunning: Map<string, Promise<PermissionKey>>;
+  keyCacheRunning: Map<string, Promise<PermissionKey>>;
   locks: Map<string, PermissionLock>;
   cb: {
     getLock: () => PermissionLock | undefined;
@@ -55,7 +55,7 @@ export const useLocks = create<LockStoreState>()(
       return {
         keyCache: new Map(),
         locks: new Map(),
-        thisDeviceKeyCacheRunning: new Map(),
+        keyCacheRunning: new Map(),
         cb: {
           getLock: () => {
             for (const lock of get().locks.values()) {
@@ -140,7 +140,10 @@ export const useLocks = create<LockStoreState>()(
 
             // TODO: verify key validity
 
-            keyCache.set(keyCacheKey, { key, pass: true });
+            const newKeyCache = new Map(keyCache);
+            newKeyCache.set(keyCacheKey, { key, pass: true });
+
+            set({ keyCache: newKeyCache });
           },
           createKey: async (lockId, inputDeviceId) => {
             const deviceId =
@@ -150,14 +153,14 @@ export const useLocks = create<LockStoreState>()(
               // throw new Error("Don't have device ID to create key with");
             }
 
-            const { keyCache, thisDeviceKeyCacheRunning, locks } = get();
+            const { keyCache, keyCacheRunning, locks } = get();
 
             const keyCacheKey = getCacheKeyForPermKey({ deviceId, lockId });
             const prevKey = keyCache.get(keyCacheKey);
             if (prevKey) {
               return prevKey.key;
             }
-            const prevKeyRunning = thisDeviceKeyCacheRunning.get(lockId);
+            const prevKeyRunning = keyCacheRunning.get(keyCacheKey);
             if (prevKeyRunning) {
               return await prevKeyRunning;
             }
@@ -176,7 +179,7 @@ export const useLocks = create<LockStoreState>()(
             }
 
             const fut = new Future<PermissionKey>();
-            thisDeviceKeyCacheRunning.set(lockId, fut.promise);
+            keyCacheRunning.set(keyCacheKey, fut.promise);
 
             const key = await PermissionLockHelpers.createKey(deviceId, {
               ...lock,
@@ -184,8 +187,13 @@ export const useLocks = create<LockStoreState>()(
             });
 
             fut.resolve(key);
-            thisDeviceKeyCacheRunning.delete(lockId);
-            keyCache.set(lockId, { key, pass: true });
+
+            keyCacheRunning.delete(keyCacheKey);
+
+            const newKeyCache = new Map(keyCache);
+            newKeyCache.set(keyCacheKey, { key, pass: true });
+
+            set({ keyCache: newKeyCache });
 
             return key;
           },
@@ -208,7 +216,7 @@ export const useLocks = create<LockStoreState>()(
               string,
               { key: PermissionKey; pass: boolean }
             >(keyCache);
-            newKeyCache.set(key.keyId, { pass, key });
+            newKeyCache.set(keyCacheKey, { pass, key });
             set({
               keyCache: newKeyCache,
             });
@@ -222,7 +230,7 @@ export const useLocks = create<LockStoreState>()(
       name: "lock-storage",
       storage: ZustandIdbStorage,
       skipHydration: true,
-      partialize: ({ cb, thisDeviceKeyCacheRunning, ...rest }) => ({
+      partialize: ({ cb, keyCacheRunning, ...rest }) => ({
         ...rest,
       }),
     },

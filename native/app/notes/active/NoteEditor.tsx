@@ -111,11 +111,12 @@ function useNoteKeyRequest(
       });
 
       const dataFetchResult = NoteDataFetch.call(peerId, {
-        noteId: noteId,
+        noteId,
         permissionKey: key,
       });
 
       for await (const { noteId, text } of dataFetchResult) {
+        toast(text);
         await writeNoteContents(noteId, text);
 
         toast.success(`Fetched and unlocked note!`, {
