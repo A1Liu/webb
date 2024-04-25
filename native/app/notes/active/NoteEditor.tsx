@@ -112,7 +112,10 @@ async function requestKeyForLock(lockId: string) {
 
   const { notes } = useNotesState.getState();
 
+  let count = 0;
   for (const note of notes.values()) {
+    if (note.lockId !== key.lockId) continue;
+
     const dataFetchResult = NoteDataFetch.call(peerId, {
       noteId: note.id,
       permissionKey: key,
@@ -121,11 +124,15 @@ async function requestKeyForLock(lockId: string) {
     for await (const { noteId, text } of dataFetchResult) {
       await writeNoteContents(noteId, text);
 
-      toast.success(`Fetched and unlocked note!`, {
+      toast.loading(`Fetching latest data... (${++count})`, {
         id: toastId,
       });
     }
   }
+
+  toast.success(`Fetched and unlocked note!`, {
+    id: toastId,
+  });
 }
 
 function useNoteKeyRequest(lockId?: string): {
