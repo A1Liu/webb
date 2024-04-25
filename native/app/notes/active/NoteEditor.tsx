@@ -72,63 +72,71 @@ function NoteContentEditor() {
   );
 }
 
-function useNoteKeyRequest(
-  noteId: string,
-  lockId?: string,
-): { loading: boolean; requestKey: () => Promise<boolean | undefined> } {
-  const { loading, runAsync: requestKey } = useRequest(
-    async () => {
-      const toastId = toast.loading(`Requesting key...`);
+async function requestKeyForLock(lockId: string) {
+  const toastId = toast.loading(`Requesting key...`);
 
-      const firstResult = await getFirstSuccess(
-        [...usePeers.getState().peers.values()].map(async (peer) => {
-          // cheating here to always get the first successful result
-          // if one exists
-          if (!lockId) throw new Error(``);
-          const result = RequestKeyForLock.call(peer.id, { lockId });
-          for await (const { key } of result) {
-            if (!key) continue;
-            return { peerId: peer.id, key };
-          }
-
-          throw new Error(``);
-        }),
-      );
-
-      if (!firstResult.success) {
-        toast.error(`Couldn't fetch key to unlock file`, {
-          id: toastId,
-        });
-        return false;
+  const { peers } = usePeers.getState();
+  const firstResult = await getFirstSuccess(
+    [...peers.values()].map(async (peer) => {
+      // cheating here to always get the first successful result
+      // if one exists
+      if (!lockId) throw new Error(``);
+      const result = RequestKeyForLock.call(peer.id, { lockId });
+      for await (const { key } of result) {
+        if (!key) continue;
+        return { peerId: peer.id, key };
       }
 
-      const { key, peerId } = firstResult.value;
+      throw new Error(``);
+    }),
+  );
 
-      useLocks.getState().cb.addKey(key);
-      toast.success(`Successfully added key!`);
-      toast.loading(`Fetching latest data...`, {
+  if (!firstResult.success) {
+    toast.error(`Couldn't fetch key to unlock file`, {
+      id: toastId,
+    });
+    return false;
+  }
+
+  const { key, peerId } = firstResult.value;
+
+  const {
+    cb: { addKey },
+  } = useLocks.getState();
+  addKey(key);
+
+  toast.success(`Successfully added key!`);
+  toast.loading(`Fetching latest data...`, {
+    id: toastId,
+  });
+
+  const { notes } = useNotesState.getState();
+
+  for (const note of notes.values()) {
+    const dataFetchResult = NoteDataFetch.call(peerId, {
+      noteId: note.id,
+      permissionKey: key,
+    });
+
+    for await (const { noteId, text } of dataFetchResult) {
+      await writeNoteContents(noteId, text);
+
+      toast.success(`Fetched and unlocked note!`, {
         id: toastId,
       });
+    }
+  }
+}
 
-      const dataFetchResult = NoteDataFetch.call(peerId, {
-        noteId,
-        permissionKey: key,
-      });
-
-      for await (const { noteId, text } of dataFetchResult) {
-        toast(text);
-        await writeNoteContents(noteId, text);
-
-        toast.success(`Fetched and unlocked note!`, {
-          id: toastId,
-        });
-
-        return true;
-      }
-
-      toast.error(`Failed somehow`, { id: toastId });
-
-      return false;
+function useNoteKeyRequest(lockId?: string): {
+  loading: boolean;
+  requestKey: () => Promise<boolean | undefined>;
+} {
+  const { loading, runAsync: requestKey } = useRequest(
+    async () => {
+      if (!lockId) return true;
+      await requestKeyForLock(lockId);
+      return true;
     },
     {
       manual: true,
@@ -162,7 +170,6 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     },
   );
   const { loading: requestKeyLoading, requestKey } = useNoteKeyRequest(
-    noteId,
     lockId ?? undefined,
   );
   const router = useRouter();

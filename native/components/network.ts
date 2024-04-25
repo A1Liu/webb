@@ -63,8 +63,8 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
               yield* rpc(chunk.peerId, result.data);
             });
           } catch (error) {
-            console.error(`Failed during RPC: ${field}`, error);
-            toast.error(`Failed during RPC: ${field} ${error}`);
+            console.error(`Failed running RPC: ${field}`, error);
+            toast.error(`Failed running RPC: ${field} ${error}`);
           }
         }
       }
@@ -74,24 +74,28 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
 
       // Call
       return async function* (peerId: string, data: In): AsyncGenerator<Out> {
-        const network = await getNetworkLayerGlobal();
+        try {
+          const network = await getNetworkLayerGlobal();
 
-        const dataFetchResult = network.rpcCall({
-          peerId,
-          channel: field,
-          data: data,
-        });
+          const dataFetchResult = network.rpcCall({
+            peerId,
+            channel: field,
+            data: data,
+          });
 
-        for await (const chunk of dataFetchResult) {
-          const result = output.safeParse(chunk.data);
-          if (!result.success) {
-            toast.error(
-              `${field} had invalid output: ${JSON.stringify(chunk)}`,
-            );
-            return;
+          for await (const chunk of dataFetchResult) {
+            const result = output.safeParse(chunk.data);
+            if (!result.success) {
+              toast.error(
+                `${field} had invalid output: ${JSON.stringify(chunk)}`,
+              );
+              return;
+            }
+
+            yield result.data;
           }
-
-          yield result.data;
+        } catch (error) {
+          console.error(`Error calling RPC function: ${String(error)}`);
         }
       };
     },

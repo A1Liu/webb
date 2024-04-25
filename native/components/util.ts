@@ -4,7 +4,7 @@ import { z } from "zod";
 import { toast } from "react-hot-toast";
 import { get, set, del } from "idb-keyval";
 import { Future, getOrCompute, timeout } from "@a1liu/webb-ui-shared/util";
-import { debounce } from "lodash";
+import { debounce, DebounceSettings } from "lodash";
 
 export const DefaultTimeFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "short",
@@ -86,35 +86,69 @@ export function zustandJsonReplacer(
   return value;
 }
 
+class Debouncer {
+  private currentFut = new Future<void>();
+  private readonly debouncedFunc: (
+    r: () => Promise<void>,
+  ) => Promise<void> | undefined;
+
+  constructor(waitTime?: number, opts?: DebounceSettings) {
+    const leading = opts?.leading;
+    const trailing = opts?.trailing ?? true;
+
+    this.debouncedFunc = debounce(
+      async (r) => {
+        if (leading) {
+          this.currentFut = new Future();
+        }
+
+        try {
+          await r();
+        } catch (error) {
+          console.error(`Failure ${String(error)}`);
+        } finally {
+          this.currentFut.resolve();
+
+          if (trailing) {
+            this.currentFut = new Future();
+          }
+        }
+      },
+      waitTime,
+      opts,
+    );
+  }
+
+  async run(r: () => Promise<void>) {
+    this.debouncedFunc(r);
+
+    return await this.currentFut.promise;
+  }
+}
+
 // operations should be linearized
 // set operations and remove operations should be debounced
 class IdbStorage implements PersistStorage<unknown> {
   private readonly mutexes = new Map<string, Mutex>();
-  private readonly debouncers = new Map<
-    string,
-    (r: () => Promise<void>) => Promise<void> | undefined
-  >();
+  private readonly debouncers = new Map<string, Debouncer>();
 
   mutex(name: string) {
     return getOrCompute(this.mutexes, name, () => new Mutex());
   }
 
   debouncer(name: string) {
-    const debouncer = getOrCompute(this.debouncers, name, () => {
-      return debounce(
-        (r: () => Promise<void>) => {
-          return r();
-        },
-        333,
-        {
+    const debouncer = getOrCompute(
+      this.debouncers,
+      name,
+      () =>
+        new Debouncer(333, {
           trailing: true,
           maxWait: 10_000,
-        },
-      );
-    });
+        }),
+    );
     return {
       async debounce(r: () => Promise<void>) {
-        await debouncer(r);
+        await debouncer.run(r);
       },
     };
   }

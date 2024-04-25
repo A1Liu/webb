@@ -191,7 +191,7 @@ const NoteListMetadata = registerRpc({
   },
 });
 
-async function requestLock() {
+async function syncNotes() {
   const { peers } = usePeers.getState();
   if (!peers) {
     toast.error(`No peers to synchronize with!`);
@@ -247,8 +247,12 @@ async function requestLock() {
 
   let totalCount = 0;
   for (const peer of peers.values()) {
+    console.log("asdf asdf");
     const stream = NoteListMetadata.call(peer.id, {});
+    console.log("wassa wassa");
     for await (const { hash, note, permissionKey } of stream) {
+      console.log("wassa wassa 2");
+
       const { localVersion, versions } = getOrCompute(
         noteVersions,
         note.id,
@@ -377,7 +381,7 @@ export function SyncNotesButton() {
   const { peers } = usePeers();
   const { isMobile } = usePlatform();
   const { userProfile } = useUserProfile();
-  const { runAsync, loading } = useRequest(requestLock, { manual: true });
+  const { runAsync, loading } = useRequest(syncNotes, { manual: true });
 
   const runSynchronization = useLockFn(runAsync);
 
