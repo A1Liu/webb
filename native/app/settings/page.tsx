@@ -4,7 +4,7 @@ import React from "react";
 import { toast } from "react-hot-toast";
 import { IncomingPeers } from "@/app/settings/IncomingPeers";
 import { usePlatform } from "@/components/hooks/usePlatform";
-import { TopbarLayout } from "@/components/TopbarLayout";
+import { buttonClass, TopbarLayout } from "@/components/TopbarLayout";
 import { useLockFn, useMemoizedFn } from "ahooks";
 import { usePeers } from "@/components/state/peers";
 import { NoteDataSchema, useNotesState } from "@/components/state/notes";
@@ -30,8 +30,6 @@ import { TapCounterButton } from "@/components/Button";
 import { clear } from "idb-keyval";
 
 export const dynamic = "force-static";
-
-const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 function BackupAndRestore<T>({
   title,
@@ -207,12 +205,12 @@ export default function Settings() {
       buttons={[
         {
           type: "button",
-          text: "Back",
+          text: "⏪ Back",
           onClick: () => router.back(),
         },
         {
           type: "button",
-          text: "Refresh",
+          text: "😵",
           onClick: () => window.location.reload(),
         },
       ]}

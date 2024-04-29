@@ -24,6 +24,7 @@ PeerInitGroup.registerInit("networkLayer", async () => {
       const update = await network.statusChannel.pop();
       switch (update.type) {
         case "networkStatus": {
+          console.log("update.status", update.status);
           switch (update.status) {
             case "connected":
               if (!connected) {
@@ -38,6 +39,7 @@ PeerInitGroup.registerInit("networkLayer", async () => {
               }
               break;
             case "disconnected":
+              toast.dismiss(update.type);
               if (connected) {
                 toast.error("Disconnected!", { id: update.type });
                 connected = false;

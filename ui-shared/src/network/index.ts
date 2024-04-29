@@ -1,13 +1,7 @@
 import { Peer, PeerErrorType } from "peerjs";
 import { v4 as uuid } from "uuid";
 import { DataConnection } from "peerjs";
-import {
-  Future,
-  getOrCompute,
-  memoize,
-  timeout,
-  UnwrappedPromise,
-} from "../util";
+import { Future, getOrCompute, memoize, UnwrappedPromise } from "../util";
 import { Channel } from "../channel";
 
 // TODO: Figure out what to do here long term. For now, this is the shit implementation.
@@ -227,13 +221,16 @@ export class NetworkLayer {
 
     this._peerGetter.clear();
 
+    // TODO: figure this out
+    //
+    // Notes:
     // We should always re-connect ASAP so that subsequent messages don't get
     // dropped. However, we don't want to connect immediately, because other
     // event handlers might still need to fire (and they'll call this method).
     //
     // This timeout prevents errors from causing an infinite loop when e.g.
     // a peer disconnects.
-    timeout(1000).then(() => this._peerGetter());
+    // timeout(1000).then(() => this._peerGetter());
   }
 
   async listen(): Promise<PeerData> {
