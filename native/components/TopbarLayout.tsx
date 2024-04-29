@@ -20,7 +20,7 @@ export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
   // py-24 px-8
   return (
     <main className={clsx("flex h-full flex-col")}>
-      <div className="flex justify-between items-center px-4 py-1 w-full border-b border-slate-400">
+      <div className="flex justify-between items-center pl-2 pr-5 py-1 w-full border-b border-slate-400">
         <div className="flex gap-2 items-center">
           {process.env.NODE_ENV === "development" ? (
             <div className="rounded-md p-1 bg-red-500 text-xs font-bold">
