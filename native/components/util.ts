@@ -238,3 +238,15 @@ class Mutex {
     return fut.promise;
   }
 }
+
+export function base64ToBytes(base64: string): ArrayBuffer {
+  const binString = atob(base64);
+  return Uint8Array.from(binString, (m) => m.codePointAt(0)!);
+}
+
+export function bytesToBase64(bytes: ArrayBuffer): string {
+  const binString = Array.from(new Uint8Array(bytes), (byte) =>
+    String.fromCodePoint(byte),
+  ).join("");
+  return btoa(binString);
+}

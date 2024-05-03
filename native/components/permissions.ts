@@ -1,6 +1,6 @@
 import stringify from "fast-json-stable-stringify";
 import { z } from "zod";
-import { base64ToBytes, bytesToBase64 } from "./crypto";
+import { base64ToBytes, bytesToBase64 } from "./util";
 
 export type PermissionMatcher = z.infer<typeof PermissionMatcherSchema>;
 const PermissionMatcherSchema = z
