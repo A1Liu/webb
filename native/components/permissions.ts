@@ -46,6 +46,14 @@ export const PermissionSchema = z.object({
   cert: CertSchema,
 });
 
+export interface Identity {
+  id: string;
+  publicKey: CryptoKey;
+}
+export interface RootIdentity extends Identity {
+  privateKey: CryptoKey;
+}
+
 export class Permissions {
   constructor(
     readonly deviceId: string,
@@ -55,15 +63,15 @@ export class Permissions {
 
   async createPermission(
     permissionInput: Omit<Permission, "cert" | "createdAt">,
-    authority: Authority,
-    key: CryptoKey,
+    authorityKind: Authority["authorityKind"],
+    identity: RootIdentity,
   ): Promise<Permission> {
     const permission = { createdAt: new Date(), ...permissionInput };
 
     const json = stringify(permission);
     const signature = await window.crypto.subtle.sign(
       { name: "RSA-PSS", saltLength: 32 },
-      key,
+      identity.privateKey,
       new TextEncoder().encode(json),
     );
 
@@ -71,17 +79,20 @@ export class Permissions {
       ...permission,
       cert: {
         signature: bytesToBase64(signature),
-        authority,
+        authority: {
+          authorityKind,
+          id: identity.id,
+        },
       },
     };
   }
 
   async verifyPermissionSignature(
     permission: Permission,
-    key: CryptoKey,
+    identity: Identity,
   ): Promise<boolean> {
     const { cert, ...permissionData } = permission;
-    if (cert.authority.id !== this.userId) {
+    if (cert.authority.id !== identity.id) {
       return false;
     }
 
@@ -100,7 +111,7 @@ export class Permissions {
     const json = stringify(permissionData);
     const valid = await window.crypto.subtle.verify(
       { name: "RSA-PSS", saltLength: 32 },
-      key,
+      identity.publicKey,
       base64ToBytes(cert.signature),
       new TextEncoder().encode(json),
     );
@@ -116,11 +127,11 @@ export class Permissions {
       resourceId: string[];
       actionId: string[];
     },
-    key: CryptoKey,
+    identity: Identity,
   ): Promise<boolean> {
     const permissionValid = await this.verifyPermissionSignature(
       permission,
-      key,
+      identity,
     );
     if (!permissionValid) return false;
 
