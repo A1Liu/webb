@@ -27,7 +27,7 @@ export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
               DEV
             </div>
           ) : null}
-          <h4>{title}</h4>{" "}
+          <h4>{title}</h4>
         </div>
 
         <div className="flex gap-2 flex-wrap">
