@@ -11,19 +11,15 @@ import { NoteDataSchema, useNotesState } from "@/components/state/notes";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import Link from "next/link";
 import { DeviceQr, ScanAndConnectButton } from "@/components/DeviceQrCode";
-import { useUserProfile } from "@/components/state/userProfile";
+import {
+  UserProfileSerializedSchema,
+  useUserProfile,
+} from "@/components/state/userProfile";
 import {
   readNoteContents,
   writeNoteContents,
 } from "@/components/state/noteContents";
 import { z } from "zod";
-import {
-  base64ToBytes,
-  bytesToBase64,
-  exportUserPublickKey,
-  importUserPublicKey,
-  verifyUserKey,
-} from "@/components/crypto";
 import { useLocks } from "@/components/state/locks";
 import { useRouter } from "next/navigation";
 import { TapCounterButton } from "@/components/Button";
@@ -90,91 +86,19 @@ function BackupUser() {
   return (
     <BackupAndRestore
       title={"user"}
-      schema={z.object({
-        publicAuthUserId: z.string(),
-        publicAuthKeyBase64: z.string(),
-        secret: z.object({
-          privateAuthKeyBase64: z.string(),
-          privateEncryptKeyBase64: z.string(),
-        }),
-      })}
+      schema={UserProfileSerializedSchema}
       fetchData={async () => {
-        const userProfile = useUserProfile.getState().userProfile;
+        const userProfile = useUserProfile.getState()._userProfileSerialized;
         if (!userProfile) {
           throw new Error("no UserProfile");
         }
 
-        const pubKey = await exportUserPublickKey(userProfile.publicAuthKey);
-
-        const secret = await (async () => {
-          if (!userProfile.secret) return undefined;
-
-          const privAuthKey = await window.crypto.subtle.exportKey(
-            "pkcs8",
-            userProfile.secret.privateAuthKey,
-          );
-          const privEncryptKey = await window.crypto.subtle.exportKey(
-            "raw",
-            userProfile.secret.privateEncryptKey,
-          );
-
-          return {
-            privateAuthKeyBase64: bytesToBase64(privAuthKey),
-            privateEncryptKeyBase64: bytesToBase64(privEncryptKey),
-          };
-        })();
-
-        return {
-          publicAuthUserId: userProfile.publicAuthUserId,
-          publicAuthKeyBase64: pubKey,
-          secret,
-        };
+        return userProfile;
       }}
       writeData={async (userProfileData) => {
-        const pubKey = await importUserPublicKey(
-          userProfileData.publicAuthKeyBase64,
-        );
-
-        const secret = await (async () => {
-          if (!userProfileData.secret) return undefined;
-
-          const privateAuthKey = await window.crypto.subtle.importKey(
-            "pkcs8",
-            base64ToBytes(userProfileData.secret.privateAuthKeyBase64),
-            {
-              name: "RSA-PSS",
-              hash: "SHA-512",
-            },
-            true,
-            ["sign"],
-          );
-          const privateEncryptKey = await window.crypto.subtle.importKey(
-            "raw",
-            base64ToBytes(userProfileData.secret.privateEncryptKeyBase64),
-            { name: "AES-GCM", length: 256 },
-            true,
-            ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
-          );
-
-          return {
-            privateAuthKey,
-            privateEncryptKey,
-          };
-        })();
-
-        const verified = await verifyUserKey(
-          pubKey,
-          userProfileData.publicAuthUserId,
-        );
-        if (!verified) {
-          throw new Error("User profile failed verification");
-        }
-
-        useUserProfile.getState().cb.updateUserProfile({
-          publicAuthUserId: userProfileData.publicAuthUserId,
-          publicAuthKey: pubKey,
-          secret,
-        });
+        await useUserProfile
+          .getState()
+          .cb.updateUserProfileFromSerialized(userProfileData);
       }}
     />
   );

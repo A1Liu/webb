@@ -61,6 +61,17 @@ export class Permissions {
     readonly permissionCache: Map<string, Permission> = new Map(),
   ) {}
 
+  findMyPermission(action: { resourceId: string[]; actionId: string[] }) {
+    for (const permission of this.permissionCache.values()) {
+      if (!match([this.deviceId], permission.deviceId)) continue;
+      if (!match([this.userId], permission.userId)) continue;
+      if (!match(action.resourceId, permission.resourceId)) continue;
+      if (!match(action.actionId, permission.actionId)) continue;
+
+      return permission;
+    }
+  }
+
   async createPermission(
     permissionInput: Omit<Permission, "cert" | "createdAt">,
     authorityKind: Authority["authorityKind"],
@@ -75,7 +86,7 @@ export class Permissions {
       new TextEncoder().encode(json),
     );
 
-    return {
+    const finalPermission = {
       ...permission,
       cert: {
         signature: bytesToBase64(signature),
@@ -85,6 +96,10 @@ export class Permissions {
         },
       },
     };
+
+    this.permissionCache.set(finalPermission.cert.signature, finalPermission);
+
+    return finalPermission;
   }
 
   async verifyPermissionSignature(
@@ -92,6 +107,18 @@ export class Permissions {
     identity: Identity,
   ): Promise<boolean> {
     const { cert, ...permissionData } = permission;
+    const previousPermission = this.permissionCache.get(cert.signature);
+    if (
+      previousPermission &&
+      previousPermission.cert.signature === permission.cert.signature
+    ) {
+      if (
+        permission.cert.authority.id === previousPermission.cert.authority.id
+      ) {
+        return true;
+      }
+    }
+
     if (cert.authority.id !== identity.id) {
       return false;
     }
@@ -115,6 +142,8 @@ export class Permissions {
       base64ToBytes(cert.signature),
       new TextEncoder().encode(json),
     );
+
+    this.permissionCache.set(permission.cert.signature, permission);
 
     return valid;
   }
