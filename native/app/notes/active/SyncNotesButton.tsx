@@ -21,14 +21,10 @@ import {
   useNoteHashStore,
   writeNoteContents,
 } from "@/components/state/noteContents";
-import {
-  AdminKeySchema,
-  PermissionKeySchema,
-  signValue,
-  verifyValue,
-} from "@/components/crypto";
 import { useUserProfile } from "@/components/state/userProfile";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
+import { PermissionSchema, PermissionsManager } from "@/components/permissions";
+import { usePermissionCache } from "@/components/state/permissions";
 
 const NoteMetadataWithHashSchema = z.object({
   note: NoteDataSchema,
@@ -41,17 +37,44 @@ const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
 export const NoteDataFetch = registerRpc({
   name: "NoteDataFetch",
   group: NotesSyncInitGroup,
-  input: z.object({
-    noteId: z.string(),
-    // permissionKey: PermissionKeySchema.nullish(),
-  }),
+  input: z.object({ noteId: z.string(), permission: PermissionSchema }),
   output: z.object({ noteId: z.string(), text: z.string() }),
-  rpc: async function* (peerId, { noteId }) {
+  rpc: async function* (peerId, { noteId, permission }) {
     console.debug(`received NoteDataFetch req`, peerId);
 
     const { notes } = useNotesState.getState();
     const noteMetadata = notes.get(noteId);
     if (!noteMetadata) return;
+
+    const { userProfile } = useUserProfile.getState();
+    if (!userProfile?.secret) return;
+
+    const { deviceProfile } = useDeviceProfile.getState();
+    if (!deviceProfile) return;
+
+    const { permissionCache, cb: permCb } = usePermissionCache.getState();
+    const permissions = new PermissionsManager(
+      deviceProfile.id,
+      userProfile.publicAuthUserId,
+      permissionCache,
+    );
+
+    const isVerified = await permissions.verifyPermission(
+      permission,
+      {
+        deviceId: peerId,
+        userId: userProfile.publicAuthUserId,
+        actionId: ["updateNote"],
+        resourceId: [noteId],
+      },
+      {
+        id: userProfile.publicAuthUserId,
+        publicKey: userProfile.publicAuthKey,
+      },
+    );
+    permCb.updateCache(permissions.permissionCache);
+
+    if (!isVerified) return;
 
     /*
     if (noteMetadata.lockId) {
@@ -81,42 +104,44 @@ const NotePushListener = registerListener({
   group: NotesSyncInitGroup,
   schema: z.object({
     notes: NoteMetadataWithHashSchema.array(),
-    adminAuth: AdminKeySchema,
+    permission: PermissionSchema,
   }),
-  listener: async (
-    peerId,
-    { notes, adminAuth: { base64Signature: adminSignature, ...adminAuth } },
-  ) => {
-    if (adminAuth.deviceId !== peerId) {
-      toast.error(`Received synchronization request with mismatched deviceId`);
-      return;
-    }
-
-    const now = new Date().getTime();
-    if (adminAuth.timestamp.getTime() > now) {
-      toast.error(`Received synchronization request with future auth`);
-      return;
-    }
-
-    const fifteenMinutes = 1000 * 60 * 15;
-    const stalenessThreshold = now - fifteenMinutes;
-    if (stalenessThreshold > adminAuth.timestamp.getTime()) {
-      toast.error(`Received synchronization request with outdated auth`);
-      return;
-    }
-
-    const userProfile = useUserProfile.getState().userProfile;
+  listener: async (peerId, { notes, permission }) => {
+    const { userProfile } = useUserProfile.getState();
     if (!userProfile) {
       console.debug(`Device has no user, refusing to sync`);
       return;
     }
 
-    const adminAuthValid = await verifyValue({
-      publicKey: userProfile.publicAuthKey,
-      signature: adminSignature,
-      value: adminAuth,
-    });
-    if (!adminAuthValid) {
+    const { deviceProfile } = useDeviceProfile.getState();
+    if (!deviceProfile) {
+      console.debug(`Device has no user, refusing to sync`);
+      return;
+    }
+
+    const { permissionCache, cb: permCb } = usePermissionCache.getState();
+    const permissions = new PermissionsManager(
+      deviceProfile.id,
+      userProfile.publicAuthUserId,
+      permissionCache,
+    );
+
+    const isVerified = await permissions.verifyPermission(
+      permission,
+      {
+        deviceId: peerId,
+        userId: userProfile.publicAuthUserId,
+        actionId: ["pushNoteData"],
+        resourceId: [],
+      },
+      {
+        id: userProfile.publicAuthUserId,
+        publicKey: userProfile.publicAuthKey,
+      },
+    );
+    permCb.updateCache(permissions.permissionCache);
+
+    if (!isVerified) {
       toast.error(
         `Received synchronization request from unauthorized requester`,
       );
@@ -139,6 +164,18 @@ const NotePushListener = registerListener({
         id: SYNC_STATUS_TOAST_ID,
       });
 
+      const permission = permissions.findMyPermission({
+        actionId: ["updateNote"],
+        resourceId: [note.id],
+      });
+
+      if (!permission) {
+        toast.error(`No permission to read data`, {
+          id: "push-data-fetch-fail",
+        });
+        continue;
+      }
+
       const prevHash = hashes.get(note.id);
       if (prevHash === hash) {
         continue;
@@ -146,6 +183,7 @@ const NotePushListener = registerListener({
 
       const dataFetchResult = NoteDataFetch.call(peerId, {
         noteId: note.id,
+        permission,
       });
 
       for await (const item of dataFetchResult) {
@@ -165,9 +203,7 @@ const NoteListMetadata = registerRpc({
   name: "NoteListMetadata",
   group: NotesSyncInitGroup,
   input: z.object({}),
-  output: NoteMetadataWithHashSchema.extend({
-    permissionKey: PermissionKeySchema.nullish(),
-  }),
+  output: NoteMetadataWithHashSchema,
   rpc: async function* (peerId, {}) {
     console.debug(`received NoteListMetadata req`, peerId);
 
@@ -203,15 +239,41 @@ async function syncNotes() {
     return;
   }
 
+  const { permissionCache, cb: permsCb } = usePermissionCache.getState();
+  const permissions = new PermissionsManager(
+    deviceProfile.id,
+    userProfile?.publicAuthUserId,
+    permissionCache,
+  );
+
+  const permission = await permissions.createPermission(
+    {
+      deviceId: [{ __typename: "Exact", value: deviceProfile.id }],
+      userId: [
+        {
+          __typename: "Exact",
+          value: userProfile.publicAuthUserId,
+        },
+      ],
+      resourceId: [{ __typename: "Any" }],
+      actionId: [{ __typename: "Any" }],
+    },
+    "userRoot",
+    {
+      id: userProfile.publicAuthUserId,
+      publicKey: userProfile.publicAuthKey,
+      privateKey: userSecret.privateAuthKey,
+    },
+  );
+  permsCb.updateCache(permissions.permissionCache);
+
+  if (!permission) {
+    toast.error(`Failed to create permission!`);
+    return;
+  }
+
   const timestamp = new Date();
   timestamp.setMilliseconds(0);
-  const adminAuth = await signValue({
-    privateKey: userSecret.privateAuthKey,
-    value: {
-      deviceId: deviceProfile.id,
-      timestamp,
-    },
-  });
 
   console.debug("Sync starting...");
   toast.loading(`Syncing ... fetching notes`, {
@@ -337,6 +399,7 @@ async function syncNotes() {
 
     const result = NoteDataFetch.call(peerId, {
       noteId: note.id,
+      permission,
     });
 
     for await (const item of result) {
@@ -352,7 +415,7 @@ async function syncNotes() {
 
   for (const [peerId, _peer] of peers.entries()) {
     await NotePushListener.send(peerId, {
-      adminAuth,
+      permission,
       notes: notesToUpdate.map(({ hash, note }) => ({
         note,
         hash,

@@ -98,6 +98,7 @@ async function requestKeyForNote(noteId: string) {
   for (const note of notes.values()) {
     const dataFetchResult = NoteDataFetch.call(peerId, {
       noteId: note.id,
+      permission,
     });
 
     for await (const { noteId, text } of dataFetchResult) {
@@ -154,17 +155,17 @@ function useNoteKeyRequest(noteId: string): {
 }
 
 export function NoteEditor({ noteId }: { noteId: string }) {
+  const { userProfile } = useUserProfile();
+  const { deviceProfile } = useDeviceProfile();
+  const { permissionCache } = usePermissionCache();
   const {
     data: hasAuth,
     loading,
     refresh,
   } = useRequest(
     async () => {
-      const { userProfile } = useUserProfile.getState();
-      const { deviceProfile } = useDeviceProfile.getState();
       if (!userProfile || !deviceProfile) return false;
 
-      const { permissionCache } = usePermissionCache.getState();
       const permissions = new PermissionsManager(
         deviceProfile.id,
         userProfile?.publicAuthUserId,
@@ -180,7 +181,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       return false;
     },
     {
-      refreshDeps: [noteId],
+      refreshDeps: [noteId, userProfile, deviceProfile, permissionCache],
     },
   );
   const { loading: requestKeyLoading, requestKey } = useNoteKeyRequest(noteId);

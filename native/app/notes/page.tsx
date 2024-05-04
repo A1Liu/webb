@@ -23,13 +23,15 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
   const { isMobile } = usePlatform();
   const { id: noteId } = note;
   const router = useRouter();
+
+  const { userProfile } = useUserProfile();
+  const { deviceProfile } = useDeviceProfile();
+  const { permissionCache } = usePermissionCache();
+
   const { data: hasAuth, loading } = useRequest(
     async () => {
-      const { userProfile } = useUserProfile.getState();
-      const { deviceProfile } = useDeviceProfile.getState();
       if (!userProfile || !deviceProfile) return false;
 
-      const { permissionCache } = usePermissionCache.getState();
       const permissions = new PermissionsManager(
         deviceProfile.id,
         userProfile?.publicAuthUserId,
@@ -45,7 +47,7 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
       return true;
     },
     {
-      refreshDeps: [noteId],
+      refreshDeps: [noteId, userProfile, deviceProfile, permissionCache],
     },
   );
 
