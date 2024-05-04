@@ -70,8 +70,23 @@ export const AskPermission = registerRpc({
       description: `Requesting to do ${JSON.stringify(
         action.actionId,
       )} with ${JSON.stringify(action.resourceId)}`,
+      options: ["Deny", "Allow", "Always Allow"] as const,
     });
-    if (!allowed) return;
+
+    let permissionAction = action;
+    switch (allowed) {
+      case "Deny":
+        return;
+      case "Allow":
+        break;
+
+      case "Always Allow":
+        permissionAction = {
+          resourceId: [{ __typename: "Any" as const }],
+          actionId: [{ __typename: "Any" as const }],
+        };
+        break;
+    }
 
     const { permissionCache, cb: permCb } = usePermissionCache.getState();
     const permissions = new PermissionsManager(
@@ -80,12 +95,16 @@ export const AskPermission = registerRpc({
       permissionCache,
     );
 
+    const permissionInput = {
+      deviceId: [{ __typename: "Exact" as const, value: peerId }],
+      userId: [
+        { __typename: "Exact" as const, value: userProfile.publicAuthUserId },
+      ],
+      ...permissionAction,
+    };
+
     const permission = await permissions.createPermission(
-      {
-        deviceId: [{ __typename: "Exact", value: peerId }],
-        userId: [{ __typename: "Exact", value: userProfile.publicAuthUserId }],
-        ...action,
-      },
+      permissionInput,
       "userRoot",
       {
         id: userProfile.publicAuthUserId,

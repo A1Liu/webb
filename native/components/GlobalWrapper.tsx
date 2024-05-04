@@ -38,19 +38,14 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
             <pre className="text-sm">{state.description}</pre>
 
             <div className="flex gap-2">
-              <button
-                className={buttonClass}
-                onClick={() => state.completion(false)}
-              >
-                Cancel
-              </button>
-
-              <button
-                className={buttonClass}
-                onClick={() => state.completion(true)}
-              >
-                Confirm
-              </button>
+              {state.options.map((value) => (
+                <button
+                  className={buttonClass}
+                  onClick={() => state.completion(value)}
+                >
+                  {value}
+                </button>
+              ))}
             </div>
           </div>
         </div>
