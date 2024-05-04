@@ -141,9 +141,9 @@ class IdbStorage implements PersistStorage<unknown> {
       this.debouncers,
       name,
       () =>
-        new Debouncer(333, {
+        new Debouncer(66, {
           trailing: true,
-          maxWait: 10_000,
+          maxWait: 5_000,
         }),
     );
     return {

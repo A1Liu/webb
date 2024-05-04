@@ -21,8 +21,27 @@ import {
 import { useUserProfile } from "@/components/state/userProfile";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { PermissionsManager } from "@/components/permissions";
+import { getNetworkLayerGlobal } from "@/components/network";
 
 export const dynamic = "force-static";
+
+function ReconnectButton() {
+  const { connected } = usePeers();
+
+  if (connected) return null;
+
+  return (
+    <button
+      className={buttonClass}
+      onClick={async () => {
+        const network = await getNetworkLayerGlobal();
+        network.ensureInit();
+      }}
+    >
+      Reconnect
+    </button>
+  );
+}
 
 function NoteContentEditor() {
   const noteText = useNoteContents((s) => s.text);
@@ -201,6 +220,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     <div className="flex justify-stretch relative flex-grow">
       <div className="absolute top-2 right-5 flex flex-col gap-2 items-end">
         <SyncNotesButton />
+        <ReconnectButton />
       </div>
 
       {!hasAuth ? (

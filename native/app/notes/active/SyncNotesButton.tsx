@@ -47,7 +47,7 @@ export const NoteDataFetch = registerRpc({
     if (!noteMetadata) return;
 
     const { userProfile } = useUserProfile.getState();
-    if (!userProfile?.secret) return;
+    if (!userProfile) return;
 
     const { deviceProfile } = useDeviceProfile.getState();
     if (!deviceProfile) return;
@@ -299,12 +299,8 @@ async function syncNotes() {
 
   let totalCount = 0;
   for (const peer of peers.values()) {
-    console.log("asdf asdf");
     const stream = NoteListMetadata.call(peer.id, {});
-    console.log("wassa wassa");
     for await (const { hash, note } of stream) {
-      console.log("wassa wassa 2");
-
       const { versions } = getOrCompute(noteVersions, note.id, () => ({
         versions: [],
       }));
@@ -342,9 +338,9 @@ async function syncNotes() {
       hash: maxHash,
       peerId,
     } = versions.reduce((maxNoteInfo, noteInfo) => {
-      // TODO: Figure out what to do with locks here
       if (maxNoteInfo.hash === noteInfo.hash) {
         if (!noteInfo.peerId) return noteInfo;
+
         return maxNoteInfo;
       }
 
@@ -352,7 +348,9 @@ async function syncNotes() {
       const { note: note } = noteInfo;
 
       if (noteInfo.hash === maxNote.lastSyncHash) return maxNoteInfo;
-      if (maxNoteInfo.hash === note.lastSyncHash) return noteInfo;
+      if (maxNoteInfo.hash === note.lastSyncHash) {
+        return noteInfo;
+      }
 
       if (note.lastSyncDate > maxNote.lastSyncDate) return noteInfo;
       if (note.lastSyncDate < maxNote.lastSyncDate) return maxNoteInfo;

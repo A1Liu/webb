@@ -14,77 +14,8 @@ export interface Peer extends PeerData {
 
 export const PeerInitGroup = new InitGroup("peers");
 
-PeerInitGroup.registerInit("networkLayer", async () => {
-  const network = await getNetworkLayerGlobal();
-  const cb = usePeers.getState().cb;
-  network.ensureInit();
-  async function initListener() {
-    let connected = false;
-    while (true) {
-      const update = await network.statusChannel.pop();
-      switch (update.type) {
-        case "networkStatus": {
-          console.log("update.status", update.status);
-          switch (update.status) {
-            case "connected":
-              if (!connected) {
-                toast.success("Connected!", { id: update.type });
-                toast.dismiss("peerError");
-                connected = true;
-              }
-              break;
-            case "connecting":
-              if (!connected) {
-                toast.loading("Connecting...", { id: update.type });
-              }
-              break;
-            case "disconnected":
-              toast.dismiss(update.type);
-              if (connected) {
-                toast.error("Disconnected!", { id: update.type });
-                connected = false;
-              }
-              break;
-          }
-
-          break;
-        }
-
-        case "networkError":
-          toast.error(`Peer Error: ${update.errorType}`, { id: update.type });
-          connected = false;
-          break;
-
-        case "peerConnected":
-          cb.updatePeer({
-            ...update.peer,
-            connected: true,
-            lastConnected: new Date(),
-          });
-          break;
-
-        case "peerDisconnected":
-          // TODO: Set this up with more info about peers
-          cb.updatePeer({ id: update.peerId, connected: false });
-          break;
-
-        case "connInfo":
-          // TODO: Set this up with more info about peers
-          // toast.error(`connInfo ${JSON.stringify(update)}`);
-          break;
-
-        default:
-          toast(`Unrecognized update=${JSON.stringify(update)}`);
-      }
-    }
-  }
-
-  initListener();
-
-  return network;
-});
-
 interface PeersState {
+  connected: boolean;
   peers: Map<string, Peer>;
   cb: {
     updatePeer: (peer: PeerData & Partial<Peer>) => void;
@@ -96,7 +27,7 @@ export const usePeers = create<PeersState>()(
   persist(
     (set) => {
       return {
-        deviceProfile: undefined,
+        connected: false,
         peers: new Map(),
         cb: {
           deletePeer: (peerId) => {
@@ -139,4 +70,75 @@ PeerInitGroup.registerValue({
 
     return usePeers;
   },
+});
+
+PeerInitGroup.registerInit("networkLayer", async () => {
+  const network = await getNetworkLayerGlobal();
+  const { cb } = usePeers.getState();
+  network.ensureInit();
+  async function initListener() {
+    while (true) {
+      const { connected } = usePeers.getState();
+
+      const update = await network.statusChannel.pop();
+      switch (update.type) {
+        case "networkStatus": {
+          console.log("update.status", update.status);
+          switch (update.status) {
+            case "connected":
+              if (!connected) {
+                toast.success("Connected!", { id: update.type });
+                toast.dismiss("peerError");
+                usePeers.setState({ connected: true });
+              }
+              break;
+            case "connecting":
+              if (!connected) {
+                toast.loading("Connecting...", { id: update.type });
+              }
+              break;
+            case "disconnected":
+              toast.dismiss(update.type);
+              if (connected) {
+                toast.error("Disconnected!", { id: update.type });
+                usePeers.setState({ connected: false });
+              }
+              break;
+          }
+
+          break;
+        }
+
+        case "networkError":
+          toast.error(`Peer Error: ${update.errorType}`, { id: update.type });
+          usePeers.setState({ connected: false });
+          break;
+
+        case "peerConnected":
+          cb.updatePeer({
+            ...update.peer,
+            connected: true,
+            lastConnected: new Date(),
+          });
+          break;
+
+        case "peerDisconnected":
+          // TODO: Set this up with more info about peers
+          cb.updatePeer({ id: update.peerId, connected: false });
+          break;
+
+        case "connInfo":
+          // TODO: Set this up with more info about peers
+          // toast.error(`connInfo ${JSON.stringify(update)}`);
+          break;
+
+        default:
+          toast(`Unrecognized update=${JSON.stringify(update)}`);
+      }
+    }
+  }
+
+  initListener();
+
+  return network;
 });
