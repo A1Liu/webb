@@ -216,8 +216,7 @@ function match(key: string[], permMatcher: PermissionMatcher): boolean {
           return false;
         }
 
-        matcherIndex = key.length;
-        break;
+        return true;
       }
     }
   }
