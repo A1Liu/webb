@@ -8,13 +8,11 @@ import { z } from "zod";
 import md5 from "md5";
 import isEqual from "lodash/isEqual";
 import { InitGroup } from "../constants";
-import { useLocks } from "./locks";
 import { ZustandIdbStorage } from "../util";
 
 const NoteDataSchemaInternal = z.object({
   id: z.string(),
   preview: z.string(),
-  lockId: z.string().nullish(),
   isTombstone: z.boolean().optional(),
   lastUpdateDate: z.coerce.date(),
   lastSyncDate: z.coerce.date(),
@@ -38,17 +36,14 @@ export interface NoteGlobalState {
     ) => void;
     updateNotesFromSync: (notes: NoteData[]) => { contentsChanged: NoteData[] };
     setActiveNote: (id: string) => void;
-    lockAll: () => void;
   };
 }
 
 const ZERO_TIME = new Date(0);
 
 function createEmptyNote(id: string): NoteData {
-  const lock = useLocks.getState().cb.getLock();
   return {
     id,
-    lockId: lock?.id,
     preview: "",
     lastUpdateDate: ZERO_TIME,
     lastSyncDate: ZERO_TIME,
@@ -135,19 +130,6 @@ export const useNotesState = create<NoteGlobalState>()(
                 return false;
               }),
             };
-          },
-          lockAll: () => {
-            const lock = useLocks.getState().cb.getLock();
-            if (!lock) return;
-
-            set((prev) => {
-              const notes = new Map<string, NoteData>();
-              for (const note of prev.notes.values()) {
-                notes.set(note.id, { ...note, lockId: lock.id });
-              }
-
-              return { notes };
-            });
           },
           setActiveNote: (id) =>
             set((prev) => {

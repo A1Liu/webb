@@ -9,8 +9,11 @@ import clsx from "clsx";
 import { DefaultTimeFormatter } from "@/components/util";
 import { useRouter } from "next/navigation";
 import { NoteEditor } from "./active/NoteEditor";
-import { useLocks } from "@/components/state/locks";
 import { useRequest } from "ahooks";
+import { usePermissionCache } from "@/components/state/permissions";
+import { PermissionsManager } from "@/components/permissions";
+import { useUserProfile } from "@/components/state/userProfile";
+import { useDeviceProfile } from "@/components/state/deviceProfile";
 
 export const dynamic = "force-static";
 
@@ -18,18 +21,31 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
   const cb = useNotesState((s) => s.cb);
   const activeNote = useNotesState((s) => s.activeNote);
   const { isMobile } = usePlatform();
-  const { lockId } = note;
+  const { id: noteId } = note;
   const router = useRouter();
   const { data: hasAuth, loading } = useRequest(
     async () => {
-      if (!lockId) return true;
-      const key = await useLocks.getState().cb.createKey(lockId);
-      if (!key) return false;
+      const { userProfile } = useUserProfile.getState();
+      const { deviceProfile } = useDeviceProfile.getState();
+      if (!userProfile || !deviceProfile) return false;
+
+      const { permissionCache } = usePermissionCache.getState();
+      const permissions = new PermissionsManager(
+        deviceProfile.id,
+        userProfile?.publicAuthUserId,
+        permissionCache,
+      );
+      const perm = permissions.findMyPermission({
+        actionId: ["updateNote"],
+        resourceId: [noteId],
+      });
+
+      if (!perm) return false;
 
       return true;
     },
     {
-      refreshDeps: [lockId],
+      refreshDeps: [noteId],
     },
   );
 

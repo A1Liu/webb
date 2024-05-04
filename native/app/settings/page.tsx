@@ -20,10 +20,12 @@ import {
   writeNoteContents,
 } from "@/components/state/noteContents";
 import { z } from "zod";
-import { useLocks } from "@/components/state/locks";
 import { useRouter } from "next/navigation";
 import { TapCounterButton } from "@/components/Button";
 import { clear } from "idb-keyval";
+import { usePermissionCache } from "@/components/state/permissions";
+import { PermissionsManager } from "@/components/permissions";
+import { useDeviceProfile } from "@/components/state/deviceProfile";
 
 export const dynamic = "force-static";
 
@@ -168,7 +170,7 @@ export default function Settings() {
               // Or it should be easier to lock and unlock things,
               // and categorize them.
               notesCb.updateNotesFromSync(
-                notes.map(({ text, lockId, ...note }) => note),
+                notes.map(({ text, ...note }) => note),
               );
 
               for (const note of notes) {
@@ -192,25 +194,42 @@ export default function Settings() {
             HARD RESET
           </TapCounterButton>
 
-          <button className={buttonClass} onClick={() => notesCb.lockAll()}>
-            Lock All
-          </button>
-
           <button
             className={buttonClass}
             onClick={async () => {
-              const { locks, cb } = useLocks.getState();
-              if (locks.size > 0) {
-                toast("Already have lock", {});
-                return;
-              }
+              const { userProfile } = useUserProfile.getState();
+              const { deviceProfile } = useDeviceProfile.getState();
+              if (!userProfile?.secret || !deviceProfile) return false;
 
-              await cb.createLock("main");
+              const { permissionCache } = usePermissionCache.getState();
+              const permissions = new PermissionsManager(
+                deviceProfile.id,
+                userProfile?.publicAuthUserId,
+                permissionCache,
+              );
 
-              toast("created lock", {});
+              await permissions.createPermission(
+                {
+                  deviceId: [{ __typename: "Exact", value: deviceProfile.id }],
+                  userId: [
+                    {
+                      __typename: "Exact",
+                      value: userProfile.publicAuthUserId,
+                    },
+                  ],
+                  resourceId: [],
+                  actionId: [],
+                },
+                "userRoot",
+                {
+                  id: userProfile.publicAuthUserId,
+                  publicKey: userProfile.publicAuthKey,
+                  privateKey: userProfile.secret.privateAuthKey,
+                },
+              );
             }}
           >
-            Create lock
+            Give Self Perms
           </button>
         </div>
       </div>

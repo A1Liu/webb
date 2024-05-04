@@ -27,7 +27,6 @@ import {
   signValue,
   verifyValue,
 } from "@/components/crypto";
-import { useLocks } from "@/components/state/locks";
 import { useUserProfile } from "@/components/state/userProfile";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 
@@ -44,17 +43,17 @@ export const NoteDataFetch = registerRpc({
   group: NotesSyncInitGroup,
   input: z.object({
     noteId: z.string(),
-    permissionKey: PermissionKeySchema.nullish(),
+    // permissionKey: PermissionKeySchema.nullish(),
   }),
   output: z.object({ noteId: z.string(), text: z.string() }),
-  rpc: async function* (peerId, { noteId, permissionKey }) {
+  rpc: async function* (peerId, { noteId }) {
     console.debug(`received NoteDataFetch req`, peerId);
 
-    const { cb: locksCb } = useLocks.getState();
     const { notes } = useNotesState.getState();
     const noteMetadata = notes.get(noteId);
     if (!noteMetadata) return;
 
+    /*
     if (noteMetadata.lockId) {
       if (permissionKey?.lockId !== noteMetadata.lockId) {
         return; // missing cert, or wrong key
@@ -68,6 +67,7 @@ export const NoteDataFetch = registerRpc({
 
       // OK we're verififed
     }
+      */
 
     const text = await readNoteContents(noteId);
     if (!text) return;
@@ -129,7 +129,6 @@ const NotePushListener = registerListener({
     });
 
     const { cb } = useNotesState.getState();
-    const { cb: locksCb } = useLocks.getState();
 
     let written = 0;
 
@@ -147,9 +146,6 @@ const NotePushListener = registerListener({
 
       const dataFetchResult = NoteDataFetch.call(peerId, {
         noteId: note.id,
-        permissionKey: note.lockId
-          ? await locksCb.createKey(note.lockId)
-          : undefined,
       });
 
       for await (const item of dataFetchResult) {
@@ -176,16 +172,12 @@ const NoteListMetadata = registerRpc({
     console.debug(`received NoteListMetadata req`, peerId);
 
     const { notes } = useNotesState.getState();
-    const { cb: locksCb } = useLocks.getState();
     const { hashes } = useNoteHashStore.getState();
 
     for (const note of notes.values()) {
       yield {
         note: { ...note },
         hash: hashes.get(note.id) ?? EMPTY_HASH,
-        permissionKey: note.lockId
-          ? await locksCb.createKey(note.lockId)
-          : undefined,
       };
     }
   },
@@ -243,21 +235,19 @@ async function syncNotes() {
     });
   }
 
-  const { cb: locksCb } = useLocks.getState();
-
   let totalCount = 0;
   for (const peer of peers.values()) {
     console.log("asdf asdf");
     const stream = NoteListMetadata.call(peer.id, {});
     console.log("wassa wassa");
-    for await (const { hash, note, permissionKey } of stream) {
+    for await (const { hash, note } of stream) {
       console.log("wassa wassa 2");
 
-      const { localVersion, versions } = getOrCompute(
-        noteVersions,
-        note.id,
-        () => ({ versions: [] }),
-      );
+      const { versions } = getOrCompute(noteVersions, note.id, () => ({
+        versions: [],
+      }));
+
+      /*
       if (localVersion?.lockId) {
         if (permissionKey?.lockId !== localVersion.lockId) {
           continue; // missing cert, or wrong key
@@ -269,6 +259,7 @@ async function syncNotes() {
         const verified = await locksCb.verifyKey(permissionKey);
         if (!verified) continue;
       }
+       */
 
       versions.push({
         peerId: peer.id,
@@ -346,9 +337,6 @@ async function syncNotes() {
 
     const result = NoteDataFetch.call(peerId, {
       noteId: note.id,
-      permissionKey: note.lockId
-        ? await locksCb.createKey(note.lockId)
-        : undefined,
     });
 
     for await (const item of result) {

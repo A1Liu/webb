@@ -28,6 +28,11 @@ const CertSchema = z.object({
   authority: AuthoritySchema,
 });
 
+export const ActionSchema = z.object({
+  resourceId: z.string().array(),
+  actionId: z.string().array(),
+});
+
 // We've basically re-invented AWS permissions. Which... I guess is fine. It's not
 // like I can import them.
 export type Permission = z.infer<typeof PermissionSchema>;
@@ -54,7 +59,7 @@ export interface RootIdentity extends Identity {
   privateKey: CryptoKey;
 }
 
-export class Permissions {
+export class PermissionsManager {
   constructor(
     readonly deviceId: string,
     readonly userId: string,
@@ -77,6 +82,14 @@ export class Permissions {
     authorityKind: Authority["authorityKind"],
     identity: RootIdentity,
   ): Promise<Permission> {
+    const permInputStr = stringify(permissionInput);
+    for (const permission of this.permissionCache.values()) {
+      // TODO: omg this is all so wrong, none of this is robust holy shit
+      const { cert, createdAt, ...permData } = permission;
+
+      if (stringify(permData) === permInputStr) return permission;
+    }
+
     const permission = { createdAt: new Date(), ...permissionInput };
 
     const json = stringify(permission);

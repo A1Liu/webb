@@ -2,7 +2,11 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { ZustandIdbStorage } from "../util";
 import { GlobalInitGroup } from "../constants";
-import { Permission, PermissionSchema, Permissions } from "../permissions";
+import {
+  Permission,
+  PermissionSchema,
+  PermissionsManager,
+} from "../permissions";
 import { z } from "zod";
 import { registerRpc } from "../network";
 import { useGlobals } from "./appGlobals";
@@ -70,7 +74,7 @@ export const AskPermission = registerRpc({
     if (!allowed) return;
 
     const { permissionCache, cb: permCb } = usePermissionCache.getState();
-    const permissions = new Permissions(
+    const permissions = new PermissionsManager(
       deviceProfile.id,
       userProfile.publicAuthUserId,
       permissionCache,
