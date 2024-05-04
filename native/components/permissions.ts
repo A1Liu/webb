@@ -87,7 +87,10 @@ export class PermissionsManager {
       // TODO: omg this is all so wrong, none of this is robust holy shit
       const { cert, createdAt, ...permData } = permission;
 
-      if (stringify(permData) === permInputStr) return permission;
+      if (stringify(permData) === permInputStr) {
+        console.log("found existing permission");
+        return permission;
+      }
     }
 
     const permission = { createdAt: new Date(), ...permissionInput };

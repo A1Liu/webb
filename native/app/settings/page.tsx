@@ -201,7 +201,7 @@ export default function Settings() {
               const { deviceProfile } = useDeviceProfile.getState();
               if (!userProfile?.secret || !deviceProfile) return false;
 
-              const { permissionCache } = usePermissionCache.getState();
+              const { permissionCache, cb } = usePermissionCache.getState();
               const permissions = new PermissionsManager(
                 deviceProfile.id,
                 userProfile?.publicAuthUserId,
@@ -217,8 +217,8 @@ export default function Settings() {
                       value: userProfile.publicAuthUserId,
                     },
                   ],
-                  resourceId: [],
-                  actionId: [],
+                  resourceId: [{ __typename: "Any" }],
+                  actionId: [{ __typename: "Any" }],
                 },
                 "userRoot",
                 {
@@ -227,6 +227,10 @@ export default function Settings() {
                   privateKey: userProfile.secret.privateAuthKey,
                 },
               );
+
+              cb.updateCache(permissions.permissionCache);
+
+              toast.success("Now I have perms!");
             }}
           >
             Give Self Perms
