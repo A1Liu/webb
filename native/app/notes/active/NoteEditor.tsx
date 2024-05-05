@@ -1,10 +1,10 @@
 "use client";
 
-import * as automerge from "@automerge/automerge";
 import React from "react";
 import { useNotesState } from "@/components/state/notes";
 import { useLockFn, useRequest } from "ahooks";
 import {
+  automergePackage,
   NoteContentStoreProvider,
   updateNoteDoc,
   useNoteContents,
@@ -72,6 +72,8 @@ function NoteContentEditor() {
 }
 
 async function requestKeyForNote(noteId: string) {
+  const automerge = automergePackage.value!;
+
   const toastId = toast.loading(`Requesting perms...`);
 
   const { peers } = usePeers.getState();

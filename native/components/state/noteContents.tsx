@@ -6,7 +6,12 @@ import { base64ToBytes, bytesToBase64, ZustandIdbStorage } from "../util";
 import { createContext, useContext, useEffect } from "react";
 import { useCreation } from "ahooks";
 import toast from "react-hot-toast";
-import * as automerge from "@automerge/automerge";
+import type * as automerge from "@automerge/automerge";
+import { Future } from "@/../ui-shared/dist/util";
+
+export const automergePackage = Future.unwrapPromise(
+  import("@automerge/automerge"),
+);
 
 interface NoteContentsSerialized {
   noteId: string;
@@ -48,6 +53,8 @@ export const ZustandIdbNotesStorage: PersistStorage<
   Omit<NoteContentState, "actions">
 > = {
   setItem: async (id, value) => {
+    const automerge = await automergePackage.promise;
+
     const serializeValue: StorageValue<NoteContentsSerialized> = {
       state: {
         noteId: value.state.noteId,
@@ -59,6 +66,8 @@ export const ZustandIdbNotesStorage: PersistStorage<
     await ZustandIdbStorage.setItem(getIdbKey(id), serializeValue);
   },
   getItem: async (id) => {
+    const automerge = await automergePackage.promise;
+
     const output = await ZustandIdbStorage.getItem(getIdbKey(id));
     if (!output) {
       return null;
@@ -103,11 +112,12 @@ export async function updateNoteDoc(
 }
 
 function createNoteContentStore(noteId: string) {
+  const automerge = automergePackage.value!;
   return createStore<NoteContentState>()(
     persist(
       (set, get) => ({
         noteId,
-        doc: automerge.from({ contents: "" }),
+        doc: automerge.from({ contents: "New Note" })!,
         actions: {
           applyChanges: (changes) => {
             const { doc } = get();
@@ -123,8 +133,11 @@ function createNoteContentStore(noteId: string) {
           },
           updateText: (text) => {
             const { doc } = get();
+            console.log(doc);
             const newDoc = automerge.change(doc, (d) => {
+              console.log("before", d, d.contents);
               automerge.next.updateText(d, ["contents"], text);
+              console.log("after", d);
             });
             set({ doc: newDoc });
           },

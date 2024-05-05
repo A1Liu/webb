@@ -1,6 +1,5 @@
 "use client";
 
-import * as automerge from "@automerge/automerge";
 import React from "react";
 import { toast } from "react-hot-toast";
 import { IncomingPeers } from "@/app/settings/IncomingPeers";
@@ -17,6 +16,7 @@ import {
   useUserProfile,
 } from "@/components/state/userProfile";
 import {
+  automergePackage,
   updateNoteDoc,
   ZustandIdbNotesStorage,
 } from "@/components/state/noteContents";
@@ -180,7 +180,7 @@ export default function Settings() {
                 if (!note.text) continue;
                 await updateNoteDoc(
                   note.id,
-                  automerge.from({
+                  automergePackage.value!.from({
                     contents: note.text,
                   }),
                 );

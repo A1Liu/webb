@@ -1,6 +1,5 @@
 "use client";
 
-import * as automerge from "@automerge/automerge";
 import React from "react";
 import { buttonClass } from "@/components/TopbarLayout";
 import { useLockFn, useRequest } from "ahooks";
@@ -17,6 +16,7 @@ import {
 import { usePeers } from "@/components/state/peers";
 import { registerRpc, registerListener } from "@/components/network";
 import {
+  automergePackage,
   updateNoteDoc,
   ZustandIdbNotesStorage,
 } from "@/components/state/noteContents";
@@ -40,6 +40,8 @@ export const NoteDataFetch = registerRpc({
   input: z.object({ noteId: z.string(), permission: PermissionSchema }),
   output: z.object({ noteId: z.string(), textData: z.string() }),
   rpc: async function* (peerId, { noteId, permission }) {
+    const automerge = automergePackage.value!;
+
     console.debug(`received NoteDataFetch req`, peerId);
 
     const { notes } = useNotesState.getState();
@@ -108,6 +110,8 @@ const NotePushListener = registerListener({
     permission: PermissionSchema,
   }),
   listener: async (peerId, { notes, permission }) => {
+    const automerge = automergePackage.value!;
+
     const { userProfile } = useUserProfile.getState();
     if (!userProfile) {
       console.debug(`Device has no user, refusing to sync`);
@@ -215,6 +219,8 @@ const NoteListMetadata = registerRpc({
 });
 
 async function syncNotes() {
+  const automerge = automergePackage.value!;
+
   const { peers } = usePeers.getState();
   if (!peers) {
     toast.error(`No peers to synchronize with!`);
