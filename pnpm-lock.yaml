@@ -23,6 +23,9 @@ importers:
       '@a1liu/webb-ui-shared':
         specifier: workspace:*
         version: link:../ui-shared
+      '@automerge/automerge':
+        specifier: ^2.2.1
+        version: 2.2.1
       '@floating-ui/react':
         specifier: ^0.26.2
         version: 0.26.2(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -250,6 +253,12 @@ packages:
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
+
+  '@automerge/automerge-wasm@0.16.0':
+    resolution: {integrity: sha512-yYQ8WJED8f4cCnbIq+5SM8Q2tLK2VawDqLKptW+FTI5asklN8NEsHUHvDzqWUQARqGp6O9BnNd7ifQ0FPdks7A==}
+
+  '@automerge/automerge@2.2.1':
+    resolution: {integrity: sha512-LJwvVapEgAox0sEp0iDihE4wqsDAUyKt41Y5m3z1hHdF5DHa7IhqiHhGNCc59H8t3Zl3fnbTgtKabcMWFffvCQ==}
 
   '@babel/runtime@7.23.2':
     resolution: {integrity: sha512-mM8eg4yl5D6i3lu2QKPuPH4FArvJ8KhTofbE7jwMUv9KX5mBvwPAqnV3MlyBNqdp9RyRKP6Yck8TrfYrPvX3bg==}
@@ -2307,6 +2316,13 @@ snapshots:
   '@aashutoshrathi/word-wrap@1.2.6': {}
 
   '@alloc/quick-lru@5.2.0': {}
+
+  '@automerge/automerge-wasm@0.16.0': {}
+
+  '@automerge/automerge@2.2.1':
+    dependencies:
+      '@automerge/automerge-wasm': 0.16.0
+      uuid: 9.0.1
 
   '@babel/runtime@7.23.2':
     dependencies:
