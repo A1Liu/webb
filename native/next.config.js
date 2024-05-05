@@ -11,7 +11,7 @@ class WasmChunksFixPlugin {
             const name = pathname.split("/")[1];
             const info = compilation.assetsInfo.get(pathname);
             compilation.emitAsset(name, source, info);
-          })
+          }),
       );
     });
   }
