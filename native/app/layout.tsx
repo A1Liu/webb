@@ -1,7 +1,6 @@
 import { GlobalWrapper } from "@/components/GlobalWrapper";
 import clsx from "clsx";
 import { Inter } from "next/font/google";
-import "./globals.css";
 
 export const dynamic = "force-static";
 
