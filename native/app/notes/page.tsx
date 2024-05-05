@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { v4 as uuid } from "uuid";
 import { NoteData, useNotesState } from "@/components/state/notes";
