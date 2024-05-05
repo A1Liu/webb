@@ -1,8 +1,8 @@
 "use client";
 
 import clsx from "clsx";
-import Link from "next/link";
 import React from "react";
+import {Link} from "react-router-dom";
 
 interface TopbarLayoutProps {
   title: string;
@@ -22,7 +22,7 @@ export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
     <main className={clsx("flex h-full flex-col")}>
       <div className="flex justify-between items-center pl-2 pr-5 py-1 w-full border-b border-slate-400">
         <div className="flex gap-2 items-center">
-          {process.env.NODE_ENV === "development" ? (
+          {import.meta.env.DEV  ? (
             <div className="rounded-md p-1 bg-red-500 text-xs font-bold">
               DEV
             </div>
@@ -37,7 +37,7 @@ export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
                 return (
                   <Link
                     key={`${buttonInfo.type}-${buttonInfo.text}-${buttonInfo.href}`}
-                    href={buttonInfo.href}
+                    to={buttonInfo.href}
                     className="flex"
                   >
                     <button className={buttonClass}>{buttonInfo.text}</button>

@@ -1,21 +1,21 @@
 "use client";
 
 import { TopbarLayout } from "@/components/TopbarLayout";
-import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useNavigate} from "react-router-dom";
 import { useDeviceProfile } from "../components/state/deviceProfile";
 
 export const dynamic = "force-static";
 
 export default function Home() {
   const { isHydrated, deviceProfile } = useDeviceProfile();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (isHydrated && deviceProfile) {
-      router.push("/notes");
+      navigate("/notes");
     }
-  }, [router, isHydrated, deviceProfile]);
+  }, [navigate, isHydrated, deviceProfile]);
 
   return (
     <TopbarLayout
