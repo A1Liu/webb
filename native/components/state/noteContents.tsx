@@ -41,13 +41,13 @@ export async function deleteNoteContents(noteId: string) {
     return;
   }
 
-  await ZustandIdbStorage.removeItem(getIdbKey(noteId));
+  await ZustandIdbNotesStorage.removeItem(noteId);
 }
 
-const ZustandIdbNotesStorage: PersistStorage<
+export const ZustandIdbNotesStorage: PersistStorage<
   Omit<NoteContentState, "actions">
 > = {
-  setItem: async (key, value) => {
+  setItem: async (id, value) => {
     const serializeValue: StorageValue<NoteContentsSerialized> = {
       state: {
         noteId: value.state.noteId,
@@ -56,10 +56,10 @@ const ZustandIdbNotesStorage: PersistStorage<
       version: VERSION,
     };
 
-    await ZustandIdbStorage.setItem(key, serializeValue);
+    await ZustandIdbStorage.setItem(getIdbKey(id), serializeValue);
   },
-  getItem: async (key) => {
-    const output = await ZustandIdbStorage.getItem(key);
+  getItem: async (id) => {
+    const output = await ZustandIdbStorage.getItem(getIdbKey(id));
     if (!output) {
       return null;
     }
@@ -71,51 +71,35 @@ const ZustandIdbNotesStorage: PersistStorage<
     );
 
     return {
+      version: VERSION,
       state: {
         noteId: state.noteId,
         doc,
       },
-      version: 0,
     };
   },
-  removeItem: async (key) => {
-    await ZustandIdbStorage.removeItem(key);
+  removeItem: async (id) => {
+    await ZustandIdbStorage.removeItem(getIdbKey(id));
   },
 };
 
-export async function writeNoteContents(noteId: string, text: string) {
+export async function updateNoteDoc(
+  noteId: string,
+  doc: automerge.next.Doc<{ contents: string }>,
+) {
   if (runningEditor.current?.getState().noteId === noteId) {
     toast(`writing to current contents`);
-    runningEditor.current.getState().actions.updateText(text);
+    runningEditor.current.setState({ doc });
     return;
   }
 
-  const doc = automerge.from({ contents: text });
-
-  const value: StorageValue<NoteContentsSerialized> = {
+  await ZustandIdbNotesStorage.setItem(noteId, {
+    version: VERSION,
     state: {
       noteId,
-      doc: bytesToBase64(automerge.save(doc)),
+      doc,
     },
-    version: VERSION,
-  };
-
-  await ZustandIdbStorage.setItem(getIdbKey(noteId), value);
-}
-
-export async function readNoteContents(
-  noteId: string,
-): Promise<string | undefined> {
-  const output = await ZustandIdbStorage.getItem(getIdbKey(noteId));
-  if (!output) {
-    return undefined;
-  }
-
-  const state = output.state as NoteContentsSerialized;
-
-  return automerge.load<NoteContentState["doc"]>(
-    new Uint8Array(base64ToBytes(state.doc)),
-  ).contents;
+  });
 }
 
 function createNoteContentStore(noteId: string) {
@@ -147,7 +131,7 @@ function createNoteContentStore(noteId: string) {
         },
       }),
       {
-        name: getIdbKey(noteId),
+        name: noteId,
         storage: ZustandIdbNotesStorage,
         version: VERSION,
         skipHydration: true,

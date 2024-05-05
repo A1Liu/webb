@@ -1,5 +1,6 @@
 "use client";
 
+import * as automerge from "@automerge/automerge";
 import React from "react";
 import { toast } from "react-hot-toast";
 import { IncomingPeers } from "@/app/settings/IncomingPeers";
@@ -16,8 +17,8 @@ import {
   useUserProfile,
 } from "@/components/state/userProfile";
 import {
-  readNoteContents,
-  writeNoteContents,
+  updateNoteDoc,
+  ZustandIdbNotesStorage,
 } from "@/components/state/noteContents";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
@@ -156,7 +157,9 @@ export default function Settings() {
               return await Promise.all(
                 [...useNotesState.getState().notes.values()].map(
                   async (note) => {
-                    const text = (await readNoteContents(note.id)) ?? "";
+                    const text =
+                      (await ZustandIdbNotesStorage.getItem(note.id))?.state.doc
+                        .contents ?? "";
                     return {
                       ...note,
                       text,
@@ -175,7 +178,12 @@ export default function Settings() {
 
               for (const note of notes) {
                 if (!note.text) continue;
-                await writeNoteContents(note.id, note.text);
+                await updateNoteDoc(
+                  note.id,
+                  automerge.from({
+                    contents: note.text,
+                  }),
+                );
               }
             }}
           />
