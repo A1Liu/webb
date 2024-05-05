@@ -4,34 +4,30 @@ import React from "react";
 import { toast } from "react-hot-toast";
 import { IncomingPeers } from "@/app/settings/IncomingPeers";
 import { usePlatform } from "@/components/hooks/usePlatform";
-import { TopbarLayout } from "@/components/TopbarLayout";
+import { buttonClass, TopbarLayout } from "@/components/TopbarLayout";
 import { useLockFn, useMemoizedFn } from "ahooks";
 import { usePeers } from "@/components/state/peers";
 import { NoteDataSchema, useNotesState } from "@/components/state/notes";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import Link from "next/link";
 import { DeviceQr, ScanAndConnectButton } from "@/components/DeviceQrCode";
-import { useUserProfile } from "@/components/state/userProfile";
+import {
+  UserProfileSerializedSchema,
+  useUserProfile,
+} from "@/components/state/userProfile";
 import {
   readNoteContents,
   writeNoteContents,
 } from "@/components/state/noteContents";
 import { z } from "zod";
-import {
-  base64ToBytes,
-  bytesToBase64,
-  exportUserPublickKey,
-  importUserPublicKey,
-  verifyUserKey,
-} from "@/components/crypto";
-import { useLocks } from "@/components/state/locks";
 import { useRouter } from "next/navigation";
 import { TapCounterButton } from "@/components/Button";
 import { clear } from "idb-keyval";
+import { usePermissionCache } from "@/components/state/permissions";
+import { PermissionsManager } from "@/components/permissions";
+import { useDeviceProfile } from "@/components/state/deviceProfile";
 
 export const dynamic = "force-static";
-
-const buttonClass = "bg-sky-700 p-2 rounded hover:bg-sky-900";
 
 function BackupAndRestore<T>({
   title,
@@ -92,91 +88,19 @@ function BackupUser() {
   return (
     <BackupAndRestore
       title={"user"}
-      schema={z.object({
-        publicAuthUserId: z.string(),
-        publicAuthKeyBase64: z.string(),
-        secret: z.object({
-          privateAuthKeyBase64: z.string(),
-          privateEncryptKeyBase64: z.string(),
-        }),
-      })}
+      schema={UserProfileSerializedSchema}
       fetchData={async () => {
-        const userProfile = useUserProfile.getState().userProfile;
+        const userProfile = useUserProfile.getState()._userProfileSerialized;
         if (!userProfile) {
           throw new Error("no UserProfile");
         }
 
-        const pubKey = await exportUserPublickKey(userProfile.publicAuthKey);
-
-        const secret = await (async () => {
-          if (!userProfile.secret) return undefined;
-
-          const privAuthKey = await window.crypto.subtle.exportKey(
-            "pkcs8",
-            userProfile.secret.privateAuthKey,
-          );
-          const privEncryptKey = await window.crypto.subtle.exportKey(
-            "raw",
-            userProfile.secret.privateEncryptKey,
-          );
-
-          return {
-            privateAuthKeyBase64: bytesToBase64(privAuthKey),
-            privateEncryptKeyBase64: bytesToBase64(privEncryptKey),
-          };
-        })();
-
-        return {
-          publicAuthUserId: userProfile.publicAuthUserId,
-          publicAuthKeyBase64: pubKey,
-          secret,
-        };
+        return userProfile;
       }}
       writeData={async (userProfileData) => {
-        const pubKey = await importUserPublicKey(
-          userProfileData.publicAuthKeyBase64,
-        );
-
-        const secret = await (async () => {
-          if (!userProfileData.secret) return undefined;
-
-          const privateAuthKey = await window.crypto.subtle.importKey(
-            "pkcs8",
-            base64ToBytes(userProfileData.secret.privateAuthKeyBase64),
-            {
-              name: "RSA-PSS",
-              hash: "SHA-512",
-            },
-            true,
-            ["sign"],
-          );
-          const privateEncryptKey = await window.crypto.subtle.importKey(
-            "raw",
-            base64ToBytes(userProfileData.secret.privateEncryptKeyBase64),
-            { name: "AES-GCM", length: 256 },
-            true,
-            ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
-          );
-
-          return {
-            privateAuthKey,
-            privateEncryptKey,
-          };
-        })();
-
-        const verified = await verifyUserKey(
-          pubKey,
-          userProfileData.publicAuthUserId,
-        );
-        if (!verified) {
-          throw new Error("User profile failed verification");
-        }
-
-        useUserProfile.getState().cb.updateUserProfile({
-          publicAuthUserId: userProfileData.publicAuthUserId,
-          publicAuthKey: pubKey,
-          secret,
-        });
+        await useUserProfile
+          .getState()
+          .cb.updateUserProfileFromSerialized(userProfileData);
       }}
     />
   );
@@ -207,12 +131,12 @@ export default function Settings() {
       buttons={[
         {
           type: "button",
-          text: "Back",
+          text: "⏪ Back",
           onClick: () => router.back(),
         },
         {
           type: "button",
-          text: "Refresh",
+          text: "😵",
           onClick: () => window.location.reload(),
         },
       ]}
@@ -246,7 +170,7 @@ export default function Settings() {
               // Or it should be easier to lock and unlock things,
               // and categorize them.
               notesCb.updateNotesFromSync(
-                notes.map(({ text, lockId, ...note }) => note),
+                notes.map(({ text, ...note }) => note),
               );
 
               for (const note of notes) {
@@ -270,25 +194,46 @@ export default function Settings() {
             HARD RESET
           </TapCounterButton>
 
-          <button className={buttonClass} onClick={() => notesCb.lockAll()}>
-            Lock All
-          </button>
-
           <button
             className={buttonClass}
             onClick={async () => {
-              const { locks, cb } = useLocks.getState();
-              if (locks.size > 0) {
-                toast("Already have lock", {});
-                return;
-              }
+              const { userProfile } = useUserProfile.getState();
+              const { deviceProfile } = useDeviceProfile.getState();
+              if (!userProfile?.secret || !deviceProfile) return false;
 
-              await cb.createLock("main");
+              const { permissionCache, cb } = usePermissionCache.getState();
+              const permissions = new PermissionsManager(
+                deviceProfile.id,
+                userProfile?.publicAuthUserId,
+                permissionCache,
+              );
 
-              toast("created lock", {});
+              await permissions.createPermission(
+                {
+                  deviceId: [{ __typename: "Exact", value: deviceProfile.id }],
+                  userId: [
+                    {
+                      __typename: "Exact",
+                      value: userProfile.publicAuthUserId,
+                    },
+                  ],
+                  resourceId: [{ __typename: "Any" }],
+                  actionId: [{ __typename: "Any" }],
+                },
+                "userRoot",
+                {
+                  id: userProfile.publicAuthUserId,
+                  publicKey: userProfile.publicAuthKey,
+                  privateKey: userProfile.secret.privateAuthKey,
+                },
+              );
+
+              cb.updateCache(permissions.permissionCache);
+
+              toast.success("Now I have perms!");
             }}
           >
-            Create lock
+            Give Self Perms
           </button>
         </div>
       </div>

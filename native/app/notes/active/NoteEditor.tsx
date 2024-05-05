@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useNoteMetadata, useNotesState } from "@/components/state/notes";
+import { useNotesState } from "@/components/state/notes";
 import { useLockFn, useRequest } from "ahooks";
 import {
   NoteContentStoreProvider,
@@ -10,37 +10,35 @@ import {
 } from "@/components/state/noteContents";
 import { NoteDataFetch, SyncNotesButton } from "./SyncNotesButton";
 import { buttonClass } from "@/components/TopbarLayout";
-import { RequestKeyForLock, useLocks } from "@/components/state/locks";
 import { usePeers } from "@/components/state/peers";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { getFirstSuccess } from "@/components/util";
+import {
+  AskPermission,
+  usePermissionCache,
+} from "@/components/state/permissions";
+import { useUserProfile } from "@/components/state/userProfile";
+import { useDeviceProfile } from "@/components/state/deviceProfile";
+import { PermissionsManager } from "@/components/permissions";
+import { getNetworkLayerGlobal } from "@/components/network";
 
 export const dynamic = "force-static";
 
-function EnableLockingButton({ noteId }: { noteId: string }) {
-  const cb = useNotesState((s) => s.cb);
-  const { lockId } = useNoteMetadata(noteId);
-  const {
-    cb: { getLock },
-  } = useLocks();
-  const lock = getLock();
+function ReconnectButton() {
+  const { connected } = usePeers();
 
-  if (!lock) {
-    return null;
-  }
+  if (connected) return null;
 
   return (
     <button
       className={buttonClass}
-      onClick={() =>
-        cb.updateNote(noteId, (prev) => ({
-          ...prev,
-          lockId: lockId ? undefined : lock.id,
-        }))
-      }
+      onClick={async () => {
+        const network = await getNetworkLayerGlobal();
+        network.ensureInit();
+      }}
     >
-      {lockId ? "Locked" : "Unlocked"}
+      Reconnect
     </button>
   );
 }
@@ -72,19 +70,23 @@ function NoteContentEditor() {
   );
 }
 
-async function requestKeyForLock(lockId: string) {
-  const toastId = toast.loading(`Requesting key...`);
+async function requestKeyForNote(noteId: string) {
+  const toastId = toast.loading(`Requesting perms...`);
 
   const { peers } = usePeers.getState();
   const firstResult = await getFirstSuccess(
     [...peers.values()].map(async (peer) => {
       // cheating here to always get the first successful result
       // if one exists
-      if (!lockId) throw new Error(``);
-      const result = RequestKeyForLock.call(peer.id, { lockId });
-      for await (const { key } of result) {
-        if (!key) continue;
-        return { peerId: peer.id, key };
+      if (!noteId) throw new Error(``);
+      const result = AskPermission.call(peer.id, {
+        action: {
+          actionId: [{ __typename: "Exact", value: "updateNote" }],
+          resourceId: [{ __typename: "Exact", value: noteId }],
+        },
+      });
+      for await (const { permission } of result) {
+        return { peerId: peer.id, permission };
       }
 
       throw new Error(``);
@@ -98,14 +100,13 @@ async function requestKeyForLock(lockId: string) {
     return false;
   }
 
-  const { key, peerId } = firstResult.value;
+  const { permission, peerId } = firstResult.value;
 
-  const {
-    cb: { addKey },
-  } = useLocks.getState();
-  addKey(key);
+  const { permissionCache, cb } = usePermissionCache.getState();
+  permissionCache.set(permission.cert.signature, permission);
+  cb.updateCache(permissionCache);
 
-  toast.success(`Successfully added key!`);
+  toast.success(`Successfully added permission!`);
   toast.loading(`Fetching latest data...`, {
     id: toastId,
   });
@@ -114,11 +115,9 @@ async function requestKeyForLock(lockId: string) {
 
   let count = 0;
   for (const note of notes.values()) {
-    if (note.lockId !== key.lockId) continue;
-
     const dataFetchResult = NoteDataFetch.call(peerId, {
       noteId: note.id,
-      permissionKey: key,
+      permission,
     });
 
     for await (const { noteId, text } of dataFetchResult) {
@@ -135,14 +134,30 @@ async function requestKeyForLock(lockId: string) {
   });
 }
 
-function useNoteKeyRequest(lockId?: string): {
+function useNoteKeyRequest(noteId: string): {
   loading: boolean;
   requestKey: () => Promise<boolean | undefined>;
 } {
   const { loading, runAsync: requestKey } = useRequest(
     async () => {
-      if (!lockId) return true;
-      await requestKeyForLock(lockId);
+      const { userProfile } = useUserProfile.getState();
+      const { deviceProfile } = useDeviceProfile.getState();
+      if (!userProfile || !deviceProfile) return false;
+
+      const { permissionCache } = usePermissionCache.getState();
+      const permissions = new PermissionsManager(
+        deviceProfile.id,
+        userProfile?.publicAuthUserId,
+        permissionCache,
+      );
+      const perm = permissions.findMyPermission({
+        actionId: ["updateNote"],
+        resourceId: [noteId],
+      });
+
+      if (perm) return true;
+
+      await requestKeyForNote(noteId);
       return true;
     },
     {
@@ -159,26 +174,36 @@ function useNoteKeyRequest(lockId?: string): {
 }
 
 export function NoteEditor({ noteId }: { noteId: string }) {
-  const { lockId } = useNoteMetadata(noteId);
+  const { userProfile } = useUserProfile();
+  const { deviceProfile } = useDeviceProfile();
+  const { permissionCache } = usePermissionCache();
   const {
     data: hasAuth,
     loading,
     refresh,
   } = useRequest(
     async () => {
-      if (!lockId) return true;
-      const key = await useLocks.getState().cb.createKey(lockId);
-      if (!key) return false;
+      if (!userProfile || !deviceProfile) return false;
 
-      return true;
+      const permissions = new PermissionsManager(
+        deviceProfile.id,
+        userProfile?.publicAuthUserId,
+        permissionCache,
+      );
+      const perm = permissions.findMyPermission({
+        actionId: ["updateNote"],
+        resourceId: [noteId],
+      });
+
+      if (perm) return true;
+
+      return false;
     },
     {
-      refreshDeps: [lockId],
+      refreshDeps: [noteId, userProfile, deviceProfile, permissionCache],
     },
   );
-  const { loading: requestKeyLoading, requestKey } = useNoteKeyRequest(
-    lockId ?? undefined,
-  );
+  const { loading: requestKeyLoading, requestKey } = useNoteKeyRequest(noteId);
   const router = useRouter();
 
   if (loading) {
@@ -193,9 +218,9 @@ export function NoteEditor({ noteId }: { noteId: string }) {
 
   return (
     <div className="flex justify-stretch relative flex-grow">
-      <div className="absolute top-2 right-2 flex flex-col gap-2 items-end">
+      <div className="absolute top-2 right-5 flex flex-col gap-2 items-end">
         <SyncNotesButton />
-        <EnableLockingButton noteId={noteId} />
+        <ReconnectButton />
       </div>
 
       {!hasAuth ? (

@@ -14,14 +14,21 @@ interface TopbarLayoutProps {
 }
 
 export const buttonClass =
-  "bg-sky-700 px-2 py-1 rounded hover:bg-sky-900 p-10 disabled:hover:bg-sky-700";
+  "bg-sky-700 px-2 py-1 rounded hover:bg-sky-900 p-10 disabled:hover:bg-sky-700 text-xs font-bold";
 
 export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
   // py-24 px-8
   return (
-    <main className={clsx("flex h-full flex-col gap-2")}>
-      <div className="flex justify-between items-center px-4 py-1 w-full border-b border-slate-400">
-        <h4>{title}</h4>
+    <main className={clsx("flex h-full flex-col")}>
+      <div className="flex justify-between items-center pl-2 pr-5 py-1 w-full border-b border-slate-400">
+        <div className="flex gap-2 items-center">
+          {process.env.NODE_ENV === "development" ? (
+            <div className="rounded-md p-1 bg-red-500 text-xs font-bold">
+              DEV
+            </div>
+          ) : null}
+          <h4>{title}</h4>
+        </div>
 
         <div className="flex gap-2 flex-wrap">
           {buttons.map((buttonInfo) => {
@@ -31,6 +38,7 @@ export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
                   <Link
                     key={`${buttonInfo.type}-${buttonInfo.text}-${buttonInfo.href}`}
                     href={buttonInfo.href}
+                    className="flex"
                   >
                     <button className={buttonClass}>{buttonInfo.text}</button>
                   </Link>

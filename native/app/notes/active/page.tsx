@@ -16,12 +16,17 @@ export default function Notes() {
       buttons={[
         {
           type: "link",
-          text: "View All",
+          text: "⏪ Back",
           href: "/notes",
         },
         {
+          type: "link",
+          text: "⚙️ ",
+          href: "/settings",
+        },
+        {
           type: "button",
-          text: "Refresh",
+          text: "😵",
           onClick: () => window.location.reload(),
         },
       ]}

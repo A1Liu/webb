@@ -19,7 +19,8 @@ type AppState =
       flowId: string;
       title: string;
       description: string;
-      completion: (value: boolean) => void;
+      options: readonly string[];
+      completion: (value: string) => void;
     };
 
 interface BackgroundFlowOptions {}
@@ -27,9 +28,10 @@ interface BackgroundFlowProps {
   id: string;
 }
 
-interface PermissionFlowProps {
+interface PermissionFlowProps<T extends string> {
   title: string;
   description: string;
+  options: readonly T[];
 }
 
 interface WebbGlobals {
@@ -38,7 +40,9 @@ interface WebbGlobals {
   state: AppState;
 
   cb: {
-    runPermissionFlow: (props: PermissionFlowProps) => Promise<boolean>;
+    runPermissionFlow: <T extends string>(
+      props: PermissionFlowProps<T>,
+    ) => Promise<T>;
     runBackgroundFlow: (
       flow: (props: BackgroundFlowProps) => Promise<void>,
       opts?: BackgroundFlowOptions,
@@ -53,22 +57,23 @@ export const useGlobals = create<WebbGlobals>()((set, get) => {
     state: { kind: AppStateKind.Page },
 
     cb: {
-      runPermissionFlow: async (props) => {
+      runPermissionFlow: async function (props) {
         const id = uuid();
         try {
-          const approve = await new Promise<boolean>((resolve) => {
+          const approve = await new Promise<string>((resolve) => {
             set({
               state: {
                 kind: AppStateKind.PermissionFlow,
                 flowId: id,
                 title: props.title,
                 description: props.description,
+                options: props.options,
                 completion: resolve,
               },
             });
           });
 
-          return approve;
+          return approve as unknown as any;
         } catch (error) {
           toast(`perm flow failed: ${String(error)}`);
           return false;

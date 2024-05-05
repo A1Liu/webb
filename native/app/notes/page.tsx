@@ -9,8 +9,11 @@ import clsx from "clsx";
 import { DefaultTimeFormatter } from "@/components/util";
 import { useRouter } from "next/navigation";
 import { NoteEditor } from "./active/NoteEditor";
-import { useLocks } from "@/components/state/locks";
 import { useRequest } from "ahooks";
+import { usePermissionCache } from "@/components/state/permissions";
+import { PermissionsManager } from "@/components/permissions";
+import { useUserProfile } from "@/components/state/userProfile";
+import { useDeviceProfile } from "@/components/state/deviceProfile";
 
 export const dynamic = "force-static";
 
@@ -18,18 +21,33 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
   const cb = useNotesState((s) => s.cb);
   const activeNote = useNotesState((s) => s.activeNote);
   const { isMobile } = usePlatform();
-  const { lockId } = note;
+  const { id: noteId } = note;
   const router = useRouter();
+
+  const { userProfile } = useUserProfile();
+  const { deviceProfile } = useDeviceProfile();
+  const { permissionCache } = usePermissionCache();
+
   const { data: hasAuth, loading } = useRequest(
     async () => {
-      if (!lockId) return true;
-      const key = await useLocks.getState().cb.createKey(lockId);
-      if (!key) return false;
+      if (!userProfile || !deviceProfile) return false;
+
+      const permissions = new PermissionsManager(
+        deviceProfile.id,
+        userProfile?.publicAuthUserId,
+        permissionCache,
+      );
+      const perm = permissions.findMyPermission({
+        actionId: ["updateNote"],
+        resourceId: [noteId],
+      });
+
+      if (!perm) return false;
 
       return true;
     },
     {
-      refreshDeps: [lockId],
+      refreshDeps: [noteId, userProfile, deviceProfile, permissionCache],
     },
   );
 
@@ -62,23 +80,38 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
   );
 }
 
+const desktopBoxStyles = "min-w-48 border-r border-slate-500";
 function SelectActiveNote() {
   const notes = useNotesState((s) => s.notes);
   const { isMobile } = usePlatform();
+  const nonTombstone = [...(notes ? notes?.values() : [])].filter(
+    (note) => !note.isTombstone,
+  );
+
+  if (nonTombstone.length === 0) {
+    return (
+      <div
+        className={clsx("flex flex-col", "items-center justify-center", {
+          [desktopBoxStyles]: !isMobile,
+          "flex-grow": isMobile,
+        })}
+      >
+        <h3>No Notes</h3>
+      </div>
+    );
+  }
 
   return (
     <div
       className={clsx(
-        "flex flex-col gap-2 overflow-y-scroll",
-        isMobile && "flex-grow",
+        "flex flex-col",
+        "gap-2 overflow-y-scroll scrollbar-hidden p-1",
+        { [desktopBoxStyles]: !isMobile, "flex-grow": isMobile },
       )}
     >
-      {[...(notes ? notes?.values() : [])]
-        .reverse()
-        .filter((note) => !note.isTombstone)
-        .map((note) => (
-          <ActiveNoteButton key={note.id} note={note} />
-        ))}
+      {nonTombstone.reverse().map((note) => (
+        <ActiveNoteButton key={note.id} note={note} />
+      ))}
     </div>
   );
 }
@@ -95,7 +128,7 @@ export default function Notes() {
       buttons={[
         {
           type: "button",
-          text: "New Note",
+          text: "+ Create",
           onClick: () => {
             cb.setActiveNote(uuid());
             if (isMobile) {
@@ -105,12 +138,12 @@ export default function Notes() {
         },
         {
           type: "link",
-          text: "Settings",
+          text: "⚙️ ",
           href: "/settings",
         },
         {
           type: "button",
-          text: "Refresh",
+          text: "😵",
           onClick: () => window.location.reload(),
         },
       ]}
