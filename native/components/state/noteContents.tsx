@@ -8,10 +8,13 @@ import { useCreation } from "ahooks";
 import toast from "react-hot-toast";
 import type * as automerge from "@automerge/automerge";
 import { Future } from "@/../ui-shared/dist/util";
+import { GlobalInitGroup } from "../constants";
 
-export const automergePackage = Future.unwrapPromise(
-  import("@automerge/automerge"),
-);
+export const automergePackage = new Future<typeof automerge>();
+
+GlobalInitGroup.registerInit("automerge", () => {
+  import("@automerge/automerge").then((a) => automergePackage.resolve(a));
+});
 
 interface NoteContentsSerialized {
   noteId: string;
