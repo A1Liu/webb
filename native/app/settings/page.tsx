@@ -13,8 +13,9 @@ import {
   useUserProfile,
 } from "@/components/state/userProfile";
 import {
-  readNoteContents,
-  writeNoteContents,
+  automergePackage,
+  updateNoteDoc,
+  ZustandIdbNotesStorage,
 } from "@/components/state/noteContents";
 import { z } from "zod";
 import { TapCounterButton } from "@/components/Button";
@@ -153,7 +154,9 @@ export default function Settings() {
               return await Promise.all(
                 [...useNotesState.getState().notes.values()].map(
                   async (note) => {
-                    const text = (await readNoteContents(note.id)) ?? "";
+                    const text =
+                      (await ZustandIdbNotesStorage.getItem(note.id))?.state.doc
+                        .contents ?? "";
                     return {
                       ...note,
                       text,
@@ -172,7 +175,12 @@ export default function Settings() {
 
               for (const note of notes) {
                 if (!note.text) continue;
-                await writeNoteContents(note.id, note.text);
+                await updateNoteDoc(
+                  note.id,
+                  automergePackage.value!.from({
+                    contents: note.text,
+                  }),
+                );
               }
             }}
           />

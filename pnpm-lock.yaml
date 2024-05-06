@@ -23,6 +23,9 @@ importers:
       '@a1liu/webb-ui-shared':
         specifier: workspace:*
         version: link:../ui-shared
+      '@automerge/automerge':
+        specifier: ^2.2.1
+        version: 2.2.1
       '@floating-ui/react':
         specifier: ^0.26.2
         version: 0.26.2(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -263,6 +266,12 @@ packages:
   '@ampproject/remapping@2.3.0':
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
+
+  '@automerge/automerge-wasm@0.16.0':
+    resolution: {integrity: sha512-yYQ8WJED8f4cCnbIq+5SM8Q2tLK2VawDqLKptW+FTI5asklN8NEsHUHvDzqWUQARqGp6O9BnNd7ifQ0FPdks7A==}
+
+  '@automerge/automerge@2.2.1':
+    resolution: {integrity: sha512-LJwvVapEgAox0sEp0iDihE4wqsDAUyKt41Y5m3z1hHdF5DHa7IhqiHhGNCc59H8t3Zl3fnbTgtKabcMWFffvCQ==}
 
   '@babel/code-frame@7.24.2':
     resolution: {integrity: sha512-y5+tLQyV8pg3fsiln67BVLD1P13Eg4lh5RW9mF0zUuvLrv9uIQ4MCL+CRT+FTsBlBjcIan6PGsLcBN0m3ClUyQ==}
@@ -2837,6 +2846,13 @@ snapshots:
     dependencies:
       '@jridgewell/gen-mapping': 0.3.5
       '@jridgewell/trace-mapping': 0.3.25
+
+  '@automerge/automerge-wasm@0.16.0': {}
+
+  '@automerge/automerge@2.2.1':
+    dependencies:
+      '@automerge/automerge-wasm': 0.16.0
+      uuid: 9.0.1
 
   '@babel/code-frame@7.24.2':
     dependencies:

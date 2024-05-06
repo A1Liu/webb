@@ -1,5 +1,7 @@
+.DS_Store
 /.svelte-kit
 /package.json
+*.zip
 *.ts
 *.tsx
 *.svelte
@@ -12,3 +14,6 @@
 /util
 /node_modules
 /components
+next.config.js
+next-env.d.ts
+
