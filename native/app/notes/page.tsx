@@ -58,7 +58,7 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
           ? "bg-yellow-700"
           : "bg-slate-700",
         "disabled:bg-slate-900",
-        "text-white rounded-md p-6 flex flex-col gap-2",
+        "text-white rounded-md px-4 py-5 flex flex-col gap-2",
       )}
       disabled={loading}
       onClick={() => {

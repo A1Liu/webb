@@ -23,6 +23,7 @@ import { useNavigate } from "react-router-dom";
 import * as automerge from "@automerge/automerge";
 import CodeMirror, { EditorView, ViewUpdate } from "@uiw/react-codemirror";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import clsx from "clsx";
 
 export const dynamic = "force-static";
 
@@ -90,7 +91,6 @@ function NoteContentEditor() {
       theme={"dark"}
       value={noteText.toString()}
       height={"100%"}
-      className={"flex-grow"}
       basicSetup={{ lineNumbers: false, foldGutter: false }}
       onChange={createOnChangeHandler(noteId, changeDoc)}
       extensions={[
@@ -274,7 +274,12 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   }
 
   return (
-    <div className="flex justify-stretch relative flex-grow">
+    <div
+      className={clsx(
+        "flex justify-stretch items-stretch relative flex-grow",
+        hasAuth && "overflow-hidden",
+      )}
+    >
       <div className="absolute top-2 right-5 flex flex-col gap-2 items-end z-10">
         <SyncNotesButton />
         <ReconnectButton />

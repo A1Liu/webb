@@ -36,3 +36,22 @@ main {
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
 }
+
+.styled-scrollbar {
+  --scrollbar-foreground: #abb2bf;
+  --scrollbar-background: #282c34;
+  /* Foreground, Background */
+  scrollbar-color: var(--scrollbar-foreground) var(--scrollbar-background);
+}
+.styled-scrollbar::-webkit-scrollbar {
+  width: 1rem; /* Mostly for vertical scrollbars */
+  height: 1rem; /* Mostly for horizontal scrollbars */
+}
+.styled-scrollbar::-webkit-scrollbar-thumb {
+  /* Foreground */
+  background: var(--scrollbar-foreground);
+}
+.styled-scrollbar::-webkit-scrollbar-track {
+  /* Background */
+  background: var(--scrollbar-background);
+}
