@@ -3,6 +3,7 @@ import { useNotesState } from "@/components/state/notes";
 import { useLockFn, useRequest } from "ahooks";
 import {
   NoteContentStoreProvider,
+  NoteDocData,
   updateNoteDoc,
   useNoteContents,
 } from "@/components/state/noteContents";
@@ -46,14 +47,20 @@ function ReconnectButton() {
 }
 
 const FontSizeTheme = EditorView.theme({
+  "& *": {
+    fontFamily: "sans-serif",
+  },
   "&": {
     fontSize: "16px",
+  },
+  ".cm-content .ͼv": {
+    wordBreak: "break-all",
   },
 });
 
 function createOnChangeHandler(
   noteId: string,
-  changeDoc: (updater: (d: { contents: automerge.Text }) => void) => void,
+  changeDoc: (updater: (d: NoteDocData) => void) => void,
 ) {
   const { cb } = useNotesState.getState();
   return (text: string, update: ViewUpdate) => {
@@ -91,8 +98,13 @@ function NoteContentEditor() {
       theme={"dark"}
       value={noteText.toString()}
       height={"100%"}
+      width={"100%"}
       className="flex-grow"
-      basicSetup={{ lineNumbers: false, foldGutter: false }}
+      basicSetup={{
+        lineNumbers: false,
+        foldGutter: false,
+        highlightActiveLine: false,
+      }}
       onChange={createOnChangeHandler(noteId, changeDoc)}
       extensions={[
         EditorView.lineWrapping,
@@ -101,27 +113,6 @@ function NoteContentEditor() {
       ]}
     />
   );
-  /*
-  return (
-    <textarea
-      className="bg-black outline-none flex-grow resize-none"
-      value={noteText}
-      onChange={(evt) => {
-        const text = evt.target.value;
-        updateText(text);
-        cb.updateNote(
-          noteId,
-          (prev) => ({
-            ...prev,
-            lastUpdateDate: new Date(),
-            preview: text.split("\n", 1)[0].slice(0, 20),
-          }),
-          true,
-        );
-      }}
-    />
-  );
-   */
 }
 
 async function requestKeyForNote(noteId: string) {
@@ -175,7 +166,7 @@ async function requestKeyForNote(noteId: string) {
     });
 
     for await (const { noteId, textData } of dataFetchResult) {
-      const doc = automerge.load<{ contents: automerge.Text }>(
+      const doc = automerge.load<NoteDocData>(
         new Uint8Array(base64ToBytes(textData)),
       );
 

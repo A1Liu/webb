@@ -10,6 +10,7 @@ const NoteDataSchemaInternal = z.object({
   id: z.string(),
   preview: z.string(),
   isTombstone: z.boolean().optional(),
+  md5ContentHash: z.string().optional(),
   lastUpdateDate: z.coerce.date(),
 });
 
@@ -30,6 +31,8 @@ export interface NoteGlobalState {
     ) => void;
     updateNotesFromSync: (notes: NoteData[]) => void;
     setActiveNote: (id: string) => void;
+    killHash: (noteId: string) => void;
+    updateHash: (noteId: string, getHash: () => string) => void;
   };
 }
 
@@ -50,6 +53,36 @@ export const useNotesState = create<NoteGlobalState>()(
         activeNote: uuid(),
         notes: new Map(),
         cb: {
+          killHash: (noteId) => {
+            const { notes } = get();
+            const note = notes.get(noteId);
+            if (!note) return;
+            if (note.md5ContentHash === undefined) return;
+
+            const newNotes = new Map(notes);
+            newNotes.set(noteId, {
+              ...note,
+              md5ContentHash: undefined,
+            });
+
+            set({ notes: newNotes });
+          },
+          updateHash: (noteId, getHash) => {
+            const { notes } = get();
+            const note = notes.get(noteId);
+            if (!note) return;
+
+            // If we already have a hash, we assume it's valid.
+            if (note.md5ContentHash) return;
+
+            const newNotes = new Map(notes);
+            newNotes.set(noteId, {
+              ...note,
+              md5ContentHash: getHash(),
+            });
+
+            set({ notes: newNotes });
+          },
           updateNote: (noteId, updater, reorder = false) => {
             set((prev) => {
               const notes = new Map(prev.notes);

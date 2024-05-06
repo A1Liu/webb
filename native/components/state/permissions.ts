@@ -63,6 +63,13 @@ export const AskPermission = registerRpc({
     const { deviceProfile } = useDeviceProfile.getState();
     if (!deviceProfile) return;
 
+    const { permissionCache, cb: permCb } = usePermissionCache.getState();
+    const permissions = new PermissionsManager(
+      deviceProfile.id,
+      userProfile.publicAuthUserId,
+      permissionCache,
+    );
+
     const globalsCb = useGlobals.getState().cb;
 
     const allowed = await globalsCb.runPermissionFlow({
@@ -73,7 +80,7 @@ export const AskPermission = registerRpc({
       options: ["Deny", "Allow", "Always Allow"] as const,
     });
 
-    let permissionAction = action;
+    let permissionAction = { ...action, allow: true };
     switch (allowed) {
       case "Deny":
         return;
@@ -84,16 +91,10 @@ export const AskPermission = registerRpc({
         permissionAction = {
           resourceId: [{ __typename: "Any" as const }],
           actionId: [{ __typename: "Any" as const }],
+          allow: true,
         };
         break;
     }
-
-    const { permissionCache, cb: permCb } = usePermissionCache.getState();
-    const permissions = new PermissionsManager(
-      deviceProfile.id,
-      userProfile.publicAuthUserId,
-      permissionCache,
-    );
 
     const permissionInput = {
       deviceId: [{ __typename: "Exact" as const, value: peerId }],

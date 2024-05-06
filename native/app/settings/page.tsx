@@ -23,7 +23,6 @@ import { usePermissionCache } from "@/components/state/permissions";
 import { PermissionsManager } from "@/components/permissions";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { Link, useNavigate } from "react-router-dom";
-import * as automerge from "@automerge/automerge";
 
 export const dynamic = "force-static";
 
@@ -176,12 +175,7 @@ export default function Settings() {
 
               for (const note of notes) {
                 if (!note.text) continue;
-                await updateNoteDoc(
-                  note.id,
-                  automerge.from({
-                    contents: new automerge.Text(note.text),
-                  }),
-                );
+                await updateNoteDoc(note.id, note.text);
               }
             }}
           />
@@ -225,6 +219,7 @@ export default function Settings() {
                   ],
                   resourceId: [{ __typename: "Any" }],
                   actionId: [{ __typename: "Any" }],
+                  allow: true,
                 },
                 "userRoot",
                 {

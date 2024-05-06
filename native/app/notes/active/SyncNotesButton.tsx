@@ -14,20 +14,23 @@ import {
 import { usePeers } from "@/components/state/peers";
 import { registerRpc, registerListener } from "@/components/network";
 import {
+  NoteDocData,
   updateNoteDoc,
   ZustandIdbNotesStorage,
 } from "@/components/state/noteContents";
 import { useUserProfile } from "@/components/state/userProfile";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
-import { PermissionSchema, PermissionsManager } from "@/components/permissions";
+import {
+  PermissionResult,
+  PermissionSchema,
+  PermissionsManager,
+} from "@/components/permissions";
 import { usePermissionCache } from "@/components/state/permissions";
 import { base64ToBytes, bytesToBase64 } from "@/components/util";
 import { maxBy } from "lodash";
 import * as automerge from "@automerge/automerge";
 
-const NoteMetadataWithHashSchema = z.object({
-  note: NoteDataSchema,
-});
+const NoteMetadataWithHashSchema = z.object({ note: NoteDataSchema });
 
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
@@ -57,7 +60,7 @@ export const NoteDataFetch = registerRpc({
       permissionCache,
     );
 
-    const isVerified = await permissions.verifyPermission(
+    const verifyResult = await permissions.verifyPermission(
       permission,
       {
         deviceId: peerId,
@@ -72,7 +75,14 @@ export const NoteDataFetch = registerRpc({
     );
     permCb.updateCache(permissions.permissionCache);
 
-    if (!isVerified) return;
+    switch (verifyResult) {
+      case PermissionResult.Allow:
+        break;
+
+      default:
+        toast.error(`Data fetch unauthorized ${verifyResult}`);
+        return;
+    }
 
     const output = await ZustandIdbNotesStorage.getItem(noteId);
     if (!output) return;
@@ -109,7 +119,7 @@ const NotePushListener = registerListener({
       permissionCache,
     );
 
-    const isVerified = await permissions.verifyPermission(
+    const verifyResult = await permissions.verifyPermission(
       permission,
       {
         deviceId: peerId,
@@ -124,11 +134,13 @@ const NotePushListener = registerListener({
     );
     permCb.updateCache(permissions.permissionCache);
 
-    if (!isVerified) {
-      toast.error(
-        `Received synchronization request from unauthorized requester`,
-      );
-      return;
+    switch (verifyResult) {
+      case PermissionResult.Allow:
+        break;
+
+      default:
+        toast.error(`Sync request unauthorized ${verifyResult}`);
+        return;
     }
 
     console.debug(`received NotePush req`);
@@ -232,8 +244,9 @@ async function syncNotes() {
           value: userProfile.publicAuthUserId,
         },
       ],
-      resourceId: [{ __typename: "Any" }],
-      actionId: [{ __typename: "Any" }],
+      resourceId: [{ __typename: "AnyRemainingSlots" }],
+      actionId: [{ __typename: "AnyRemainingSlots" }],
+      allow: true,
     },
     "userRoot",
     {
@@ -315,7 +328,7 @@ async function syncNotes() {
 
       for await (const item of result) {
         const { textData } = item;
-        const remoteDoc = automerge.load<{ contents: automerge.Text }>(
+        const remoteDoc = automerge.load<NoteDocData>(
           new Uint8Array(base64ToBytes(textData)),
         );
 

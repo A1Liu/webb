@@ -1,31 +1,33 @@
 import { createStore, StoreApi, useStore } from "zustand";
+import md5 from "md5";
 import { persist, PersistStorage, StorageValue } from "zustand/middleware";
 import { base64ToBytes, bytesToBase64, ZustandIdbStorage } from "../util";
 import { createContext, useContext, useEffect } from "react";
 import { useCreation } from "ahooks";
 import toast from "react-hot-toast";
 import * as automerge from "@automerge/automerge";
+import { useNotesState } from "./notes";
 
 interface NoteContentsSerialized {
   noteId: string;
   doc: string;
 }
 
+export type NoteDocData = { contents: automerge.Text };
+export type NoteDoc = automerge.Doc<NoteDocData>;
 interface NoteContentState {
   noteId: string;
-  doc: automerge.next.Doc<{ contents: automerge.Text }>;
+  doc: NoteDoc;
   actions: {
     overwriteTextNoHistory: (s: string) => void;
     applyChanges: (s: Uint8Array[]) => void;
-    changeDoc: (updater: (d: { contents: automerge.Text }) => void) => void;
+    changeDoc: (updater: (d: NoteDocData) => void) => void;
   };
 }
 
 // TODO: support multiple
-const runningEditor: {
-  current?: ReturnType<typeof createNoteContentStore>;
-} = {};
-
+const editorRef: { current?: ReturnType<typeof createNoteContentStore> } = {};
+const AUTOMERGE_ACTOR = "60b965cef36a4894aa53fb8cd00e7685";
 const VERSION = 0;
 
 function getIdbKey(noteId: string) {
@@ -33,9 +35,9 @@ function getIdbKey(noteId: string) {
 }
 
 export async function deleteNoteContents(noteId: string) {
-  if (runningEditor.current?.getState().noteId === noteId) {
-    runningEditor.current.getState().actions.overwriteTextNoHistory("");
-    runningEditor.current.persist.clearStorage();
+  if (editorRef.current?.getState().noteId === noteId) {
+    editorRef.current.getState().actions.overwriteTextNoHistory("");
+    editorRef.current.persist.clearStorage();
   }
 
   await ZustandIdbNotesStorage.removeItem(noteId);
@@ -45,6 +47,7 @@ export const ZustandIdbNotesStorage: PersistStorage<
   Omit<NoteContentState, "actions">
 > = {
   setItem: async (id, value) => {
+    useNotesState.getState().cb.killHash(id);
     const serializeValue: StorageValue<NoteContentsSerialized> = {
       state: {
         noteId: value.state.noteId,
@@ -63,9 +66,13 @@ export const ZustandIdbNotesStorage: PersistStorage<
 
     const state = output.state as NoteContentsSerialized;
 
-    const doc = automerge.load<NoteContentState["doc"]>(
+    const doc = automerge.load<NoteDoc>(
       new Uint8Array(base64ToBytes(state.doc)),
     );
+
+    useNotesState.getState().cb.updateHash(id, () => {
+      return md5(doc.contents.toString());
+    });
 
     return {
       version: VERSION,
@@ -82,11 +89,18 @@ export const ZustandIdbNotesStorage: PersistStorage<
 
 export async function updateNoteDoc(
   noteId: string,
-  doc: automerge.next.Doc<{ contents: automerge.Text }>,
+  docInput: NoteDoc | string,
 ) {
-  if (runningEditor.current?.getState().noteId === noteId) {
+  const doc =
+    typeof docInput === "string"
+      ? automerge.from(
+          { contents: new automerge.Text(docInput) },
+          { actor: AUTOMERGE_ACTOR },
+        )
+      : docInput;
+  if (editorRef.current?.getState().noteId === noteId) {
     toast(`writing to current contents`);
-    runningEditor.current.setState({ doc });
+    editorRef.current.setState({ doc });
   }
 
   await ZustandIdbNotesStorage.setItem(noteId, {
@@ -103,27 +117,26 @@ function createNoteContentStore(noteId: string) {
     persist(
       (set, get) => ({
         noteId,
-        doc: automerge.from({ contents: new automerge.Text("") })!,
+        doc: automerge.from(
+          { contents: new automerge.Text("") },
+          { actor: AUTOMERGE_ACTOR },
+        ),
         actions: {
           changeDoc: (updater) => {
             const { doc } = get();
-            const newDoc = automerge.change(doc, (d) => {
-              updater(d);
-            });
-            console.log(newDoc.contents);
+            const newDoc = automerge.change(doc, updater);
             set({ doc: newDoc });
           },
           applyChanges: (changes) => {
             const { doc } = get();
-            const [newDoc] = automerge.applyChanges<{
-              contents: automerge.Text;
-            }>(doc, changes);
+            const [newDoc] = automerge.applyChanges<NoteDocData>(doc, changes);
             set({ doc: newDoc });
           },
           overwriteTextNoHistory: (contents) => {
-            const doc = automerge.from({
-              contents: new automerge.Text(contents),
-            });
+            const doc = automerge.from(
+              { contents: new automerge.Text(contents) },
+              { actor: AUTOMERGE_ACTOR },
+            );
             set({ doc });
           },
         },
@@ -157,11 +170,11 @@ export const NoteContentStoreProvider = ({
 
   useEffect(() => {
     store.persist.rehydrate();
-    runningEditor.current = store;
+    editorRef.current = store;
 
     return () => {
-      if (store === runningEditor.current) {
-        runningEditor.current = undefined;
+      if (store === editorRef.current) {
+        editorRef.current = undefined;
       }
     };
   }, [store]);

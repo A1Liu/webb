@@ -57,8 +57,9 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
           : activeNote === note.id && !isMobile
           ? "bg-yellow-700"
           : "bg-slate-700",
-        "disabled:bg-slate-900",
-        "text-white rounded-md px-4 py-5 flex flex-col gap-2",
+        "text-white disabled:bg-slate-900",
+        "rounded-md px-3 py-2",
+        "flex flex-col items-start gap-1",
       )}
       disabled={loading}
       onClick={() => {
@@ -68,7 +69,7 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
         }
       }}
     >
-      <p>
+      <p className="text-ellipsis overflow-hidden text-left whitespace-nowrap w-full">
         {note.merges ? "*" : ""}
         {note.preview}
       </p>
@@ -78,7 +79,7 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
   );
 }
 
-const desktopBoxStyles = "min-w-48 border-r-2 border-slate-500";
+const desktopBoxStyles = "w-48 flex-shrink-0 border-r-2 border-slate-500";
 function SelectActiveNote() {
   const notes = useNotesState((s) => s.notes);
   const { isMobile } = usePlatform();
@@ -150,7 +151,7 @@ export default function Notes() {
         <SelectActiveNote />
 
         {!isMobile ? (
-          <div className="flex flex-col gap-2 flex-grow">
+          <div className="flex flex-col gap-2 justify-stretch flex-grow">
             <NoteEditor noteId={activeNote} />
           </div>
         ) : null}

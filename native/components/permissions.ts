@@ -34,6 +34,13 @@ export const ActionSchema = z.object({
   actionId: z.string().array(),
 });
 
+export enum PermissionResult {
+  Allow = "Allow",
+  Reject = "Reject",
+  CertFailure = "CertFailure",
+  MatchFailure = "MatchFailure",
+}
+
 // We've basically re-invented AWS permissions. Which... I guess is fine. It's not
 // like I can import them.
 export type Permission = z.infer<typeof PermissionSchema>;
@@ -48,6 +55,8 @@ export const PermissionSchema = z.object({
 
   createdAt: z.coerce.date(),
   expiresAt: z.coerce.date().optional(),
+
+  allow: z.boolean(),
 
   cert: CertSchema,
 });
@@ -68,9 +77,22 @@ export class PermissionsManager {
   ) {}
 
   findMyPermission(action: { resourceId: string[]; actionId: string[] }) {
+    return this.searchCachedPermissions({
+      deviceId: this.deviceId,
+      userId: this.userId,
+      ...action,
+    });
+  }
+
+  searchCachedPermissions(action: {
+    deviceId: string;
+    userId: string;
+    resourceId: string[];
+    actionId: string[];
+  }) {
     for (const permission of this.permissionCache.values()) {
-      if (!match([this.deviceId], permission.deviceId)) continue;
-      if (!match([this.userId], permission.userId)) continue;
+      if (!match([action.deviceId], permission.deviceId)) continue;
+      if (!match([action.userId], permission.userId)) continue;
       if (!match(action.resourceId, permission.resourceId)) continue;
       if (!match(action.actionId, permission.actionId)) continue;
 
@@ -104,6 +126,7 @@ export class PermissionsManager {
 
     const permission: Omit<Permission, "cert"> = {
       createdAt: new Date(),
+      allow: permissionInput.allow,
       ...permissionFields,
     };
 
@@ -197,19 +220,25 @@ export class PermissionsManager {
       actionId: string[];
     },
     identity: Identity,
-  ): Promise<boolean> {
+  ): Promise<PermissionResult> {
     const permissionValid = await this.verifyPermissionSignature(
       permission,
       identity,
     );
-    if (!permissionValid) return false;
+    if (!permissionValid) return PermissionResult.CertFailure;
 
-    if (!match([action.deviceId], permission.deviceId)) return false;
-    if (!match([action.userId], permission.userId)) return false;
-    if (!match(action.resourceId, permission.resourceId)) return false;
-    if (!match(action.actionId, permission.actionId)) return false;
+    if (!match([action.deviceId], permission.deviceId))
+      return PermissionResult.MatchFailure;
+    if (!match([action.userId], permission.userId))
+      return PermissionResult.MatchFailure;
+    if (!match(action.resourceId, permission.resourceId))
+      return PermissionResult.MatchFailure;
+    if (!match(action.actionId, permission.actionId))
+      return PermissionResult.MatchFailure;
 
-    return true;
+    if (!permission.allow) return PermissionResult.Reject;
+
+    return PermissionResult.Allow;
   }
 }
 
