@@ -45,33 +45,33 @@ interface UserProfileState {
 export const useUserProfile = create<UserProfileState>()(
   persist(
     (set) => {
+      async function updateUserProfile(userProfile: UserProfile) {
+        const pubKey = await exportUserPublickKey(userProfile.publicAuthKey);
+        const secret = await (async () => {
+          if (!userProfile.secret) return undefined;
+          const privAuthKey = await window.crypto.subtle.exportKey(
+            "pkcs8",
+            userProfile.secret.privateAuthKey,
+          );
+
+          return {
+            privateAuthKey: bytesToBase64(privAuthKey),
+          };
+        })();
+
+        set({
+          userProfile,
+          _userProfileSerialized: {
+            publicAuthUserId: userProfile.publicAuthUserId,
+            publicAuthKey: pubKey,
+            secret,
+          },
+        });
+      }
+
       return {
         cb: {
-          updateUserProfile: async (userProfile) => {
-            const pubKey = await exportUserPublickKey(
-              userProfile.publicAuthKey,
-            );
-            const secret = await (async () => {
-              if (!userProfile.secret) return undefined;
-              const privAuthKey = await window.crypto.subtle.exportKey(
-                "pkcs8",
-                userProfile.secret.privateAuthKey,
-              );
-
-              return {
-                privateAuthKey: bytesToBase64(privAuthKey),
-              };
-            })();
-
-            set({
-              userProfile,
-              _userProfileSerialized: {
-                publicAuthUserId: userProfile.publicAuthUserId,
-                publicAuthKey: pubKey,
-                secret,
-              },
-            });
-          },
+          updateUserProfile,
           updateUserProfileFromSerialized: async (userProfile) => {
             const publicKey = await importUserPublicKey(
               userProfile.publicAuthKey,
@@ -113,7 +113,8 @@ export const useUserProfile = create<UserProfileState>()(
                 privateAuthKey: keys.privateAuthKey,
               },
             };
-            set({ userProfile });
+
+            await updateUserProfile(userProfile);
           },
         },
       };
