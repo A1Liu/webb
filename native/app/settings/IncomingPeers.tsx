@@ -1,5 +1,3 @@
-"use client";
-
 import { DefaultTimeFormatter } from "@/components/util";
 import clsx from "clsx";
 import { useState } from "react";

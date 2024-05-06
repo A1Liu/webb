@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import { useNotesState } from "@/components/state/notes";
 import { useLockFn, useRequest } from "ahooks";
