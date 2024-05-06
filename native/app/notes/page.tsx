@@ -55,8 +55,8 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
         !hasAuth
           ? "bg-slate-900"
           : activeNote === note.id && !isMobile
-          ? "bg-yellow-700"
-          : "bg-slate-700",
+            ? "bg-yellow-700"
+            : "bg-slate-700",
         "disabled:bg-slate-900",
         "text-white rounded-md p-6 flex flex-col gap-2",
       )}
@@ -78,7 +78,7 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
   );
 }
 
-const desktopBoxStyles = "min-w-48 border-r border-slate-500";
+const desktopBoxStyles = "min-w-48 border-r-2 border-slate-500";
 function SelectActiveNote() {
   const notes = useNotesState((s) => s.notes);
   const { isMobile } = usePlatform();
@@ -146,7 +146,7 @@ export default function Notes() {
         },
       ]}
     >
-      <div className="flex h-full w-full gap-2 flex-grow justify-stretch">
+      <div className="flex h-full w-full flex-grow justify-stretch">
         <SelectActiveNote />
 
         {!isMobile ? (
