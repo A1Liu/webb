@@ -55,8 +55,8 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
         !hasAuth
           ? "bg-slate-900"
           : activeNote === note.id && !isMobile
-            ? "bg-yellow-700"
-            : "bg-slate-700",
+          ? "bg-yellow-700"
+          : "bg-slate-700",
         "disabled:bg-slate-900",
         "text-white rounded-md p-6 flex flex-col gap-2",
       )}

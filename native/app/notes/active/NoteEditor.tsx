@@ -45,7 +45,7 @@ function ReconnectButton() {
 }
 
 const FontSizeTheme = EditorView.theme({
-  '&': {
+  "&": {
     fontSize: "16px",
   },
 });
