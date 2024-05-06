@@ -13,8 +13,8 @@ import {
   useUserProfile,
 } from "@/components/state/userProfile";
 import {
-  readNoteContents,
-  writeNoteContents,
+  updateNoteDoc,
+  ZustandIdbNotesStorage,
 } from "@/components/state/noteContents";
 import { z } from "zod";
 import { TapCounterButton } from "@/components/Button";
@@ -23,6 +23,7 @@ import { usePermissionCache } from "@/components/state/permissions";
 import { PermissionsManager } from "@/components/permissions";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { Link, useNavigate } from "react-router-dom";
+import * as automerge from "@automerge/automerge";
 
 export const dynamic = "force-static";
 
@@ -138,7 +139,7 @@ export default function Settings() {
         },
       ]}
     >
-      <div className={"flex gap-2 justify-center"}>
+      <div className={"flex gap-2 justify-center p-2"}>
         <DeviceQr />
 
         <div className="flex flex-col gap-2">
@@ -153,7 +154,9 @@ export default function Settings() {
               return await Promise.all(
                 [...useNotesState.getState().notes.values()].map(
                   async (note) => {
-                    const text = (await readNoteContents(note.id)) ?? "";
+                    const text =
+                      (await ZustandIdbNotesStorage.getItem(note.id))?.state.doc
+                        .contents ?? "";
                     return {
                       ...note,
                       text,
@@ -172,7 +175,12 @@ export default function Settings() {
 
               for (const note of notes) {
                 if (!note.text) continue;
-                await writeNoteContents(note.id, note.text);
+                await updateNoteDoc(
+                  note.id,
+                  automerge.from({
+                    contents: note.text,
+                  }),
+                );
               }
             }}
           />

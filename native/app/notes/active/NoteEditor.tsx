@@ -3,14 +3,14 @@ import { useNotesState } from "@/components/state/notes";
 import { useLockFn, useRequest } from "ahooks";
 import {
   NoteContentStoreProvider,
+  updateNoteDoc,
   useNoteContents,
-  writeNoteContents,
 } from "@/components/state/noteContents";
 import { NoteDataFetch, SyncNotesButton } from "./SyncNotesButton";
 import { buttonClass } from "@/components/TopbarLayout";
 import { usePeers } from "@/components/state/peers";
 import toast from "react-hot-toast";
-import { getFirstSuccess } from "@/components/util";
+import { base64ToBytes, getFirstSuccess } from "@/components/util";
 import {
   AskPermission,
   usePermissionCache,
@@ -20,6 +20,7 @@ import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { PermissionsManager } from "@/components/permissions";
 import { getNetworkLayerGlobal } from "@/components/network";
 import { useNavigate } from "react-router-dom";
+import * as automerge from "@automerge/automerge";
 
 export const dynamic = "force-static";
 
@@ -42,9 +43,9 @@ function ReconnectButton() {
 }
 
 function NoteContentEditor() {
-  const noteText = useNoteContents((s) => s.text);
+  const noteText = useNoteContents((s) => s.doc.contents);
   const noteId = useNoteContents((s) => s.noteId);
-  const { updateText } = useNoteContents((s) => s.cb);
+  const { updateText } = useNoteContents((s) => s.actions);
   const cb = useNotesState((s) => s.cb);
 
   return (
@@ -118,8 +119,12 @@ async function requestKeyForNote(noteId: string) {
       permission,
     });
 
-    for await (const { noteId, text } of dataFetchResult) {
-      await writeNoteContents(noteId, text);
+    for await (const { noteId, textData } of dataFetchResult) {
+      const doc = automerge.load<{ contents: string }>(
+        new Uint8Array(base64ToBytes(textData)),
+      );
+
+      await updateNoteDoc(noteId, doc);
 
       toast.loading(`Fetching latest data... (${++count})`, {
         id: toastId,
