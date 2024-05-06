@@ -66,7 +66,6 @@ function NoteContentEditor() {
           (t) => !t.changes.empty,
         );
         if (transactions.length === 0) return;
-        toast(`changing doc`);
 
         changeDoc((d) => {
           transactions.forEach((t) => {
