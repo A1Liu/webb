@@ -74,22 +74,6 @@ export const NoteDataFetch = registerRpc({
 
     if (!isVerified) return;
 
-    /*
-    if (noteMetadata.lockId) {
-      if (permissionKey?.lockId !== noteMetadata.lockId) {
-        return; // missing cert, or wrong key
-      }
-      if (peerId !== permissionKey.deviceId) {
-        return; // Using a key not given to them
-      }
-
-      const verified = await locksCb.verifyKey(permissionKey);
-      if (!verified) return;
-
-      // OK we're verififed
-    }
-      */
-
     const output = await ZustandIdbNotesStorage.getItem(noteId);
     if (!output) return;
 

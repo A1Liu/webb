@@ -5,6 +5,7 @@
 *.ts
 *.tsx
 *.svelte
+*.html
 /static
 /app
 /.next
@@ -12,8 +13,8 @@
 /node_modules
 /public
 /util
+/dist
 /node_modules
 /components
 next.config.js
 next-env.d.ts
-

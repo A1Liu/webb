@@ -88,7 +88,6 @@ export async function updateNoteDoc(
   if (runningEditor.current?.getState().noteId === noteId) {
     toast(`writing to current contents`);
     runningEditor.current.setState({ doc });
-    return;
   }
 
   await ZustandIdbNotesStorage.setItem(noteId, {
