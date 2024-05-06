@@ -1,4 +1,5 @@
 import stringify from "fast-json-stable-stringify";
+import { isEqual, pick } from "lodash";
 import { z } from "zod";
 import { base64ToBytes, bytesToBase64 } from "./util";
 
@@ -82,18 +83,39 @@ export class PermissionsManager {
     authorityKind: Authority["authorityKind"],
     identity: RootIdentity,
   ): Promise<Permission> {
-    const permInputStr = stringify(permissionInput);
+    const permissionFields = pick(permissionInput, [
+      "userId",
+      "resourceId",
+      "deviceId",
+      "actionId",
+    ]);
     for (const permission of this.permissionCache.values()) {
       // TODO: omg this is all so wrong, none of this is robust holy shit
-      const { cert, createdAt, ...permData } = permission;
-
-      if (stringify(permData) === permInputStr) {
+      if (
+        isEqual(
+          permissionFields,
+          pick(permission, ["userId", "resourceId", "deviceId", "actionId"]),
+        )
+      ) {
         console.log("found existing permission");
         return permission;
       }
     }
 
-    const permission = { createdAt: new Date(), ...permissionInput };
+    const permission: Omit<Permission, "cert"> = {
+      createdAt: new Date(),
+      ...permissionFields,
+    };
+
+    // This is necessary because... something. When being serialized,
+    // for some reason the milliseconds field is sometimes lost,
+    // causing mis-certs.
+    permission.createdAt.setMilliseconds(0);
+    if (permissionInput.expiresAt) {
+      // should not modify inputs
+      permission.expiresAt = new Date(permissionInput.expiresAt);
+      permission.expiresAt.setMilliseconds(0);
+    }
 
     const json = stringify(permission);
     const signature = await window.crypto.subtle.sign(
@@ -159,7 +181,9 @@ export class PermissionsManager {
       new TextEncoder().encode(json),
     );
 
-    this.permissionCache.set(permission.cert.signature, permission);
+    if (valid) {
+      this.permissionCache.set(permission.cert.signature, permission);
+    }
 
     return valid;
   }
