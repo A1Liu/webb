@@ -16,5 +16,3 @@
 /dist
 /node_modules
 /components
-next.config.js
-next-env.d.ts
