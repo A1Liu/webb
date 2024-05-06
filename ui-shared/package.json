@@ -2,6 +2,7 @@
   "name": "@a1liu/webb-ui-shared",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "format": "prettier --write .",
     "ts-check": "tsc",

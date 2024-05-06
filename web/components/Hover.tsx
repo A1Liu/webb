@@ -1,5 +1,3 @@
-"use client";
-
 import { includeIf } from "@/util/basic";
 import {
   useClick,

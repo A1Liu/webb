@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import { toast } from "react-hot-toast";
 import { IncomingPeers } from "@/app/settings/IncomingPeers";
@@ -9,7 +7,6 @@ import { useLockFn, useMemoizedFn } from "ahooks";
 import { usePeers } from "@/components/state/peers";
 import { NoteDataSchema, useNotesState } from "@/components/state/notes";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
-import Link from "next/link";
 import { DeviceQr, ScanAndConnectButton } from "@/components/DeviceQrCode";
 import {
   UserProfileSerializedSchema,
@@ -21,12 +18,12 @@ import {
   ZustandIdbNotesStorage,
 } from "@/components/state/noteContents";
 import { z } from "zod";
-import { useRouter } from "next/navigation";
 import { TapCounterButton } from "@/components/Button";
 import { clear } from "idb-keyval";
 import { usePermissionCache } from "@/components/state/permissions";
 import { PermissionsManager } from "@/components/permissions";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
+import { Link, useNavigate } from "react-router-dom";
 
 export const dynamic = "force-static";
 
@@ -116,7 +113,7 @@ export default function Settings() {
     cb: { logout, createUserProfile },
   } = useUserProfile();
 
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const hardReset = useMemoizedFn(async () => {
     await clear();
@@ -133,7 +130,7 @@ export default function Settings() {
         {
           type: "button",
           text: "⏪ Back",
-          onClick: () => router.back(),
+          onClick: () => navigate(-1),
         },
         {
           type: "button",
@@ -190,7 +187,7 @@ export default function Settings() {
 
           <BackupUser />
 
-          <Link href={"/"}>
+          <Link to={"/"}>
             <button className={buttonClass}>Home</button>
           </Link>
 

@@ -1,5 +1,3 @@
-"use client";
-
 export const EnvFlags = {} as const;
 
 // Explicitly declaring the flags on the window interface so that they're editable

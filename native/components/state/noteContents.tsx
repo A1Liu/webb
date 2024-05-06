@@ -1,5 +1,3 @@
-"use client";
-
 import { createStore, StoreApi, useStore } from "zustand";
 import { persist, PersistStorage, StorageValue } from "zustand/middleware";
 import { base64ToBytes, bytesToBase64, ZustandIdbStorage } from "../util";

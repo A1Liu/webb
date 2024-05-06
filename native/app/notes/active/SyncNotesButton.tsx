@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import { buttonClass } from "@/components/TopbarLayout";
 import { useLockFn, useRequest } from "ahooks";
