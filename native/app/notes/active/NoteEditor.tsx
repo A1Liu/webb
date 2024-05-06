@@ -2,7 +2,6 @@ import React from "react";
 import { useNotesState } from "@/components/state/notes";
 import { useLockFn, useRequest } from "ahooks";
 import {
-  automergePackage,
   NoteContentStoreProvider,
   updateNoteDoc,
   useNoteContents,
@@ -21,6 +20,7 @@ import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { PermissionsManager } from "@/components/permissions";
 import { getNetworkLayerGlobal } from "@/components/network";
 import { useNavigate } from "react-router-dom";
+import * as automerge from "@automerge/automerge";
 
 export const dynamic = "force-static";
 
@@ -70,8 +70,6 @@ function NoteContentEditor() {
 }
 
 async function requestKeyForNote(noteId: string) {
-  const automerge = automergePackage.value!;
-
   const toastId = toast.loading(`Requesting perms...`);
 
   const { peers } = usePeers.getState();

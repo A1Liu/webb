@@ -7,14 +7,9 @@ import { NotesSyncInitGroup } from "./state/notes";
 import { PeerInitGroup } from "./state/peers";
 import { NetworkInitGroup } from "./network";
 import { buttonClass } from "./TopbarLayout";
-import { useRequest } from "ahooks";
-import { automergePackage } from "./state/noteContents";
 
 export function GlobalWrapper({ children }: { children: React.ReactNode }) {
   const { state } = useGlobals();
-  const { loading: automergeLoading } = useRequest(
-    () => automergePackage.promise,
-  );
 
   useEffect(() => {
     GlobalInitGroup.init();
@@ -22,10 +17,6 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
     PeerInitGroup.init();
     NotesSyncInitGroup.init();
   }, []);
-
-  if (automergeLoading) {
-    return null;
-  }
 
   return (
     <div className="h-full w-full">

@@ -13,7 +13,6 @@ import {
   useUserProfile,
 } from "@/components/state/userProfile";
 import {
-  automergePackage,
   updateNoteDoc,
   ZustandIdbNotesStorage,
 } from "@/components/state/noteContents";
@@ -24,6 +23,7 @@ import { usePermissionCache } from "@/components/state/permissions";
 import { PermissionsManager } from "@/components/permissions";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { Link, useNavigate } from "react-router-dom";
+import * as automerge from "@automerge/automerge";
 
 export const dynamic = "force-static";
 
@@ -177,7 +177,7 @@ export default function Settings() {
                 if (!note.text) continue;
                 await updateNoteDoc(
                   note.id,
-                  automergePackage.value!.from({
+                  automerge.from({
                     contents: note.text,
                   }),
                 );
