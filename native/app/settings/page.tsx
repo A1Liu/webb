@@ -155,8 +155,9 @@ export default function Settings() {
                 [...useNotesState.getState().notes.values()].map(
                   async (note) => {
                     const text =
-                      (await ZustandIdbNotesStorage.getItem(note.id))?.state.doc
-                        .contents ?? "";
+                      (
+                        await ZustandIdbNotesStorage.getItem(note.id)
+                      )?.state.doc.contents?.toString() ?? "";
                     return {
                       ...note,
                       text,
@@ -178,7 +179,7 @@ export default function Settings() {
                 await updateNoteDoc(
                   note.id,
                   automerge.from({
-                    contents: note.text,
+                    contents: new automerge.Text(note.text),
                   }),
                 );
               }

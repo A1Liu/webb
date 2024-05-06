@@ -13,11 +13,11 @@ interface NoteContentsSerialized {
 
 interface NoteContentState {
   noteId: string;
-  doc: automerge.next.Doc<{ contents: string }>;
+  doc: automerge.next.Doc<{ contents: automerge.Text }>;
   actions: {
-    updateText: (s: string) => void;
     overwriteTextNoHistory: (s: string) => void;
     applyChanges: (s: Uint8Array[]) => void;
+    changeDoc: (updater: (d: { contents: automerge.Text }) => void) => void;
   };
 }
 
@@ -34,9 +34,8 @@ function getIdbKey(noteId: string) {
 
 export async function deleteNoteContents(noteId: string) {
   if (runningEditor.current?.getState().noteId === noteId) {
-    runningEditor.current.getState().actions.updateText("");
+    runningEditor.current.getState().actions.overwriteTextNoHistory("");
     runningEditor.current.persist.clearStorage();
-    return;
   }
 
   await ZustandIdbNotesStorage.removeItem(noteId);
@@ -83,7 +82,7 @@ export const ZustandIdbNotesStorage: PersistStorage<
 
 export async function updateNoteDoc(
   noteId: string,
-  doc: automerge.next.Doc<{ contents: string }>,
+  doc: automerge.next.Doc<{ contents: automerge.Text }>,
 ) {
   if (runningEditor.current?.getState().noteId === noteId) {
     toast(`writing to current contents`);
@@ -104,29 +103,28 @@ function createNoteContentStore(noteId: string) {
     persist(
       (set, get) => ({
         noteId,
-        doc: automerge.from({ contents: "New Note" })!,
+        doc: automerge.from({ contents: new automerge.Text("") })!,
         actions: {
+          changeDoc: (updater) => {
+            const { doc } = get();
+            const newDoc = automerge.change(doc, (d) => {
+              updater(d);
+            });
+            console.log(newDoc.contents);
+            set({ doc: newDoc });
+          },
           applyChanges: (changes) => {
             const { doc } = get();
-            const [newDoc] = automerge.applyChanges<{ contents: string }>(
-              doc,
-              changes,
-            );
+            const [newDoc] = automerge.applyChanges<{
+              contents: automerge.Text;
+            }>(doc, changes);
             set({ doc: newDoc });
           },
           overwriteTextNoHistory: (contents) => {
-            const doc = automerge.from({ contents });
-            set({ doc });
-          },
-          updateText: (text) => {
-            const { doc } = get();
-            console.log(doc);
-            const newDoc = automerge.change(automerge.clone(doc), (d) => {
-              // This doesn't work. Oh well.
-              // automerge.next.updateText(d, ["contents"], text);
-              d.contents = text;
+            const doc = automerge.from({
+              contents: new automerge.Text(contents),
             });
-            set({ doc: newDoc });
+            set({ doc });
           },
         },
       }),

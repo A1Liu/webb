@@ -3,8 +3,6 @@ import { persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import { v4 as uuid } from "uuid";
 import { z } from "zod";
-import md5 from "md5";
-import isEqual from "lodash/isEqual";
 import { InitGroup } from "../constants";
 import { ZustandIdbStorage } from "../util";
 
@@ -13,8 +11,6 @@ const NoteDataSchemaInternal = z.object({
   preview: z.string(),
   isTombstone: z.boolean().optional(),
   lastUpdateDate: z.coerce.date(),
-  lastSyncDate: z.coerce.date(),
-  lastSyncHash: z.string(),
 });
 
 export type NoteData = z.infer<typeof NoteDataSchema>;
@@ -32,7 +28,7 @@ export interface NoteGlobalState {
       updater: (prev: NoteData) => NoteData,
       reoder?: boolean,
     ) => void;
-    updateNotesFromSync: (notes: NoteData[]) => { contentsChanged: NoteData[] };
+    updateNotesFromSync: (notes: NoteData[]) => void;
     setActiveNote: (id: string) => void;
   };
 }
@@ -44,8 +40,6 @@ function createEmptyNote(id: string): NoteData {
     id,
     preview: "",
     lastUpdateDate: ZERO_TIME,
-    lastSyncDate: ZERO_TIME,
-    lastSyncHash: md5(""),
   };
 }
 
@@ -101,33 +95,6 @@ export const useNotesState = create<NoteGlobalState>()(
             );
 
             set({ notes });
-
-            return {
-              contentsChanged: newNotes.filter((note) => {
-                const prevNote = prev.notes.get(note.id);
-                if (!prevNote) return true;
-
-                // We don't want merges because that's just noise.
-                // We ALSO don't want lastSyncDate, because that updates
-                // on every sync. Last sync hash is pretty likely to not have
-                // changed since last time though. Unless there's new content
-                // which is a true positive anyways.
-                const {
-                  merges: _a,
-                  lastSyncDate: _b,
-                  ...prevNoteData
-                } = prevNote;
-                const { merges: _w, lastSyncDate: _x, ...newNoteData } = note;
-
-                // NOTE: Technically, we might be able to get away with
-                // only updating when the `hash` field changes. However,
-                // we'd need to fix any inconsistencies caused by mismatches
-                // between the content store and the metadata store.
-                if (!isEqual(prevNoteData, newNoteData)) return true;
-
-                return false;
-              }),
-            };
           },
           setActiveNote: (id) =>
             set((prev) => {
