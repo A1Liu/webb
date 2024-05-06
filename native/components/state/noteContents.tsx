@@ -1,5 +1,3 @@
-"use client";
-
 import { createStore, StoreApi, useStore } from "zustand";
 import { persist, StorageValue } from "zustand/middleware";
 import { z } from "zod";

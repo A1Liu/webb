@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import { useNotesState } from "@/components/state/notes";
 import { useLockFn, useRequest } from "ahooks";
@@ -12,7 +10,6 @@ import { NoteDataFetch, SyncNotesButton } from "./SyncNotesButton";
 import { buttonClass } from "@/components/TopbarLayout";
 import { usePeers } from "@/components/state/peers";
 import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
 import { getFirstSuccess } from "@/components/util";
 import {
   AskPermission,
@@ -22,6 +19,7 @@ import { useUserProfile } from "@/components/state/userProfile";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { PermissionsManager } from "@/components/permissions";
 import { getNetworkLayerGlobal } from "@/components/network";
+import { useNavigate } from "react-router-dom";
 
 export const dynamic = "force-static";
 
@@ -204,7 +202,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     },
   );
   const { loading: requestKeyLoading, requestKey } = useNoteKeyRequest(noteId);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -231,7 +229,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
             <button
               className={buttonClass}
               disabled={requestKeyLoading}
-              onClick={() => router.back()}
+              onClick={() => navigate(-1)}
             >
               Go back
             </button>
