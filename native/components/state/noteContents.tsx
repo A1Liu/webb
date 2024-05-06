@@ -1,57 +1,23 @@
-"use client";
-
 import { createStore, StoreApi, useStore } from "zustand";
-import { persist, StorageValue } from "zustand/middleware";
-import { z } from "zod";
-import { ZustandIdbStorage } from "../util";
+import { persist, PersistStorage, StorageValue } from "zustand/middleware";
+import { base64ToBytes, bytesToBase64, ZustandIdbStorage } from "../util";
 import { createContext, useContext, useEffect } from "react";
 import { useCreation } from "ahooks";
-import { GlobalInitGroup } from "../constants";
-import { debounce } from "lodash";
-import md5 from "md5";
 import toast from "react-hot-toast";
+import * as automerge from "@automerge/automerge";
 
-export const EMPTY_HASH = md5("");
+interface NoteContentsSerialized {
+  noteId: string;
+  doc: string;
+}
 
-export const useNoteHashStore = createStore<{
-  hashes: Map<string, string>;
-  setHash: (noteId: string, hash: string) => void;
-}>()(
-  persist(
-    (set) => {
-      return {
-        hashes: new Map(),
-        setHash: (noteId, hash) => {
-          set(({ hashes }) => {
-            const newHashes = new Map(hashes);
-            newHashes.set(noteId, hash);
-
-            return {
-              hashes: newHashes,
-            };
-          });
-        },
-      };
-    },
-    {
-      name: "webb-note-hashes",
-      storage: ZustandIdbStorage,
-      skipHydration: true,
-      partialize: ({ setHash, ...rest }) => ({ ...rest }),
-    },
-  ),
-);
-
-export type NoteContents = z.infer<typeof NoteContentsSchema>;
-export const NoteContentsSchema = z.object({
-  __typename: z.literal("CleartextNote"),
-  noteId: z.string(),
-  text: z.string(),
-});
-
-interface NoteContentState extends NoteContents {
-  cb: {
+interface NoteContentState {
+  noteId: string;
+  doc: automerge.next.Doc<{ contents: string }>;
+  actions: {
     updateText: (s: string) => void;
+    overwriteTextNoHistory: (s: string) => void;
+    applyChanges: (s: Uint8Array[]) => void;
   };
 }
 
@@ -63,89 +29,113 @@ const runningEditor: {
 const VERSION = 0;
 
 function getIdbKey(noteId: string) {
-  return `webb-note-contents-${noteId}`;
+  return `webb-note-content-data-${noteId}`;
 }
 
 export async function deleteNoteContents(noteId: string) {
   if (runningEditor.current?.getState().noteId === noteId) {
-    runningEditor.current.getState().cb.updateText("");
+    runningEditor.current.getState().actions.updateText("");
     runningEditor.current.persist.clearStorage();
     return;
   }
 
-  await ZustandIdbStorage.removeItem(getIdbKey(noteId));
+  await ZustandIdbNotesStorage.removeItem(noteId);
 }
 
-export async function writeNoteContents(noteId: string, text: string) {
+export const ZustandIdbNotesStorage: PersistStorage<
+  Omit<NoteContentState, "actions">
+> = {
+  setItem: async (id, value) => {
+    const serializeValue: StorageValue<NoteContentsSerialized> = {
+      state: {
+        noteId: value.state.noteId,
+        doc: bytesToBase64(automerge.save(value.state.doc)),
+      },
+      version: VERSION,
+    };
+
+    await ZustandIdbStorage.setItem(getIdbKey(id), serializeValue);
+  },
+  getItem: async (id) => {
+    const output = await ZustandIdbStorage.getItem(getIdbKey(id));
+    if (!output) {
+      return null;
+    }
+
+    const state = output.state as NoteContentsSerialized;
+
+    const doc = automerge.load<NoteContentState["doc"]>(
+      new Uint8Array(base64ToBytes(state.doc)),
+    );
+
+    return {
+      version: VERSION,
+      state: {
+        noteId: state.noteId,
+        doc,
+      },
+    };
+  },
+  removeItem: async (id) => {
+    await ZustandIdbStorage.removeItem(getIdbKey(id));
+  },
+};
+
+export async function updateNoteDoc(
+  noteId: string,
+  doc: automerge.next.Doc<{ contents: string }>,
+) {
   if (runningEditor.current?.getState().noteId === noteId) {
     toast(`writing to current contents`);
-    runningEditor.current.getState().cb.updateText(text);
-    return;
+    runningEditor.current.setState({ doc });
   }
 
-  const value: StorageValue<NoteContents> = {
-    state: {
-      __typename: "CleartextNote",
-      noteId,
-      text,
-    },
+  await ZustandIdbNotesStorage.setItem(noteId, {
     version: VERSION,
-  };
-
-  await ZustandIdbStorage.setItem(getIdbKey(noteId), value);
-  useNoteHashStore.getState().setHash(noteId, md5(text));
-}
-
-export async function readNoteContents(
-  noteId: string,
-): Promise<string | undefined> {
-  const output = await ZustandIdbStorage.getItem(getIdbKey(noteId));
-  if (!output) {
-    return undefined;
-  }
-
-  const state = output.state as NoteContents;
-
-  return state.text;
+    state: {
+      noteId,
+      doc,
+    },
+  });
 }
 
 function createNoteContentStore(noteId: string) {
-  const { setHash } = useNoteHashStore.getState();
-  const updateHash = debounce(
-    (text: string) => {
-      const hash = md5(text);
-      setHash(noteId, hash);
-    },
-    500,
-    { trailing: true },
-  );
-
   return createStore<NoteContentState>()(
     persist(
-      (set) => ({
-        __typename: "CleartextNote",
+      (set, get) => ({
         noteId,
-        text: "",
-        cb: {
+        doc: automerge.from({ contents: "New Note" })!,
+        actions: {
+          applyChanges: (changes) => {
+            const { doc } = get();
+            const [newDoc] = automerge.applyChanges<{ contents: string }>(
+              doc,
+              changes,
+            );
+            set({ doc: newDoc });
+          },
+          overwriteTextNoHistory: (contents) => {
+            const doc = automerge.from({ contents });
+            set({ doc });
+          },
           updateText: (text) => {
-            set({ text });
-            updateHash(text);
+            const { doc } = get();
+            console.log(doc);
+            const newDoc = automerge.change(automerge.clone(doc), (d) => {
+              // This doesn't work. Oh well.
+              // automerge.next.updateText(d, ["contents"], text);
+              d.contents = text;
+            });
+            set({ doc: newDoc });
           },
         },
       }),
       {
-        name: getIdbKey(noteId),
-        storage: ZustandIdbStorage,
+        name: noteId,
+        storage: ZustandIdbNotesStorage,
         version: VERSION,
         skipHydration: true,
-        partialize: ({ cb, ...rest }) => ({ ...rest }),
-        onRehydrateStorage: (_prevState) => {
-          return (newState) => {
-            if (newState) {
-              updateHash(newState.text);
-            }
-          };
-        },
+        partialize: ({ actions, ...rest }) => ({ ...rest }),
       },
     ),
   );
@@ -198,11 +188,3 @@ export function useNoteContents<T>(
 
   return useStore(noteContentContext, selector);
 }
-
-GlobalInitGroup.registerValue({
-  field: "noteHashes",
-  eagerInit: true,
-  create: () => {
-    useNoteHashStore.persist.rehydrate();
-  },
-});

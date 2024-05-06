@@ -1,5 +1,3 @@
-"use client";
-
 import { create } from "zustand";
 import { v4 as uuid } from "uuid";
 import { toast } from "react-hot-toast";

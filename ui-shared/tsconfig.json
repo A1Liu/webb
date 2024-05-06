@@ -1,9 +1,13 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
+    "module": "es2020",
+    "moduleResolution": "Node",
+
     "outDir": "./dist",
     "noEmit": false,
-    "declaration": true
+    "declaration": true,
+    "declarationMap": true
   },
 
   "include": ["**/*.ts", "**/*.tsx"],

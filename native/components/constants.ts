@@ -1,5 +1,3 @@
-"use client";
-
 import { memoize } from "@a1liu/webb-ui-shared/util";
 import toast from "react-hot-toast";
 

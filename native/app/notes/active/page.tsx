@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { useActiveNote } from "@/components/state/notes";

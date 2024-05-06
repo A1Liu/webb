@@ -27,3 +27,5 @@ yarn.lock
 
 gen/**/*.json
 gen/**/*.yml
+
+/dist
