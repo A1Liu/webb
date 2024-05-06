@@ -139,7 +139,7 @@ export default function Settings() {
         },
       ]}
     >
-      <div className={"flex gap-2 justify-center"}>
+      <div className={"flex gap-2 justify-center p-2"}>
         <DeviceQr />
 
         <div className="flex flex-col gap-2">
