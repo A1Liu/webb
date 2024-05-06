@@ -47,6 +47,7 @@
     "zustand": "^4.4.6"
   },
   "devDependencies": {
+    "@types/react-router-dom": "^5.3.3",
     "@types/lodash": "^4.17.0",
     "@types/md5": "^2.3.5",
     "@types/node": "^20",
