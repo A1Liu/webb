@@ -7,6 +7,7 @@ import wasmPlugin from "vite-plugin-wasm";
 export default defineConfig({
   plugins: [react(), tsconfigPaths(), wasmPlugin()],
   build: {
+    target: "esnext",
     commonjsOptions: {
       // include: [],
       exclude: [/@a1liu\/webb-ui-shared/],

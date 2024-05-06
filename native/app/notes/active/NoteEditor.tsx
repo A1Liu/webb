@@ -94,6 +94,7 @@ function NoteContentEditor() {
       basicSetup={{ lineNumbers: false, foldGutter: false }}
       onChange={createOnChangeHandler(noteId, changeDoc)}
       extensions={[
+        EditorView.lineWrapping,
         markdown({ base: markdownLanguage, codeLanguages: [] }),
         FontSizeTheme,
       ]}
