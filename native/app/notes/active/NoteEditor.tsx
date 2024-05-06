@@ -21,6 +21,8 @@ import { PermissionsManager } from "@/components/permissions";
 import { getNetworkLayerGlobal } from "@/components/network";
 import { useNavigate } from "react-router-dom";
 import * as automerge from "@automerge/automerge";
+import CodeMirror from "@uiw/react-codemirror";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 
 export const dynamic = "force-static";
 
@@ -45,9 +47,49 @@ function ReconnectButton() {
 function NoteContentEditor() {
   const noteText = useNoteContents((s) => s.doc.contents);
   const noteId = useNoteContents((s) => s.noteId);
-  const { updateText } = useNoteContents((s) => s.actions);
+  const { changeDoc } = useNoteContents((s) => s.actions);
   const cb = useNotesState((s) => s.cb);
 
+  return (
+    <CodeMirror
+      key={noteId}
+      theme={"dark"}
+      value={noteText.toString()}
+      height={"100%"}
+      className={"flex-grow"}
+      basicSetup={{
+        lineNumbers: false,
+        foldGutter: false,
+      }}
+      onChange={(text, update) => {
+        const transactions = update.transactions.filter(
+          (t) => !t.changes.empty,
+        );
+        if (transactions.length === 0) return;
+        toast(`changing doc`);
+
+        changeDoc((d) => {
+          transactions.forEach((t) => {
+            t.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+              d.contents.deleteAt(fromA, toA - fromA);
+              d.contents.insertAt(fromA, ...inserted);
+            });
+          });
+        });
+        cb.updateNote(
+          noteId,
+          (prev) => ({
+            ...prev,
+            lastUpdateDate: new Date(),
+            preview: text.split("\n", 1)[0].slice(0, 20),
+          }),
+          true,
+        );
+      }}
+      extensions={[markdown({ base: markdownLanguage, codeLanguages: [] })]}
+    />
+  );
+  /*
   return (
     <textarea
       className="bg-black outline-none flex-grow resize-none"
@@ -67,6 +109,7 @@ function NoteContentEditor() {
       }}
     />
   );
+   */
 }
 
 async function requestKeyForNote(noteId: string) {
@@ -120,7 +163,7 @@ async function requestKeyForNote(noteId: string) {
     });
 
     for await (const { noteId, textData } of dataFetchResult) {
-      const doc = automerge.load<{ contents: string }>(
+      const doc = automerge.load<{ contents: automerge.Text }>(
         new Uint8Array(base64ToBytes(textData)),
       );
 
@@ -221,7 +264,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
 
   return (
     <div className="flex justify-stretch relative flex-grow">
-      <div className="absolute top-2 right-5 flex flex-col gap-2 items-end">
+      <div className="absolute top-2 right-5 flex flex-col gap-2 items-end z-10">
         <SyncNotesButton />
         <ReconnectButton />
       </div>

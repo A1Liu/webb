@@ -165,7 +165,7 @@ const NotePushListener = registerListener({
 
       for await (const item of dataFetchResult) {
         const { noteId, textData } = item;
-        const doc = automerge.load<{ contents: string }>(
+        const doc = automerge.load<{ contents: automerge.Text }>(
           new Uint8Array(base64ToBytes(textData)),
         );
 
@@ -315,7 +315,7 @@ async function syncNotes() {
 
       for await (const item of result) {
         const { textData } = item;
-        const remoteDoc = automerge.load<{ contents: string }>(
+        const remoteDoc = automerge.load<{ contents: automerge.Text }>(
           new Uint8Array(base64ToBytes(textData)),
         );
 
