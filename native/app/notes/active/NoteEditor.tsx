@@ -91,6 +91,7 @@ function NoteContentEditor() {
       theme={"dark"}
       value={noteText.toString()}
       height={"100%"}
+      className="flex-grow"
       basicSetup={{ lineNumbers: false, foldGutter: false }}
       onChange={createOnChangeHandler(noteId, changeDoc)}
       extensions={[
