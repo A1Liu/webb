@@ -22,7 +22,7 @@
         "name": "next"
       }
     ],
-     "types": ["vite/client"],
+    "types": ["vite/client"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]

@@ -6,7 +6,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   root: "./app",
   plugins: [react(), tsconfigPaths()],
-   build: {
+  build: {
     commonjsOptions: {
       include: [/ui-shared/],
     },

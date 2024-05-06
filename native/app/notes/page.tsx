@@ -7,13 +7,13 @@ import { NoteData, useNotesState } from "@/components/state/notes";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import clsx from "clsx";
 import { DefaultTimeFormatter } from "@/components/util";
-import { useRouter } from "next/navigation";
 import { NoteEditor } from "./active/NoteEditor";
 import { useRequest } from "ahooks";
 import { usePermissionCache } from "@/components/state/permissions";
 import { PermissionsManager } from "@/components/permissions";
 import { useUserProfile } from "@/components/state/userProfile";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
+import { useNavigate } from "react-router-dom";
 
 export const dynamic = "force-static";
 
@@ -22,7 +22,7 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
   const activeNote = useNotesState((s) => s.activeNote);
   const { isMobile } = usePlatform();
   const { id: noteId } = note;
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const { userProfile } = useUserProfile();
   const { deviceProfile } = useDeviceProfile();
@@ -66,7 +66,7 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
       onClick={() => {
         cb.setActiveNote(note.id);
         if (isMobile) {
-          router.push("/notes/active");
+          navigate("/notes/active");
         }
       }}
     >
@@ -120,7 +120,7 @@ export default function Notes() {
   const { isMobile } = usePlatform();
   const activeNote = useNotesState((s) => s.activeNote);
   const cb = useNotesState((s) => s.cb);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   return (
     <TopbarLayout
@@ -132,7 +132,7 @@ export default function Notes() {
           onClick: () => {
             cb.setActiveNote(uuid());
             if (isMobile) {
-              router.push("/notes/active");
+              navigate("/notes/active");
             }
           },
         },

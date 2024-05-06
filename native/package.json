@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "pnpm tauri dev",
     "dev:ios": "pnpm tauri ios dev",
-    "dev:web": "next dev -H 0.0.0.0 -p 4110",
-    "build:web": "next build",
-    "start:web": "next start",
+    "dev:web": "vite --host 0.0.0.0 --port 4110",
+    "build:web": "vite build",
+    "start:web": "vite start",
     "format": "prettier --write .",
     "build:mac": "CI=true pnpm tauri build",
     "build:ios": "CI=true pnpm tauri ios build",
@@ -65,7 +65,7 @@
     "vite": "^5.2.11",
     "vite-tsconfig-paths": "^4.3.2"
   },
-   "dependenciesMeta": {
+  "dependenciesMeta": {
     "@a1liu/webb-ui-shared": {
       "injected": true
     }

@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import React from "react";
-import {Link} from "react-router-dom";
+import { Link } from "react-router-dom";
 
 interface TopbarLayoutProps {
   title: string;
@@ -22,7 +22,7 @@ export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
     <main className={clsx("flex h-full flex-col")}>
       <div className="flex justify-between items-center pl-2 pr-5 py-1 w-full border-b border-slate-400">
         <div className="flex gap-2 items-center">
-          {import.meta.env.DEV  ? (
+          {import.meta.env.DEV ? (
             <div className="rounded-md p-1 bg-red-500 text-xs font-bold">
               DEV
             </div>

@@ -2,7 +2,6 @@
 
 import { Toaster } from "react-hot-toast";
 import clsx from "clsx";
-import Head from "next/head";
 import { useEffect } from "react";
 import { GlobalInitGroup } from "./constants";
 import { AppStateKind, useGlobals } from "./state/appGlobals";
@@ -23,10 +22,6 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="h-full w-full">
-      <Head>
-        <meta name="theme-color" content="#39ff14" />
-      </Head>
-
       {state.kind === AppStateKind.PermissionFlow ? (
         <div
           className="fixed top-0 bottom-0 left-0 right-0 flex items-center
