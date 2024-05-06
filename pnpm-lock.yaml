@@ -150,9 +150,6 @@ importers:
       vite-tsconfig-paths:
         specifier: ^4.3.2
         version: 4.3.2(typescript@5.4.3)(vite@5.2.11(@types/node@20.9.1)(terser@5.29.2))
-    dependenciesMeta:
-      '@a1liu/webb-ui-shared':
-        injected: true
 
   networking:
     dependencies:

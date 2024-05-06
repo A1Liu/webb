@@ -4,11 +4,11 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 /** @type {import('vite').UserConfig} */
 export default defineConfig({
-  root: "./app",
   plugins: [react(), tsconfigPaths()],
   build: {
     commonjsOptions: {
-      include: [/ui-shared/],
+      // include: [],
+      exclude: [/@a1liu\/webb-ui-shared/],
     },
   },
 });
