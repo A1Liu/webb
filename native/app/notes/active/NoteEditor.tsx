@@ -47,16 +47,21 @@ function ReconnectButton() {
 }
 
 const FontSizeTheme = EditorView.theme({
-  "& *": {
-    fontFamily: "sans-serif",
-  },
-  "&": {
-    fontSize: "16px",
-  },
-  ".cm-content .ͼv": {
-    wordBreak: "break-all",
-  },
+  "&": { fontSize: "16px" },
+  "& *": { fontFamily: "sans-serif" },
+  ".cm-content .ͼv": { wordBreak: "break-all" },
 });
+
+const EditorBasicSetup = {
+  lineNumbers: false,
+  foldGutter: false,
+  highlightActiveLine: false,
+};
+const EditorExtensions = [
+  EditorView.lineWrapping,
+  markdown({ base: markdownLanguage, codeLanguages: [] }),
+  FontSizeTheme,
+];
 
 function createOnChangeHandler(
   noteId: string,
@@ -99,17 +104,9 @@ function NoteContentEditor() {
       height={"100%"}
       width={"100%"}
       className="flex-grow"
-      basicSetup={{
-        lineNumbers: false,
-        foldGutter: false,
-        highlightActiveLine: false,
-      }}
+      basicSetup={EditorBasicSetup}
       onChange={createOnChangeHandler(noteId, changeDoc)}
-      extensions={[
-        EditorView.lineWrapping,
-        markdown({ base: markdownLanguage, codeLanguages: [] }),
-        FontSizeTheme,
-      ]}
+      extensions={EditorExtensions}
     />
   );
 }
