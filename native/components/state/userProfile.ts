@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, PersistStorage } from "zustand/middleware";
 import { GlobalInitGroup } from "../constants";
 import {
   createUserKeys,
@@ -8,6 +8,9 @@ import {
   importUserPublicKey,
 } from "../crypto";
 import { base64ToBytes, bytesToBase64, ZustandIdbStorage } from "../util";
+
+const IDB_KEY = "user-profile-storage";
+const VERSION = 0;
 
 export type UserProfileSerialized = z.infer<typeof UserProfileSerializedSchema>;
 export const UserProfileSerializedSchema = z.object({
@@ -29,24 +32,53 @@ export interface UserProfile {
   };
 }
 
-interface UserProfileState {
-  _userProfileSerialized?: UserProfileSerialized;
-  userProfile?: UserProfile;
-  cb: {
-    updateUserProfile: (useProfile: UserProfile) => Promise<void>;
-    updateUserProfileFromSerialized: (
-      userProfile: UserProfileSerialized,
-    ) => Promise<void>;
-    logout: () => void;
-    createUserProfile: () => Promise<void>;
+async function deserializeUserProfile(userProfile: UserProfileSerialized) {
+  const publicKey = await importUserPublicKey(userProfile.publicAuthKey);
+
+  const privateKey = userProfile.secret
+    ? await window.crypto.subtle.importKey(
+        "pkcs8",
+        base64ToBytes(userProfile.secret.privateAuthKey),
+        {
+          name: "RSA-PSS",
+          hash: "SHA-512",
+        },
+        true,
+        ["sign"],
+      )
+    : undefined;
+
+  return {
+    publicAuthUserId: userProfile.publicAuthUserId,
+    publicAuthKey: publicKey,
+    secret: privateKey ? { privateAuthKey: privateKey } : undefined,
   };
 }
 
-export const useUserProfile = create<UserProfileState>()(
-  persist(
-    (set) => {
-      async function updateUserProfile(userProfile: UserProfile) {
+export async function getUserProfileSerialized(): Promise<
+  UserProfileSerialized | undefined
+> {
+  const output = await ZustandIdbStorage.getItem(IDB_KEY);
+  if (!output) return undefined;
+
+  const state = z
+    .object({ _userProfileSerialized: UserProfileSerializedSchema })
+    .safeParse(output?.state);
+  if (!state.success) return undefined;
+
+  return state.data._userProfileSerialized;
+}
+
+const ZustandIdbUserProfileStorage: PersistStorage<
+  Pick<UserProfileState, "userProfile">
+> = {
+  setItem: async (key, value) => {
+    const _userProfileSerialized: UserProfileSerialized | undefined =
+      await (async () => {
+        const userProfile = value.state.userProfile;
+        if (!userProfile) return undefined;
         const pubKey = await exportUserPublickKey(userProfile.publicAuthKey);
+
         const secret = await (async () => {
           if (!userProfile.secret) return undefined;
           const privAuthKey = await window.crypto.subtle.exportKey(
@@ -59,49 +91,68 @@ export const useUserProfile = create<UserProfileState>()(
           };
         })();
 
-        set({
-          userProfile,
-          _userProfileSerialized: {
-            publicAuthUserId: userProfile.publicAuthUserId,
-            publicAuthKey: pubKey,
-            secret,
-          },
-        });
+        return {
+          publicAuthUserId: userProfile.publicAuthUserId,
+          publicAuthKey: pubKey,
+          secret,
+        };
+      })();
+
+    await ZustandIdbStorage.setItem(key, {
+      state: { _userProfileSerialized },
+      version: VERSION,
+    });
+  },
+  getItem: async (key) => {
+    const output = await ZustandIdbStorage.getItem(key);
+    if (!output) {
+      return null;
+    }
+
+    const state = z
+      .object({ _userProfileSerialized: UserProfileSerializedSchema })
+      .safeParse(output.state);
+    if (!state.success) return null;
+
+    const userProfileSerialized = state.data._userProfileSerialized;
+    const userProfile = userProfileSerialized
+      ? await deserializeUserProfile(userProfileSerialized)
+      : undefined;
+
+    return { version: 0, state: { userProfile } };
+  },
+  removeItem: async (key) => {
+    await ZustandIdbStorage.removeItem(key);
+  },
+};
+
+interface UserProfileState {
+  userProfile?: UserProfile;
+  cb: {
+    updateUserProfile: (useProfile: UserProfile) => void;
+    updateUserProfileFromSerialized: (
+      userProfile: UserProfileSerialized,
+    ) => Promise<void>;
+    logout: () => void;
+    createUserProfile: () => Promise<void>;
+  };
+}
+
+export const useUserProfile = create<UserProfileState>()(
+  persist(
+    (set) => {
+      function updateUserProfile(userProfile: UserProfile) {
+        set({ userProfile });
       }
 
       return {
         cb: {
           updateUserProfile,
-          updateUserProfileFromSerialized: async (userProfile) => {
-            const publicKey = await importUserPublicKey(
-              userProfile.publicAuthKey,
-            );
-
-            const privateKey = userProfile.secret
-              ? await window.crypto.subtle.importKey(
-                  "pkcs8",
-                  base64ToBytes(userProfile.secret.privateAuthKey),
-                  {
-                    name: "RSA-PSS",
-                    hash: "SHA-512",
-                  },
-                  true,
-                  ["sign"],
-                )
-              : undefined;
-
-            set({
-              _userProfileSerialized: userProfile,
-              userProfile: {
-                publicAuthUserId: userProfile.publicAuthUserId,
-                publicAuthKey: publicKey,
-                secret: privateKey ? { privateAuthKey: privateKey } : undefined,
-              },
-            });
+          updateUserProfileFromSerialized: async (serialized) => {
+            const userProfile = await deserializeUserProfile(serialized);
+            set({ userProfile });
           },
-          logout: () => {
-            set({ userProfile: undefined, _userProfileSerialized: undefined });
-          },
+          logout: () => set({ userProfile: undefined }),
           createUserProfile: async () => {
             const keys = await createUserKeys();
 
@@ -114,25 +165,16 @@ export const useUserProfile = create<UserProfileState>()(
               },
             };
 
-            await updateUserProfile(userProfile);
+            updateUserProfile(userProfile);
           },
         },
       };
     },
     {
-      name: "user-profile-storage",
-      storage: ZustandIdbStorage,
+      name: IDB_KEY,
+      storage: ZustandIdbUserProfileStorage,
       skipHydration: true,
-      partialize: ({ cb, userProfile, ...rest }) => ({ ...rest }),
-      onRehydrateStorage: (state) => {
-        return async (newState) => {
-          if (newState?._userProfileSerialized) {
-            await state.cb.updateUserProfileFromSerialized(
-              newState._userProfileSerialized,
-            );
-          }
-        };
-      },
+      partialize: ({ cb, ...rest }) => ({ ...rest }),
     },
   ),
 );

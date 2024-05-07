@@ -9,6 +9,7 @@ import { NoteDataSchema, useNotesState } from "@/components/state/notes";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { DeviceQr, ScanAndConnectButton } from "@/components/DeviceQrCode";
 import {
+  getUserProfileSerialized,
   UserProfileSerializedSchema,
   useUserProfile,
 } from "@/components/state/userProfile";
@@ -87,7 +88,7 @@ function BackupUser() {
       title={"user"}
       schema={UserProfileSerializedSchema}
       fetchData={async () => {
-        const userProfile = useUserProfile.getState()._userProfileSerialized;
+        const userProfile = await getUserProfileSerialized();
         if (!userProfile) {
           throw new Error("no UserProfile");
         }
