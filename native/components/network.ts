@@ -2,7 +2,10 @@ import toast from "react-hot-toast";
 import { z } from "zod";
 import { NetworkLayer } from "@a1liu/webb-ui-shared/network";
 import { InitGroup } from "./constants";
-import { useDeviceProfile } from "./state/deviceProfile";
+import {
+  DeviceProfileHydration,
+  useDeviceProfile,
+} from "./state/deviceProfile";
 
 export const NetworkInitGroup = new InitGroup("network");
 
@@ -10,7 +13,7 @@ export const getNetworkLayerGlobal = NetworkInitGroup.registerValue({
   field: "networkLayer",
   eagerInit: true,
   create: async () => {
-    await useDeviceProfile.getState().hydrationPromise.promise;
+    await DeviceProfileHydration.promise;
 
     const id = useDeviceProfile.getState().deviceProfile?.id;
     if (!id) {

@@ -6,14 +6,14 @@ import { useDeviceProfile } from "../components/state/deviceProfile";
 export const dynamic = "force-static";
 
 export default function Home() {
-  const { isHydrated, deviceProfile } = useDeviceProfile();
+  const { deviceProfile } = useDeviceProfile();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isHydrated && deviceProfile) {
+    if (deviceProfile) {
       navigate("/notes");
     }
-  }, [navigate, isHydrated, deviceProfile]);
+  }, [navigate, deviceProfile]);
 
   return (
     <TopbarLayout

@@ -94,7 +94,6 @@ function NoteContentEditor() {
 
   return (
     <CodeMirror
-      key={noteId}
       theme={"dark"}
       value={noteText.toString()}
       height={"100%"}
@@ -300,7 +299,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
           </div>
         </div>
       ) : (
-        <NoteContentStoreProvider noteId={noteId}>
+        <NoteContentStoreProvider key={noteId} noteId={noteId}>
           <NoteContentEditor />
         </NoteContentStoreProvider>
       )}
