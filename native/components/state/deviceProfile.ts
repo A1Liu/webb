@@ -39,8 +39,9 @@ export const useDeviceProfile = create<DeviceProfileState>()(
         return (hydratedState, _error) => {
           if (!hydratedState?.deviceProfile) {
             cb._initDeviceProfile({ id: uuid() });
-            DeviceProfileHydration.resolve(true);
           }
+
+          DeviceProfileHydration.resolve(true);
         };
       },
     },
