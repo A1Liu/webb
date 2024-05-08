@@ -317,6 +317,10 @@ async function syncNotes() {
   cb.updateNotesFromSync(notesToUpdate);
 
   for (const note of notesToUpdate) {
+      toast.loading(`Syncing ... writing notes (${++totalCount})`, {
+        id: ACTIVE_SYNC_STATUS_TOAST_ID,
+      });
+
     const localDoc = await ZustandIdbNotesStorage.getItem(note.id);
     let doc = localDoc?.state.doc;
 

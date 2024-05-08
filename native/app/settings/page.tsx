@@ -29,11 +29,13 @@ export const dynamic = "force-static";
 
 function BackupAndRestore<T>({
   title,
+  toastId,
   fetchData,
   writeData,
   schema,
 }: {
   title: string;
+  toastId: string;
   fetchData: () => Promise<T>;
   writeData: (t: T) => Promise<void>;
   schema: z.ZodSchema<T>;
@@ -48,13 +50,19 @@ function BackupAndRestore<T>({
       <button
         className={buttonClass}
         onClick={async () => {
-          const data = await fetchData();
+          try {
+            toast.loading(`Loading...`, { id: toastId });
+            const data = await fetchData();
 
-          const json = JSON.stringify(data);
-          await writeText(json);
+            const json = JSON.stringify(data);
+            await writeText(json);
 
-          console.log("backup done");
-          toast.success(`Copied to clipboard`);
+            console.log("backup done");
+            toast.success(`Copied to clipboard`, { id: toastId });
+          } catch (e) {
+            toast.error(`Failed to backup`, { id: toastId });
+            console.error(e);
+          }
         }}
       >
         Backup
@@ -64,14 +72,15 @@ function BackupAndRestore<T>({
         className={buttonClass}
         onClick={async () => {
           try {
+            toast.loading(`Loading...`, { id: toastId });
             const text = await readText();
             const data = JSON.parse(text);
 
             await writeData(schema.parse(data));
 
-            toast.success(`Restored from clipboard`);
+            toast.success(`Restored from clipboard`, { id: toastId });
           } catch (e) {
-            toast.error(`Failed to restore`);
+            toast.error(`Failed to restore`, { id: toastId });
             console.error(e);
           }
         }}
@@ -83,9 +92,11 @@ function BackupAndRestore<T>({
 }
 
 function BackupUser() {
+  const toastId = "backup-users";
   return (
     <BackupAndRestore
       title={"user"}
+      toastId={toastId}
       schema={UserProfileSerializedSchema}
       fetchData={async () => {
         const userProfile = await getUserProfileSerialized();
@@ -147,6 +158,7 @@ export default function Settings() {
 
           <BackupAndRestore
             title={"notes"}
+            toastId={"write-note-data"}
             schema={NoteDataSchema.extend({
               text: z.string().nullish(),
             }).array()}
@@ -167,14 +179,16 @@ export default function Settings() {
               );
             }}
             writeData={async (notes) => {
-              // TODO: Eventually, maybe locks should be included.
-              // Or it should be easier to lock and unlock things,
-              // and categorize them.
               notesCb.updateNotesFromSync(
                 notes.map(({ text, ...note }) => note),
               );
 
+              let index = 0;
               for (const note of notes) {
+                toast.loading(`Writing note data... ${++index}`, {
+                  id: "write-note-data",
+                });
+
                 if (!note.text) continue;
                 await updateNoteDoc(note.id, note.text);
               }

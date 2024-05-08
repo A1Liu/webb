@@ -9,8 +9,8 @@ import { ZustandIdbStorage } from "../util";
 const NoteDataSchemaInternal = z.object({
   id: z.string(),
   preview: z.string(),
-  isTombstone: z.boolean().optional(),
-  md5ContentHash: z.string().optional(),
+  isTombstone: z.boolean().nullish(),
+  md5ContentHash: z.string().nullish(),
   lastUpdateDate: z.coerce.date(),
 });
 

@@ -21,6 +21,7 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
 - Authenticator rs - https://github.com/mozilla/authenticator-rs/
 - https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/Platform_vs_Cross-Platform.html
 - MacOS/iOS LocalAuthentication - https://lib.rs/crates/localauthentication-rs
+- Yubikey HSM - https://github.com/iqlusioninc/yubihsm.rs
 
 - Model is:
   - UserProfile - Person
@@ -47,3 +48,5 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
 - https://www.browserstack.com/blog/building-secure-native-apps-with-self-signed-ssl-certificates-using-certificate-pinning/
 - https://stackoverflow.com/questions/54452129/how-to-create-ios-nwconnection-for-tls-with-self-signed-cert
 - qp2p? (supposedly works on mobile) - https://github.com/maidsafe/qp2p
+
+
