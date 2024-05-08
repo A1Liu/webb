@@ -29,6 +29,7 @@ import { usePermissionCache } from "@/components/state/permissions";
 import { base64ToBytes, bytesToBase64 } from "@/components/util";
 import { maxBy } from "lodash";
 import * as automerge from "@automerge/automerge";
+import md5 from "md5";
 
 const NoteMetadataWithHashSchema = z.object({ note: NoteDataSchema });
 
@@ -152,10 +153,9 @@ const NotePushListener = registerListener({
 
     let written = 0;
 
-    cb.updateNotesFromSync(notes.map(({ note }) => note));
     for (const { note } of notes) {
       const md5ContentHash = prevNotes.get(note.id)?.md5ContentHash;
-      if (md5ContentHash && md5ContentHash === note.md5ContentHash) {
+      if (!!md5ContentHash && md5ContentHash === note.md5ContentHash) {
         continue;
       }
 
@@ -189,6 +189,8 @@ const NotePushListener = registerListener({
         await updateNoteDocAsync(noteId, doc);
       }
     }
+
+    cb.updateNotesFromSync(notes.map(({ note }) => note));
 
     console.debug(`executed NotePush`);
     toast.success(`Sync complete!`, {
@@ -329,7 +331,6 @@ async function syncNotes() {
 
     notesToUpdate.push(mostRecentNote);
   }
-  cb.updateNotesFromSync(notesToUpdate);
 
   for (const note of notesToUpdate) {
     if (note.isTombstone) continue;
@@ -364,8 +365,13 @@ async function syncNotes() {
       }
     }
 
-    if (doc) await updateNoteDocAsync(note.id, doc);
+    if (doc) {
+      note.md5ContentHash = md5(doc.contents.toString());
+      await updateNoteDocAsync(note.id, doc);
+    }
   }
+
+  cb.updateNotesFromSync(notesToUpdate);
 
   console.debug(`Finalized ${notesToUpdate.length} notes`);
   toast.loading(`Syncing ... resolved ${notesToUpdate.length} notes`, {
