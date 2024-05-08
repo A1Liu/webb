@@ -4,7 +4,7 @@ import { useLockFn, useRequest } from "ahooks";
 import {
   NoteContentStoreProvider,
   NoteDocData,
-  updateNoteDoc,
+  updateNoteDocAsync,
   useNoteContents,
 } from "@/components/state/noteContents";
 import { NoteDataFetch, SyncNotesButton } from "./SyncNotesButton";
@@ -166,7 +166,7 @@ async function requestKeyForNote(noteId: string) {
         new Uint8Array(base64ToBytes(textData)),
       );
 
-      await updateNoteDoc(noteId, doc);
+      await updateNoteDocAsync(noteId, doc);
 
       toast.loading(`Fetching latest data... (${++count})`, {
         id: toastId,

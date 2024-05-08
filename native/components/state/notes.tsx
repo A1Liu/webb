@@ -15,9 +15,7 @@ const NoteDataSchemaInternal = z.object({
 });
 
 export type NoteData = z.infer<typeof NoteDataSchema>;
-export const NoteDataSchema = NoteDataSchemaInternal.extend({
-  merges: NoteDataSchemaInternal.array().nullish(),
-});
+export const NoteDataSchema = NoteDataSchemaInternal;
 
 export interface NoteGlobalState {
   activeNote: string;

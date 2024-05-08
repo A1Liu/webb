@@ -87,7 +87,7 @@ export const ZustandIdbNotesStorage: PersistStorage<
   },
 };
 
-export async function updateNoteDoc(
+export async function updateNoteDocAsync(
   noteId: string,
   docInput: NoteDoc | string,
 ) {
@@ -103,13 +103,16 @@ export async function updateNoteDoc(
     editorRef.current.setState({ doc });
   }
 
-  await ZustandIdbNotesStorage.setItem(noteId, {
+  const setItemPromise = ZustandIdbNotesStorage.setItem(noteId, {
     version: VERSION,
-    state: {
-      noteId,
-      doc,
-    },
+    state: { noteId, doc },
   });
+
+  useNotesState.getState().cb.updateHash(noteId, () => {
+    return md5(doc.contents.toString());
+  });
+
+  await setItemPromise;
 }
 
 function createNoteContentStore(noteId: string) {

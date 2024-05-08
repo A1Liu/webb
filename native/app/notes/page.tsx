@@ -70,7 +70,6 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
       }}
     >
       <p className="text-ellipsis overflow-hidden text-left whitespace-nowrap w-full">
-        {note.merges ? "*" : ""}
         {note.preview}
       </p>
 

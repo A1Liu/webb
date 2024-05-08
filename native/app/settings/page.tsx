@@ -14,7 +14,7 @@ import {
   useUserProfile,
 } from "@/components/state/userProfile";
 import {
-  updateNoteDoc,
+  updateNoteDocAsync,
   ZustandIdbNotesStorage,
 } from "@/components/state/noteContents";
 import { z } from "zod";
@@ -190,7 +190,7 @@ export default function Settings() {
                 });
 
                 if (!note.text) continue;
-                await updateNoteDoc(note.id, note.text);
+                await updateNoteDocAsync(note.id, note.text);
               }
             }}
           />

@@ -15,7 +15,7 @@ import { usePeers } from "@/components/state/peers";
 import { registerRpc, registerListener } from "@/components/network";
 import {
   NoteDocData,
-  updateNoteDoc,
+  updateNoteDocAsync,
   ZustandIdbNotesStorage,
 } from "@/components/state/noteContents";
 import { useUserProfile } from "@/components/state/userProfile";
@@ -148,12 +148,17 @@ const NotePushListener = registerListener({
       id: SYNC_STATUS_TOAST_ID,
     });
 
-    const { cb } = useNotesState.getState();
+    const { notes: prevNotes, cb } = useNotesState.getState();
 
     let written = 0;
 
     cb.updateNotesFromSync(notes.map(({ note }) => note));
     for (const { note } of notes) {
+      const md5ContentHash = prevNotes.get(note.id)?.md5ContentHash;
+      if (md5ContentHash && md5ContentHash === note.md5ContentHash) {
+        continue;
+      }
+
       toast.loading(`Syncing - updating notes (${++written})`, {
         id: SYNC_STATUS_TOAST_ID,
       });
@@ -181,7 +186,7 @@ const NotePushListener = registerListener({
           new Uint8Array(base64ToBytes(textData)),
         );
 
-        await updateNoteDoc(noteId, doc);
+        await updateNoteDocAsync(noteId, doc);
       }
     }
 
@@ -192,6 +197,20 @@ const NotePushListener = registerListener({
   },
 });
 
+async function* listNoteMetadataUpdateHashes() {
+  for (const note of useNotesState.getState().notes.values()) {
+    if (!note.md5ContentHash) {
+      await ZustandIdbNotesStorage.getItem(note.id);
+    }
+  }
+
+  for await (const note of useNotesState.getState().notes.values()) {
+    const md5ContentHash = note.isTombstone ? "TOMBSTONE" : note.md5ContentHash;
+
+    yield { ...note, md5ContentHash };
+  }
+}
+
 const NoteListMetadata = registerRpc({
   name: "NoteListMetadata",
   group: NotesSyncInitGroup,
@@ -199,10 +218,7 @@ const NoteListMetadata = registerRpc({
   output: NoteMetadataWithHashSchema,
   rpc: async function* (peerId, {}) {
     console.debug(`received NoteListMetadata req`, peerId);
-
-    const { notes } = useNotesState.getState();
-
-    for (const note of notes.values()) {
+    for await (const note of listNoteMetadataUpdateHashes()) {
       yield { note };
     }
   },
@@ -238,12 +254,7 @@ async function syncNotes() {
   const permission = await permissions.createPermission(
     {
       deviceId: [{ __typename: "Exact", value: deviceProfile.id }],
-      userId: [
-        {
-          __typename: "Exact",
-          value: userProfile.publicAuthUserId,
-        },
-      ],
+      userId: [{ __typename: "Exact", value: userProfile.publicAuthUserId }],
       resourceId: [{ __typename: "AnyRemainingSlots" }],
       actionId: [{ __typename: "AnyRemainingSlots" }],
       allow: true,
@@ -262,27 +273,30 @@ async function syncNotes() {
     return;
   }
 
-  const timestamp = new Date();
-  timestamp.setMilliseconds(0);
-
   console.debug("Sync starting...");
   toast.loading(`Syncing ... fetching notes`, {
     id: ACTIVE_SYNC_STATUS_TOAST_ID,
   });
 
-  const { notes, cb } = useNotesState.getState();
+  const { cb } = useNotesState.getState();
+  interface NoteSyncState {
+    md5ContentHash: string;
+    localVersion?: NoteData;
+    versions: { peerId?: string; md5ContentHash: string; note: NoteData }[];
+  }
 
-  const noteVersions = new Map<
-    string,
-    {
-      localVersion?: NoteData;
-      versions: { peerId?: string; note: NoteData }[];
-    }
-  >();
-  for (const { merges, ...note } of notes.values()) {
+  const noteVersions = new Map<string, NoteSyncState>();
+  const existingNoteMetadata = new Map<string, NoteData>();
+  for await (const note of listNoteMetadataUpdateHashes()) {
+    const md5ContentHash = note.md5ContentHash;
+    if (!md5ContentHash) continue;
+
+    existingNoteMetadata.set(note.id, note);
+
     noteVersions.set(note.id, {
+      md5ContentHash,
       localVersion: note,
-      versions: [{ note }],
+      versions: [{ note, md5ContentHash }],
     });
   }
 
@@ -290,14 +304,15 @@ async function syncNotes() {
   for (const peer of peers.values()) {
     const stream = NoteListMetadata.call(peer.id, {});
     for await (const { note } of stream) {
+      const md5ContentHash = note.md5ContentHash;
+      if (!md5ContentHash) continue;
+
       const { versions } = getOrCompute(noteVersions, note.id, () => ({
+        md5ContentHash,
         versions: [],
       }));
 
-      versions.push({
-        peerId: peer.id,
-        note: { ...note, merges: undefined },
-      });
+      versions.push({ peerId: peer.id, note, md5ContentHash });
 
       toast.loading(`Syncing ... fetching notes (${++totalCount})`, {
         id: ACTIVE_SYNC_STATUS_TOAST_ID,
@@ -317,9 +332,14 @@ async function syncNotes() {
   cb.updateNotesFromSync(notesToUpdate);
 
   for (const note of notesToUpdate) {
-      toast.loading(`Syncing ... writing notes (${++totalCount})`, {
-        id: ACTIVE_SYNC_STATUS_TOAST_ID,
-      });
+    if (note.isTombstone) continue;
+
+    const prevNote = existingNoteMetadata.get(note.id);
+    if (prevNote?.md5ContentHash === note.md5ContentHash) continue;
+
+    toast.loading(`Syncing ... writing notes (${++totalCount})`, {
+      id: ACTIVE_SYNC_STATUS_TOAST_ID,
+    });
 
     const localDoc = await ZustandIdbNotesStorage.getItem(note.id);
     let doc = localDoc?.state.doc;
@@ -344,7 +364,7 @@ async function syncNotes() {
       }
     }
 
-    if (doc) await updateNoteDoc(note.id, doc);
+    if (doc) await updateNoteDocAsync(note.id, doc);
   }
 
   console.debug(`Finalized ${notesToUpdate.length} notes`);
