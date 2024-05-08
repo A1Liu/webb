@@ -6,22 +6,20 @@ import { z } from "zod";
 import { InitGroup } from "../constants";
 import { ZustandIdbStorage } from "../util";
 
-const NoteDataSchemaInternal = z
-  .object({
-    id: z.string(),
-    preview: z.string(),
-    isTombstone: z.boolean().nullish(),
-    commitHeads: z.string().array().readonly().default([]),
-    lastUpdateDate: z.coerce.date(),
-  })
-  .readonly();
+const NoteDataSchemaInternal = z.object({
+  id: z.string(),
+  preview: z.string(),
+  isTombstone: z.boolean().nullish(),
+  commitHeads: z.string().array().readonly().default([]),
+  lastUpdateDate: z.coerce.date(),
+});
 
 export type NoteData = z.infer<typeof NoteDataSchema>;
 export const NoteDataSchema = NoteDataSchemaInternal;
 
 export interface NoteGlobalState {
   activeNote: string;
-  notes: Map<string, NoteData>;
+  notes: Map<string, Readonly<NoteData>>;
 
   cb: {
     updateNote: (

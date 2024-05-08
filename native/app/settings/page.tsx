@@ -17,7 +17,7 @@ import {
   updateNoteDocAsync,
   ZustandIdbNotesStorage,
 } from "@/components/state/noteContents";
-import { z } from "zod";
+import { z, ZodTypeDef } from "zod";
 import { TapCounterButton } from "@/components/Button";
 import { clear } from "idb-keyval";
 import { usePermissionCache } from "@/components/state/permissions";
@@ -38,7 +38,7 @@ function BackupAndRestore<T>({
   toastId: string;
   fetchData: () => Promise<T>;
   writeData: (t: T) => Promise<void>;
-  schema: z.ZodSchema<T>;
+  schema: z.ZodSchema<T, ZodTypeDef, unknown>;
 }) {
   const { isMobile } = usePlatform();
   if (isMobile) return null;
