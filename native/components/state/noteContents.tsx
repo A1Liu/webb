@@ -1,5 +1,4 @@
 import { createStore, StoreApi, useStore } from "zustand";
-import md5 from "md5";
 import { persist, PersistStorage, StorageValue } from "zustand/middleware";
 import { base64ToBytes, bytesToBase64, ZustandIdbStorage } from "../util";
 import { createContext, useContext, useEffect } from "react";
@@ -47,7 +46,10 @@ export const ZustandIdbNotesStorage: PersistStorage<
   Omit<NoteContentState, "actions">
 > = {
   setItem: async (id, value) => {
-    useNotesState.getState().cb.killHash(id);
+    useNotesState.getState().cb.updateNote(id, (prev) => ({
+      ...prev,
+      commitHeads: automerge.getHeads(value.state.doc),
+    }));
     const serializeValue: StorageValue<NoteContentsSerialized> = {
       state: {
         noteId: value.state.noteId,
@@ -69,10 +71,6 @@ export const ZustandIdbNotesStorage: PersistStorage<
     const doc = automerge.load<NoteDoc>(
       new Uint8Array(base64ToBytes(state.doc)),
     );
-
-    useNotesState.getState().cb.updateHash(id, () => {
-      return md5(doc.contents.toString());
-    });
 
     return {
       version: VERSION,
@@ -106,10 +104,6 @@ export async function updateNoteDocAsync(
   const setItemPromise = ZustandIdbNotesStorage.setItem(noteId, {
     version: VERSION,
     state: { noteId, doc },
-  });
-
-  useNotesState.getState().cb.updateHash(noteId, () => {
-    return md5(doc.contents.toString());
   });
 
   await setItemPromise;

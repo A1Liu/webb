@@ -1,5 +1,5 @@
 import toast from "react-hot-toast";
-import { z } from "zod";
+import { z, ZodTypeDef } from "zod";
 import { NetworkLayer } from "@a1liu/webb-ui-shared/network";
 import { InitGroup } from "./constants";
 import {
@@ -123,7 +123,7 @@ function createListener<T>({
   listener,
 }: {
   channel: string;
-  schema: z.ZodSchema<T>;
+  schema: z.ZodSchema<T, ZodTypeDef, unknown>;
   listener: (peerId: string, t: T) => Promise<void>;
 }): Listener<T> {
   const channel = `chan-${userChannel}`;
@@ -181,7 +181,7 @@ export function registerListener<T>({
 }: {
   group: InitGroup;
   channel: string;
-  schema: z.ZodSchema<T>;
+  schema: z.ZodSchema<T, ZodTypeDef, unknown>;
   listener: (peerId: string, t: T) => Promise<void>;
 }): Listener<T> {
   const getValue = group.registerValue({

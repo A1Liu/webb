@@ -6,13 +6,15 @@ import { z } from "zod";
 import { InitGroup } from "../constants";
 import { ZustandIdbStorage } from "../util";
 
-const NoteDataSchemaInternal = z.object({
-  id: z.string(),
-  preview: z.string(),
-  isTombstone: z.boolean().nullish(),
-  md5ContentHash: z.string().nullish(),
-  lastUpdateDate: z.coerce.date(),
-});
+const NoteDataSchemaInternal = z
+  .object({
+    id: z.string(),
+    preview: z.string(),
+    isTombstone: z.boolean().nullish(),
+    commitHeads: z.string().array().readonly().default([]),
+    lastUpdateDate: z.coerce.date(),
+  })
+  .readonly();
 
 export type NoteData = z.infer<typeof NoteDataSchema>;
 export const NoteDataSchema = NoteDataSchemaInternal;
@@ -29,8 +31,6 @@ export interface NoteGlobalState {
     ) => void;
     updateNotesFromSync: (notes: NoteData[]) => void;
     setActiveNote: (id: string) => void;
-    killHash: (noteId: string) => void;
-    updateHash: (noteId: string, getHash: () => string) => void;
   };
 }
 
@@ -40,6 +40,7 @@ function createEmptyNote(id: string): NoteData {
   return {
     id,
     preview: "",
+    commitHeads: [],
     lastUpdateDate: ZERO_TIME,
   };
 }
@@ -51,36 +52,6 @@ export const useNotesState = create<NoteGlobalState>()(
         activeNote: uuid(),
         notes: new Map(),
         cb: {
-          killHash: (noteId) => {
-            const { notes } = get();
-            const note = notes.get(noteId);
-            if (!note) return;
-            if (note.md5ContentHash === undefined) return;
-
-            const newNotes = new Map(notes);
-            newNotes.set(noteId, {
-              ...note,
-              md5ContentHash: undefined,
-            });
-
-            set({ notes: newNotes });
-          },
-          updateHash: (noteId, getHash) => {
-            const { notes } = get();
-            const note = notes.get(noteId);
-            if (!note) return;
-
-            // If we already have a hash, we assume it's valid.
-            if (note.md5ContentHash) return;
-
-            const newNotes = new Map(notes);
-            newNotes.set(noteId, {
-              ...note,
-              md5ContentHash: getHash(),
-            });
-
-            set({ notes: newNotes });
-          },
           updateNote: (noteId, updater, reorder = false) => {
             set((prev) => {
               const notes = new Map(prev.notes);
@@ -102,18 +73,6 @@ export const useNotesState = create<NoteGlobalState>()(
             const prev = get();
             const mutableNotesMap = new Map(prev.notes);
             for (const newNote of newNotes) {
-              if (!newNote.isTombstone) {
-                mutableNotesMap.set(newNote.id, newNote);
-              }
-
-              const prevNote = prev.notes?.get(newNote.id);
-              if (!prevNote) continue;
-
-              if (prevNote.isTombstone) {
-                mutableNotesMap.delete(newNote.id);
-                continue;
-              }
-
               mutableNotesMap.set(newNote.id, newNote);
             }
 
@@ -138,6 +97,7 @@ export const useNotesState = create<NoteGlobalState>()(
                 const notes = new Map(prev.notes);
                 notes.set(prevActive.id, {
                   ...prevActive,
+                  commitHeads: [],
                   isTombstone: true,
                 });
 

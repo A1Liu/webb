@@ -14,6 +14,7 @@ import {
 import { usePeers } from "@/components/state/peers";
 import { registerRpc, registerListener } from "@/components/network";
 import {
+  NoteDoc,
   NoteDocData,
   updateNoteDocAsync,
   ZustandIdbNotesStorage,
@@ -27,9 +28,8 @@ import {
 } from "@/components/permissions";
 import { usePermissionCache } from "@/components/state/permissions";
 import { base64ToBytes, bytesToBase64 } from "@/components/util";
-import { maxBy } from "lodash";
+import { isEqual, maxBy } from "lodash";
 import * as automerge from "@automerge/automerge";
-import md5 from "md5";
 
 const NoteMetadataWithHashSchema = z.object({ note: NoteDataSchema });
 
@@ -150,12 +150,12 @@ const NotePushListener = registerListener({
     });
 
     const { notes: prevNotes, cb } = useNotesState.getState();
+    cb.updateNotesFromSync(notes.map(({ note }) => note));
 
     let written = 0;
-
     for (const { note } of notes) {
-      const md5ContentHash = prevNotes.get(note.id)?.md5ContentHash;
-      if (!!md5ContentHash && md5ContentHash === note.md5ContentHash) {
+      const prevHeads = prevNotes.get(note.id)?.commitHeads;
+      if (isEqual(prevHeads, note.commitHeads)) {
         continue;
       }
 
@@ -182,7 +182,7 @@ const NotePushListener = registerListener({
 
       for await (const item of dataFetchResult) {
         const { noteId, textData } = item;
-        const doc = automerge.load<{ contents: automerge.Text }>(
+        const doc = automerge.load<NoteDoc>(
           new Uint8Array(base64ToBytes(textData)),
         );
 
@@ -190,26 +190,16 @@ const NotePushListener = registerListener({
       }
     }
 
-    cb.updateNotesFromSync(notes.map(({ note }) => note));
-
     console.debug(`executed NotePush`);
-    toast.success(`Sync complete!`, {
+    toast.success(`Synced ${written} notes!`, {
       id: SYNC_STATUS_TOAST_ID,
     });
   },
 });
 
 async function* listNoteMetadataUpdateHashes() {
-  for (const note of useNotesState.getState().notes.values()) {
-    if (!note.md5ContentHash) {
-      await ZustandIdbNotesStorage.getItem(note.id);
-    }
-  }
-
-  for await (const note of useNotesState.getState().notes.values()) {
-    const md5ContentHash = note.isTombstone ? "TOMBSTONE" : note.md5ContentHash;
-
-    yield { ...note, md5ContentHash };
+  for await (const note of [...useNotesState.getState().notes.values()]) {
+    yield note;
   }
 }
 
@@ -282,39 +272,26 @@ async function syncNotes() {
 
   const { cb } = useNotesState.getState();
   interface NoteSyncState {
-    md5ContentHash: string;
-    localVersion?: NoteData;
-    versions: { peerId?: string; md5ContentHash: string; note: NoteData }[];
+    versions: { peerId?: string; note: NoteData }[];
   }
 
   const noteVersions = new Map<string, NoteSyncState>();
   const existingNoteMetadata = new Map<string, NoteData>();
   for await (const note of listNoteMetadataUpdateHashes()) {
-    const md5ContentHash = note.md5ContentHash;
-    if (!md5ContentHash) continue;
-
     existingNoteMetadata.set(note.id, note);
 
-    noteVersions.set(note.id, {
-      md5ContentHash,
-      localVersion: note,
-      versions: [{ note, md5ContentHash }],
-    });
+    noteVersions.set(note.id, { versions: [{ note }] });
   }
 
   let totalCount = 0;
   for (const peer of peers.values()) {
     const stream = NoteListMetadata.call(peer.id, {});
     for await (const { note } of stream) {
-      const md5ContentHash = note.md5ContentHash;
-      if (!md5ContentHash) continue;
-
       const { versions } = getOrCompute(noteVersions, note.id, () => ({
-        md5ContentHash,
         versions: [],
       }));
 
-      versions.push({ peerId: peer.id, note, md5ContentHash });
+      versions.push({ peerId: peer.id, note });
 
       toast.loading(`Syncing ... fetching notes (${++totalCount})`, {
         id: ACTIVE_SYNC_STATUS_TOAST_ID,
@@ -323,20 +300,25 @@ async function syncNotes() {
   }
 
   const notesToUpdate = [];
-  for (const [_noteId, { localVersion, versions }] of noteVersions.entries()) {
-    const mostRecentNote =
-      maxBy(versions, (version) => version.note.lastUpdateDate)?.note ??
-      localVersion;
+  for (const [_noteId, { versions }] of noteVersions.entries()) {
+    const mostRecentNote = maxBy(
+      versions,
+      (version) => version.note.lastUpdateDate,
+    )?.note;
     if (!mostRecentNote) continue;
 
-    notesToUpdate.push(mostRecentNote);
-  }
+    const note = mostRecentNote;
+    if (note.isTombstone) {
+      notesToUpdate.push(mostRecentNote);
+      continue;
+    }
 
-  for (const note of notesToUpdate) {
-    if (note.isTombstone) continue;
-
-    const prevNote = existingNoteMetadata.get(note.id);
-    if (prevNote?.md5ContentHash === note.md5ContentHash) continue;
+    const allNotesEqualHeads = versions.every((v) =>
+      isEqual(mostRecentNote.commitHeads, v.note.commitHeads),
+    );
+    if (allNotesEqualHeads) {
+      continue;
+    }
 
     toast.loading(`Syncing ... writing notes (${++totalCount})`, {
       id: ACTIVE_SYNC_STATUS_TOAST_ID,
@@ -366,11 +348,14 @@ async function syncNotes() {
     }
 
     if (doc) {
-      note.md5ContentHash = md5(doc.contents.toString());
       await updateNoteDocAsync(note.id, doc);
     }
-  }
 
+    notesToUpdate.push({
+      ...mostRecentNote,
+      commitHeads: doc ? automerge.getHeads(doc) : mostRecentNote.commitHeads,
+    });
+  }
   cb.updateNotesFromSync(notesToUpdate);
 
   console.debug(`Finalized ${notesToUpdate.length} notes`);
@@ -381,7 +366,7 @@ async function syncNotes() {
   for (const [peerId, _peer] of peers.entries()) {
     await NotePushListener.send(peerId, {
       permission,
-      notes: notesToUpdate.map((note) => ({
+      notes: [...useNotesState.getState().notes.values()].map((note) => ({
         note,
       })),
     });
