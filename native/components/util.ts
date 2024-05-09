@@ -6,10 +6,29 @@ import { get, set, del } from "idb-keyval";
 import { Future, getOrCompute, timeout } from "@a1liu/webb-ui-shared/util";
 import { debounce, DebounceSettings } from "lodash";
 
+type Result<T> =
+  | { success: true; value: T }
+  | { success: false; error: unknown };
+
 export const DefaultTimeFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "short",
   timeStyle: "medium",
 });
+
+export async function timePromise<T>(t: () => Promise<T>): Promise<{
+  duration: number;
+  result: Result<T>;
+}> {
+  const begin = performance.now();
+  try {
+    const value = await t();
+    const end = performance.now();
+    return { duration: end - begin, result: { success: true, value } };
+  } catch (error) {
+    const end = performance.now();
+    return { duration: end - begin, result: { success: false, error } };
+  }
+}
 
 // Not sure how I feel about this yet, but the idea is at least interesting.
 // There is some argument to be made that this kind of thing should not be
@@ -86,8 +105,11 @@ export function zustandJsonReplacer(
   return value;
 }
 
+// TODO: test this code please
 class Debouncer {
-  private currentFut = new Future<void>();
+  private currentFut = new Future<true>();
+  private isRunning = false;
+
   private readonly debouncedFunc: (
     r: () => Promise<void>,
   ) => Promise<void> | undefined;
@@ -98,7 +120,12 @@ class Debouncer {
 
     this.debouncedFunc = debounce(
       async (r) => {
-        if (leading) {
+        // TODO: timeouts
+        if (this.isRunning) {
+          return; // If we're already running, we shouldn't run again.
+        }
+
+        if (leading && this.currentFut.value) {
           this.currentFut = new Future();
         }
 
@@ -107,7 +134,8 @@ class Debouncer {
         } catch (error) {
           console.error(`Failure ${String(error)}`);
         } finally {
-          this.currentFut.resolve();
+          this.isRunning = false;
+          this.currentFut.resolve(true);
 
           if (trailing) {
             this.currentFut = new Future();
@@ -142,6 +170,7 @@ class IdbStorage implements PersistStorage<unknown> {
       name,
       () =>
         new Debouncer(500, {
+          leading: true,
           trailing: true,
           maxWait: 5_000,
         }),
@@ -155,38 +184,42 @@ class IdbStorage implements PersistStorage<unknown> {
 
   async getItem(name: string): Promise<StorageValue<unknown> | null> {
     return this.mutex(name).run(async () => {
-      const value = (await get(name)) ?? null;
-      console.log(`Read ${name}`);
-      return value;
+      const { result, duration } = await timePromise(() => get(name));
+      console.log(
+        `Read ${name}${!result.success ? " (failed)" : ""} in ${duration}ms`,
+      );
+      if (!result.success) throw result.error;
+
+      return result.value;
     });
   }
 
   async setItem(name: string, value: StorageValue<unknown>): Promise<void> {
     await this.debouncer(name).debounce(() => {
       return this.mutex(name).run(async () => {
-        await set(name, value);
-        console.log(`Wrote ${name}`);
+        const { result, duration } = await timePromise(() => set(name, value));
+        console.log(
+          `Wrote ${name}${!result.success ? " (failed)" : ""} in ${duration}ms`,
+        );
       });
     });
   }
 
   async removeItem(name: string): Promise<void> {
     return this.mutex(name).run(async () => {
-      await del(name);
-      console.log(`Deleted ${name}`);
+      const { result, duration } = await timePromise(() => del(name));
+      console.log(
+        `Deleted ${name}${!result.success ? " (failed)" : ""} in ${duration}ms`,
+      );
     });
   }
 }
 
 export const ZustandIdbStorage: PersistStorage<unknown> = new IdbStorage();
 
-export async function getFirstSuccess<T>(promises: Promise<T>[]): Promise<
-  | {
-      success: true;
-      value: T;
-    }
-  | { success: false }
-> {
+export async function getFirstSuccess<T>(
+  promises: Promise<T>[],
+): Promise<{ success: true; value: T } | { success: false }> {
   const neverResolve = new Promise<T>(() => {});
 
   const firstSuccess = Promise.race(
@@ -201,6 +234,7 @@ export async function getFirstSuccess<T>(promises: Promise<T>[]): Promise<
   return Promise.race([firstSuccess, allFailed]);
 }
 
+// TODO: test this code please
 class Mutex {
   private isRunning = false;
   private readonly listeners: (() => unknown)[] = [];

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { useNotesState } from "@/components/state/notes";
 import { useLockFn, useRequest } from "ahooks";
 import {
@@ -22,7 +22,12 @@ import { PermissionsManager } from "@/components/permissions";
 import { getNetworkLayerGlobal } from "@/components/network";
 import { useNavigate } from "react-router-dom";
 import * as automerge from "@automerge/automerge";
-import CodeMirror, { EditorView, ViewUpdate } from "@uiw/react-codemirror";
+import CodeMirror, {
+  BasicSetupOptions,
+  EditorView,
+  ReactCodeMirrorRef,
+  ViewUpdate,
+} from "@uiw/react-codemirror";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import clsx from "clsx";
 
@@ -52,7 +57,7 @@ const FontSizeTheme = EditorView.theme({
   ".cm-content .ͼv": { wordBreak: "break-all" },
 });
 
-const EditorBasicSetup = {
+const EditorBasicSetup: BasicSetupOptions = {
   lineNumbers: false,
   foldGutter: false,
   highlightActiveLine: false,
@@ -93,14 +98,29 @@ function createOnChangeHandler(
 }
 
 function NoteContentEditor() {
-  const noteText = useNoteContents((s) => s.doc.contents);
-  const noteId = useNoteContents((s) => s.noteId);
+  const { noteId, doc, hydrationPromise } = useNoteContents((s) => s);
   const { changeDoc } = useNoteContents((s) => s.actions);
+  const editorRef = useRef<ReactCodeMirrorRef>({});
+  const { loading } = useRequest(() => hydrationPromise.promise, {
+    refreshDeps: [hydrationPromise],
+  });
+
+  if (loading) {
+    return (
+      <div className="flex justify-stretch relative flex-grow">
+        <div className="flex grow items-center justify-center">
+          <p className="text-lg font-bold">LOADING</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <CodeMirror
+      key={noteId}
+      ref={editorRef}
       theme={"dark"}
-      value={noteText.toString()}
+      value={doc.contents.toString()}
       height={"100%"}
       width={"100%"}
       className="flex-grow"
@@ -296,7 +316,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
           </div>
         </div>
       ) : (
-        <NoteContentStoreProvider key={noteId} noteId={noteId}>
+        <NoteContentStoreProvider noteId={noteId}>
           <NoteContentEditor />
         </NoteContentStoreProvider>
       )}

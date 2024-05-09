@@ -6,6 +6,7 @@ import { useCreation } from "ahooks";
 import toast from "react-hot-toast";
 import * as automerge from "@automerge/automerge";
 import { useNotesState } from "./notes";
+import { Future } from "@/../ui-shared/dist/util";
 
 interface NoteContentsSerialized {
   noteId: string;
@@ -17,6 +18,7 @@ export type NoteDoc = automerge.Doc<NoteDocData>;
 interface NoteContentState {
   noteId: string;
   doc: NoteDoc;
+  hydrationPromise: Future<true>;
   actions: {
     overwriteTextNoHistory: (s: string) => void;
     applyChanges: (s: Uint8Array[]) => void;
@@ -43,7 +45,7 @@ export async function deleteNoteContents(noteId: string) {
 }
 
 export const ZustandIdbNotesStorage: PersistStorage<
-  Omit<NoteContentState, "actions">
+  Omit<NoteContentState, "actions" | "hydrationPromise">
 > = {
   setItem: async (id, value) => {
     useNotesState.getState().cb.updateNote(id, (prev) => ({
@@ -112,38 +114,50 @@ export async function updateNoteDocAsync(
 function createNoteContentStore(noteId: string) {
   return createStore<NoteContentState>()(
     persist(
-      (set, get) => ({
-        noteId,
-        doc: automerge.from(
-          { contents: new automerge.Text("") },
-          { actor: AUTOMERGE_ACTOR },
-        ),
-        actions: {
-          changeDoc: (updater) => {
-            const { doc } = get();
-            const newDoc = automerge.change(doc, updater);
-            set({ doc: newDoc });
+      (set, get) => {
+        const hydrationPromise = new Future<true>();
+        return {
+          noteId,
+          hydrationPromise,
+          doc: automerge.from(
+            { contents: new automerge.Text("") },
+            { actor: AUTOMERGE_ACTOR },
+          ),
+          actions: {
+            changeDoc: (updater) => {
+              const { doc } = get();
+              const newDoc = automerge.change(doc, updater);
+              set({ doc: newDoc });
+            },
+            applyChanges: (changes) => {
+              const { doc } = get();
+              const [newDoc] = automerge.applyChanges<NoteDocData>(
+                doc,
+                changes,
+              );
+              set({ doc: newDoc });
+            },
+            overwriteTextNoHistory: (contents) => {
+              const doc = automerge.from(
+                { contents: new automerge.Text(contents) },
+                { actor: AUTOMERGE_ACTOR },
+              );
+              set({ doc });
+            },
           },
-          applyChanges: (changes) => {
-            const { doc } = get();
-            const [newDoc] = automerge.applyChanges<NoteDocData>(doc, changes);
-            set({ doc: newDoc });
-          },
-          overwriteTextNoHistory: (contents) => {
-            const doc = automerge.from(
-              { contents: new automerge.Text(contents) },
-              { actor: AUTOMERGE_ACTOR },
-            );
-            set({ doc });
-          },
-        },
-      }),
+        };
+      },
       {
         name: noteId,
         storage: ZustandIdbNotesStorage,
         version: VERSION,
         skipHydration: true,
-        partialize: ({ actions, ...rest }) => ({ ...rest }),
+        partialize: ({ actions, hydrationPromise, ...rest }) => ({ ...rest }),
+        onRehydrateStorage: ({ hydrationPromise }) => {
+          return () => {
+            hydrationPromise.resolve(true);
+          };
+        },
       },
     ),
   );
