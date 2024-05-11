@@ -219,7 +219,7 @@ export default function Settings() {
               const { permissionCache, cb } = usePermissionCache.getState();
               const permissions = new PermissionsManager(
                 deviceProfile.id,
-                userProfile?.publicAuthUserId,
+                userProfile?.id,
                 permissionCache,
               );
 
@@ -229,7 +229,7 @@ export default function Settings() {
                   userId: [
                     {
                       __typename: "Exact",
-                      value: userProfile.publicAuthUserId,
+                      value: userProfile.id,
                     },
                   ],
                   resourceId: [{ __typename: "Any" }],
@@ -237,11 +237,7 @@ export default function Settings() {
                   allow: true,
                 },
                 "userRoot",
-                {
-                  id: userProfile.publicAuthUserId,
-                  publicKey: userProfile.publicAuthKey,
-                  privateKey: userProfile.secret.privateAuthKey,
-                },
+                { ...userProfile, ...userProfile.secret },
               );
 
               cb.updateCache(permissions.permissionCache);
@@ -256,7 +252,7 @@ export default function Settings() {
 
       {userProfile ? (
         <h4 className="text-left text-wrap break-words overflow-hidden">
-          USER: {userProfile?.publicAuthUserId}
+          USER: {userProfile?.id}
         </h4>
       ) : (
         <h4>NO USER</h4>

@@ -57,7 +57,7 @@ export const NoteDataFetch = registerRpc({
     const { permissionCache, cb: permCb } = usePermissionCache.getState();
     const permissions = new PermissionsManager(
       deviceProfile.id,
-      userProfile.publicAuthUserId,
+      userProfile.id,
       permissionCache,
     );
 
@@ -65,14 +65,11 @@ export const NoteDataFetch = registerRpc({
       permission,
       {
         deviceId: peerId,
-        userId: userProfile.publicAuthUserId,
+        userId: userProfile.id,
         actionId: ["updateNote"],
         resourceId: [noteId],
       },
-      {
-        id: userProfile.publicAuthUserId,
-        publicKey: userProfile.publicAuthKey,
-      },
+      userProfile,
     );
     permCb.updateCache(permissions.permissionCache);
 
@@ -116,7 +113,7 @@ const NotePushListener = registerListener({
     const { permissionCache, cb: permCb } = usePermissionCache.getState();
     const permissions = new PermissionsManager(
       deviceProfile.id,
-      userProfile.publicAuthUserId,
+      userProfile.id,
       permissionCache,
     );
 
@@ -124,14 +121,11 @@ const NotePushListener = registerListener({
       permission,
       {
         deviceId: peerId,
-        userId: userProfile.publicAuthUserId,
+        userId: userProfile.id,
         actionId: ["pushNoteData"],
         resourceId: [],
       },
-      {
-        id: userProfile.publicAuthUserId,
-        publicKey: userProfile.publicAuthKey,
-      },
+      userProfile,
     );
     permCb.updateCache(permissions.permissionCache);
 
@@ -239,24 +233,20 @@ async function syncNotes() {
   const { permissionCache, cb: permsCb } = usePermissionCache.getState();
   const permissions = new PermissionsManager(
     deviceProfile.id,
-    userProfile?.publicAuthUserId,
+    userProfile?.id,
     permissionCache,
   );
 
   const permission = await permissions.createPermission(
     {
       deviceId: [{ __typename: "Exact", value: deviceProfile.id }],
-      userId: [{ __typename: "Exact", value: userProfile.publicAuthUserId }],
+      userId: [{ __typename: "Exact", value: userProfile.id }],
       resourceId: [{ __typename: "AnyRemainingSlots" }],
       actionId: [{ __typename: "AnyRemainingSlots" }],
       allow: true,
     },
     "userRoot",
-    {
-      id: userProfile.publicAuthUserId,
-      publicKey: userProfile.publicAuthKey,
-      privateKey: userSecret.privateAuthKey,
-    },
+    { ...userProfile, ...userSecret },
   );
   permsCb.updateCache(permissions.permissionCache);
 
@@ -286,6 +276,9 @@ async function syncNotes() {
   let totalCount = 0;
   for (const peer of peers.values()) {
     const stream = NoteListMetadata.call(peer.id, {});
+
+    // TODO: Check that permissions are properly sent over
+
     for await (const { note } of stream) {
       const { versions } = getOrCompute(noteVersions, note.id, () => ({
         versions: [],

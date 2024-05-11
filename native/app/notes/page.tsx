@@ -32,7 +32,7 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
 
       const permissions = new PermissionsManager(
         deviceProfile.id,
-        userProfile?.publicAuthUserId,
+        userProfile?.id,
         permissionCache,
       );
       const perm = permissions.findMyPermission({

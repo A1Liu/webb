@@ -35,8 +35,8 @@ const JoinMe = registerRpc({
     }
 
     useUserProfile.getState().cb.updateUserProfile({
-      publicAuthUserId: userId,
-      publicAuthKey,
+      id: userId,
+      publicKey: publicAuthKey,
     });
 
     yield { success: true };
@@ -56,9 +56,9 @@ const MayIJoinListener = registerListener({
       return;
     }
 
-    const userPublicKey = await exportUserPublickKey(userProfile.publicAuthKey);
+    const userPublicKey = await exportUserPublickKey(userProfile.publicKey);
     const result = JoinMe.call(peerId, {
-      userId: userProfile.publicAuthUserId,
+      userId: userProfile.id,
       userPublicKey,
     });
 
@@ -90,7 +90,7 @@ export function DeviceQr() {
 
     const data: DeviceQrData = {
       deviceId: deviceProfile.id,
-      userId: userProfile?.publicAuthUserId,
+      userId: userProfile?.id,
     };
 
     toCanvas(canvasRef.current, JSON.stringify(data)).catch((error) => {
@@ -131,10 +131,10 @@ export function ScanAndConnectButton() {
           Promise.resolve(null).then(async () => {
             if (myProfile) {
               const userPublicKey = await exportUserPublickKey(
-                myProfile.publicAuthKey,
+                myProfile.publicKey,
               );
               const result = JoinMe.call(device.deviceId, {
-                userId: myProfile.publicAuthUserId,
+                userId: myProfile.id,
                 userPublicKey,
               });
 

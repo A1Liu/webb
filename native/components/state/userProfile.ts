@@ -24,11 +24,11 @@ export const UserProfileSerializedSchema = z.object({
 });
 
 export interface UserProfile {
-  publicAuthUserId: string;
-  publicAuthKey: CryptoKey;
+  id: string;
+  publicKey: CryptoKey;
 
   secret?: {
-    privateAuthKey: CryptoKey;
+    privateKey: CryptoKey;
   };
 }
 
@@ -49,9 +49,9 @@ async function deserializeUserProfile(userProfile: UserProfileSerialized) {
     : undefined;
 
   return {
-    publicAuthUserId: userProfile.publicAuthUserId,
-    publicAuthKey: publicKey,
-    secret: privateKey ? { privateAuthKey: privateKey } : undefined,
+    id: userProfile.publicAuthUserId,
+    publicKey: publicKey,
+    secret: privateKey ? { privateKey } : undefined,
   };
 }
 
@@ -77,13 +77,13 @@ const ZustandIdbUserProfileStorage: PersistStorage<
       await (async () => {
         const userProfile = value.state.userProfile;
         if (!userProfile) return undefined;
-        const pubKey = await exportUserPublickKey(userProfile.publicAuthKey);
+        const pubKey = await exportUserPublickKey(userProfile.publicKey);
 
         const secret = await (async () => {
           if (!userProfile.secret) return undefined;
           const privAuthKey = await window.crypto.subtle.exportKey(
             "pkcs8",
-            userProfile.secret.privateAuthKey,
+            userProfile.secret.privateKey,
           );
 
           return {
@@ -92,7 +92,7 @@ const ZustandIdbUserProfileStorage: PersistStorage<
         })();
 
         return {
-          publicAuthUserId: userProfile.publicAuthUserId,
+          publicAuthUserId: userProfile.id,
           publicAuthKey: pubKey,
           secret,
         };
@@ -157,11 +157,11 @@ export const useUserProfile = create<UserProfileState>()(
             const keys = await createUserKeys();
 
             const userProfile: UserProfile = {
-              publicAuthUserId: keys.publicAuthUserId,
-              publicAuthKey: keys.publicAuthKey,
+              id: keys.publicAuthUserId,
+              publicKey: keys.publicAuthKey,
               secret: {
                 // TODO: store this stuff in a separate store
-                privateAuthKey: keys.privateAuthKey,
+                privateKey: keys.privateAuthKey,
               },
             };
 

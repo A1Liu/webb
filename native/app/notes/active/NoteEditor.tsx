@@ -212,7 +212,7 @@ function useNoteKeyRequest(noteId: string): {
       const { permissionCache } = usePermissionCache.getState();
       const permissions = new PermissionsManager(
         deviceProfile.id,
-        userProfile?.publicAuthUserId,
+        userProfile?.id,
         permissionCache,
       );
       const perm = permissions.findMyPermission({
@@ -252,7 +252,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
 
       const permissions = new PermissionsManager(
         deviceProfile.id,
-        userProfile?.publicAuthUserId,
+        userProfile?.id,
         permissionCache,
       );
       const perm = permissions.findMyPermission({

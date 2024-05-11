@@ -66,7 +66,7 @@ export const AskPermission = registerRpc({
     const { permissionCache, cb: permCb } = usePermissionCache.getState();
     const permissions = new PermissionsManager(
       deviceProfile.id,
-      userProfile.publicAuthUserId,
+      userProfile.id,
       permissionCache,
     );
 
@@ -98,20 +98,14 @@ export const AskPermission = registerRpc({
 
     const permissionInput = {
       deviceId: [{ __typename: "Exact" as const, value: peerId }],
-      userId: [
-        { __typename: "Exact" as const, value: userProfile.publicAuthUserId },
-      ],
+      userId: [{ __typename: "Exact" as const, value: userProfile.id }],
       ...permissionAction,
     };
 
     const permission = await permissions.createPermission(
       permissionInput,
       "userRoot",
-      {
-        id: userProfile.publicAuthUserId,
-        publicKey: userProfile.publicAuthKey,
-        privateKey: userProfile.secret.privateAuthKey,
-      },
+      { ...userProfile, ...userProfile.secret },
     );
     permCb.updateCache(permissions.permissionCache);
 
