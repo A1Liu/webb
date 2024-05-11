@@ -113,11 +113,12 @@ export async function createPermission(
     resourceId: permissionInput.resourceId,
     allow: permissionInput.allow,
 
-    expiresAt: permissionInput.expiresAt
-      ? getLowPrecisionDate(permissionInput.expiresAt)
-      : undefined,
     createdAt: getLowPrecisionDate(),
   };
+
+  if (permissionInput.expiresAt) {
+    permission.expiresAt = getLowPrecisionDate(permissionInput.expiresAt);
+  }
 
   const json = stringify(permission);
   const signature = await window.crypto.subtle.sign(

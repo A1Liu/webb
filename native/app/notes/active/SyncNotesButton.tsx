@@ -30,8 +30,12 @@ import { usePermissionCache } from "@/components/state/permissions";
 import { base64ToBytes, bytesToBase64 } from "@/components/util";
 import { isEqual, maxBy } from "lodash";
 import * as automerge from "@automerge/automerge";
+import _ from "lodash";
 
-const NoteMetadataWithHashSchema = z.object({ note: NoteDataSchema });
+const NoteMetadataWithHashSchema = z.object({
+  note: NoteDataSchema,
+  permission: PermissionSchema,
+});
 
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
@@ -61,7 +65,7 @@ export const NoteDataFetch = registerRpc({
         deviceId: peerId,
         userId: userProfile.id,
         actionId: ["updateNote"],
-        resourceId: [noteId],
+        resourceId: [noteMetadata.folder, noteId],
       },
       userProfile,
     );
@@ -87,7 +91,7 @@ const NotePushListener = registerListener({
   channel: "NotePushListener",
   group: NotesSyncInitGroup,
   schema: z.object({
-    notes: NoteMetadataWithHashSchema.array(),
+    notes: z.object({ note: NoteDataSchema }).array(),
     permission: PermissionSchema,
   }),
   listener: async (peerId, { notes, permission }) => {
@@ -144,9 +148,10 @@ const NotePushListener = registerListener({
       });
 
       const permission = permCb.findPermission({
+        deviceId: deviceProfile.id,
         userId: userProfile.id,
         actionId: ["updateNote"],
-        resourceId: [note.id],
+        resourceId: [note.folder, note.id],
       });
 
       if (!permission) {
@@ -190,9 +195,25 @@ const NoteListMetadata = registerRpc({
   input: z.object({}),
   output: NoteMetadataWithHashSchema,
   rpc: async function* (peerId, {}) {
+    const { deviceProfile } = useDeviceProfile.getState();
+    const { userProfile } = useUserProfile.getState();
+    const { cb } = usePermissionCache.getState();
     console.debug(`received NoteListMetadata req`, peerId);
+
+    if (!deviceProfile || !userProfile) return;
+
     for await (const note of listNoteMetadataUpdateHashes()) {
-      yield { note };
+      const perm = cb.findPermission({
+        deviceId: deviceProfile.id,
+        userId: userProfile.id,
+        actionId: ["updateNote"],
+        resourceId: [note.folder, note.id],
+      });
+      if (!perm) {
+        continue;
+      }
+
+      yield { note, permission: perm };
     }
   },
 });
@@ -221,7 +242,7 @@ async function syncNotes() {
 
   const permission = await permsCb.createPermission(
     {
-      deviceId: [MatchPerms.exact(userProfile.id)],
+      deviceId: [MatchPerms.exact(deviceProfile.id)],
       userId: [MatchPerms.exact(userProfile.id)],
       resourceId: [MatchPerms.AnyRemaining],
       actionId: [MatchPerms.AnyRemaining],
@@ -260,7 +281,21 @@ async function syncNotes() {
 
     // TODO: Check that permissions are properly sent over
 
-    for await (const { note } of stream) {
+    for await (const { note, permission } of stream) {
+      const verified = await permsCb.verifyPermissions(
+        permission,
+        {
+          deviceId: peer.id,
+          userId: userProfile.id,
+          actionId: ["updateNote"],
+          resourceId: [note.folder, note.id],
+        },
+        userProfile,
+      );
+      if (!verified) {
+        continue;
+      }
+
       const { versions } = getOrCompute(noteVersions, note.id, () => ({
         versions: [],
       }));
@@ -290,7 +325,7 @@ async function syncNotes() {
     const allNotesEqualHeads = versions.every((v) =>
       isEqual(mostRecentNote.commitHeads, v.note.commitHeads),
     );
-    if (allNotesEqualHeads) {
+    if (allNotesEqualHeads && existingNoteMetadata.has(note.id)) {
       continue;
     }
 

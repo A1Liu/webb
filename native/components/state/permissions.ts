@@ -11,7 +11,6 @@ import {
   PermissionSchema,
   matchPermission,
   verifyPermissionSignature,
-  matchPermKey,
   Authority,
   RootIdentity,
   permissionEqual,
@@ -30,9 +29,7 @@ interface PermissionCacheState {
   permissionCache: Map<string, Permission>;
   cb: {
     updateCache: (p: Map<string, Permission>) => void;
-    findPermission: (
-      action: Partial<Action> & Pick<Action, "actionId" | "resourceId">,
-    ) => Permission | undefined;
+    findPermission: (action: Action) => Permission | undefined;
     createPermission: (
       permissionInput: Omit<Permission, "cert" | "createdAt">,
       authorityKind: Authority["authorityKind"],
@@ -86,21 +83,7 @@ export const usePermissionCache = create<PermissionCacheState>()(
           findPermission: (action) => {
             const { permissionCache } = get();
             for (const permission of permissionCache.values()) {
-              if (!matchPermKey(action.resourceId, permission.resourceId))
-                continue;
-              if (!matchPermKey(action.actionId, permission.actionId)) continue;
-              if (
-                action.userId &&
-                !matchPermKey([action.userId], permission.userId)
-              )
-                continue;
-              if (
-                action.deviceId &&
-                !matchPermKey([action.deviceId], permission.deviceId)
-              )
-                continue;
-
-              return permission;
+              if (matchPermission(permission, action)) return permission;
             }
 
             return undefined;
@@ -174,7 +157,7 @@ export const AskPermission = registerRpc({
       description: `Requesting to do ${JSON.stringify(
         action.actionId,
       )} with ${JSON.stringify(action.resourceId)}`,
-      options: ["Deny", "Allow", "Always Allow"] as const,
+      options: ["Deny", "Allow", "Allow in Folder", "Always Allow"] as const,
     });
 
     let permissionAction = { ...action, allow: true };
@@ -184,10 +167,18 @@ export const AskPermission = registerRpc({
       case "Allow":
         break;
 
+      case "Allow in Folder":
+        permissionAction = {
+          resourceId: [action.resourceId[0]!, MatchPerms.AnyRemaining],
+          actionId: permissionAction.actionId,
+          allow: true,
+        };
+        break;
+
       case "Always Allow":
         permissionAction = {
-          resourceId: [MatchPerms.Any],
-          actionId: [MatchPerms.Any],
+          resourceId: [MatchPerms.AnyRemaining],
+          actionId: permissionAction.actionId,
           allow: true,
         };
         break;

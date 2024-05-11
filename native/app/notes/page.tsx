@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 export const dynamic = "force-static";
 
 function ActiveNoteButton({ note }: { note: NoteData }) {
+  const hideDisallowedFolders = useNotesState((s) => s.hideDisallowedFolders);
   const cb = useNotesState((s) => s.cb);
   const activeNote = useNotesState((s) => s.activeNote);
   const { isMobile } = usePlatform();
@@ -29,9 +30,10 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
     async () => {
       if (!userProfile || !deviceProfile) return false;
       const perm = permsCb.findPermission({
+        deviceId: deviceProfile.id,
         userId: userProfile.id,
         actionId: ["updateNote"],
-        resourceId: [noteId],
+        resourceId: [note.folder, noteId],
       });
 
       if (!perm) return false;
@@ -46,6 +48,12 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
   return (
     <button
       className={clsx(
+        {
+          hidden: !hasAuth && hideDisallowedFolders,
+          "bg-slate-900": !hasAuth,
+          "bg-yellow-700": hasAuth && activeNote === note.id,
+          "bg-slate-700": hasAuth && activeNote !== note.id,
+        },
         !hasAuth
           ? "bg-slate-900"
           : activeNote === note.id && !isMobile
@@ -76,11 +84,11 @@ const desktopBoxStyles = "w-48 flex-shrink-0 border-r-2 border-slate-500";
 function SelectActiveNote() {
   const notes = useNotesState((s) => s.notes);
   const { isMobile } = usePlatform();
-  const nonTombstone = [...(notes ? notes?.values() : [])].filter(
+  const shownNotes = [...(notes ? notes?.values() : [])].filter(
     (note) => !note.isTombstone,
   );
 
-  if (nonTombstone.length === 0) {
+  if (shownNotes.length === 0) {
     return (
       <div
         className={clsx("flex flex-col", "items-center justify-center", {
@@ -101,7 +109,7 @@ function SelectActiveNote() {
         { [desktopBoxStyles]: !isMobile, "flex-grow": isMobile },
       )}
     >
-      {nonTombstone.reverse().map((note) => (
+      {shownNotes.reverse().map((note) => (
         <ActiveNoteButton key={note.id} note={note} />
       ))}
     </div>

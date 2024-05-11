@@ -5,10 +5,11 @@ import { v4 as uuid } from "uuid";
 import { z } from "zod";
 import { InitGroup } from "../constants";
 import { ZustandIdbStorage } from "../util";
+import { useCreation } from "ahooks";
 
 const NoteDataSchemaInternal = z.object({
   id: z.string(),
-  folder: z.string().nullish(),
+  folder: z.string().default("default"),
   preview: z.string(),
   isTombstone: z.boolean().nullish(),
   commitHeads: z.string().array().readonly().default([]),
@@ -22,7 +23,12 @@ export interface NoteGlobalState {
   activeNote: string;
   notes: Map<string, Readonly<NoteData>>;
 
+  createNoteDefaultFolder?: string;
+  hideDisallowedFolders?: boolean;
+
   cb: {
+    setHidePreference: (pref: boolean) => void;
+    setDefaultFolder: (pref: string) => void;
     updateNote: (
       id: string,
       updater: (prev: NoteData) => NoteData,
@@ -38,6 +44,7 @@ const ZERO_TIME = new Date(0);
 function createEmptyNote(id: string): NoteData {
   return {
     id,
+    folder: useNotesState.getState().createNoteDefaultFolder ?? "default",
     preview: "",
     commitHeads: [],
     lastUpdateDate: ZERO_TIME,
@@ -51,6 +58,12 @@ export const useNotesState = create<NoteGlobalState>()(
         activeNote: uuid(),
         notes: new Map(),
         cb: {
+          setHidePreference: (pref) => {
+            set({ hideDisallowedFolders: pref });
+          },
+          setDefaultFolder: (pref) => {
+            set({ createNoteDefaultFolder: pref });
+          },
           updateNote: (noteId, updater, reorder = false) => {
             set((prev) => {
               const notes = new Map(prev.notes);
@@ -118,8 +131,9 @@ export const useNotesState = create<NoteGlobalState>()(
 );
 
 export function useNoteMetadata(noteId: string): NoteData {
+  const defaultNote = useCreation(() => createEmptyNote(noteId), [noteId]);
   return useNotesState(
-    useShallow((state) => state.notes.get(noteId) ?? createEmptyNote(noteId)),
+    useShallow((state) => state.notes.get(noteId) ?? defaultNote),
   );
 }
 

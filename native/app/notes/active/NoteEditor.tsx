@@ -1,5 +1,9 @@
 import React, { useRef } from "react";
-import { useNotesState } from "@/components/state/notes";
+import {
+  NoteData,
+  useNoteMetadata,
+  useNotesState,
+} from "@/components/state/notes";
 import { useLockFn, useRequest } from "ahooks";
 import {
   NoteContentStoreProvider,
@@ -131,19 +135,19 @@ function NoteContentEditor() {
   );
 }
 
-async function requestKeyForNote(noteId: string) {
+async function requestKeyForNote(note: NoteData) {
   const toastId = toast.loading(`Requesting perms...`);
 
   const { peers } = usePeers.getState();
   const firstResult = await getFirstSuccess(
     [...peers.values()].map(async (peer) => {
-      // cheating here to always get the first successful result
-      // if one exists
-      if (!noteId) throw new Error(``);
       const result = AskPermission.call(peer.id, {
         action: {
           actionId: [MatchPerms.exact("updateNote")],
-          resourceId: [MatchPerms.exact(noteId)],
+          resourceId: [
+            MatchPerms.exact(note.folder),
+            MatchPerms.exact(note.id),
+          ],
         },
       });
       for await (const { permission } of result) {
@@ -199,7 +203,7 @@ async function requestKeyForNote(noteId: string) {
   });
 }
 
-function useNoteKeyRequest(noteId: string): {
+function useNoteKeyRequest(note: NoteData): {
   loading: boolean;
   requestKey: () => Promise<boolean | undefined>;
 } {
@@ -211,13 +215,14 @@ function useNoteKeyRequest(noteId: string): {
 
       const { cb: permsCb } = usePermissionCache.getState();
       const perm = permsCb.findPermission({
+        deviceId: deviceProfile.id,
         userId: userProfile.id,
         actionId: ["updateNote"],
-        resourceId: [noteId],
+        resourceId: [note.folder, note.id],
       });
       if (perm) return true;
 
-      await requestKeyForNote(noteId);
+      await requestKeyForNote(note);
       return true;
     },
     {
@@ -237,6 +242,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const { userProfile } = useUserProfile();
   const { deviceProfile } = useDeviceProfile();
   const { permissionCache, cb: permsCb } = usePermissionCache();
+  const note = useNoteMetadata(noteId);
   const {
     data: hasAuth,
     loading,
@@ -245,19 +251,20 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     async () => {
       if (!userProfile || !deviceProfile) return false;
       const perm = permsCb.findPermission({
+        deviceId: deviceProfile.id,
         userId: userProfile.id,
         actionId: ["updateNote"],
-        resourceId: [noteId],
+        resourceId: [note.folder, noteId],
       });
       if (perm) return true;
 
       return false;
     },
     {
-      refreshDeps: [noteId, userProfile, deviceProfile, permissionCache],
+      refreshDeps: [note, userProfile, deviceProfile, permissionCache],
     },
   );
-  const { loading: requestKeyLoading, requestKey } = useNoteKeyRequest(noteId);
+  const { loading: requestKeyLoading, requestKey } = useNoteKeyRequest(note);
   const navigate = useNavigate();
 
   if (loading) {

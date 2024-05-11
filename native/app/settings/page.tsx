@@ -115,24 +115,84 @@ function BackupUser() {
   );
 }
 
-export default function Settings() {
-  const { platform } = usePlatform();
-  const { peers } = usePeers();
-  const notesCb = useNotesState((s) => s.cb);
+function PreferencesBar() {
   const {
     userProfile,
     cb: { logout, createUserProfile },
   } = useUserProfile();
+  const createUser = useLockFn(createUserProfile);
+  const {
+    hideDisallowedFolders,
+    createNoteDefaultFolder,
+    cb: notesCb,
+  } = useNotesState();
 
+  return (
+    <div className="flex flex-col gap-2 px-2">
+      {userProfile ? (
+        <h4 className="text-left text-wrap break-words overflow-hidden">
+          USER: {userProfile?.id}
+        </h4>
+      ) : (
+        <h4>NO USER</h4>
+      )}
+
+      <div className="flex gap-2">
+        {userProfile ? (
+          <TapCounterButton
+            counterLimit={5}
+            className={buttonClass}
+            onClick={() => {
+              logout();
+              toast("Created user profile");
+            }}
+          >
+            Logout
+          </TapCounterButton>
+        ) : (
+          <button className={buttonClass} onClick={createUser}>
+            Create User
+          </button>
+        )}
+
+        <div className="flex items-center gap-2 p-2 rounded-md border border-white">
+          <input
+            type="checkbox"
+            checked={!!hideDisallowedFolders}
+            onChange={(evt) => {
+              notesCb.setHidePreference(evt.target.checked);
+            }}
+          />
+          Hide unallowed
+        </div>
+
+        <div className="flex flex-col gap-1 text-xs p-2 rounded-md border border-white">
+          Default folder
+          <input
+            className="text-xs text-black"
+            type="text"
+            placeholder="e.g. 'default'"
+            value={createNoteDefaultFolder ?? "default"}
+            onChange={(evt) => {
+              notesCb.setDefaultFolder(evt.target.value);
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Settings() {
+  const { platform } = usePlatform();
+  const { peers } = usePeers();
+  const notesCb = useNotesState((s) => s.cb);
   const navigate = useNavigate();
-
   const hardReset = useMemoizedFn(async () => {
     await clear();
 
     window.location.reload();
   });
-
-  const createUser = useLockFn(createUserProfile);
 
   return (
     <TopbarLayout
@@ -222,8 +282,8 @@ export default function Settings() {
                 {
                   deviceId: [MatchPerms.exact(deviceProfile.id)],
                   userId: [MatchPerms.exact(userProfile.id)],
-                  resourceId: [MatchPerms.Any],
-                  actionId: [MatchPerms.Any],
+                  resourceId: [MatchPerms.AnyRemaining],
+                  actionId: [MatchPerms.AnyRemaining],
                   allow: true,
                 },
                 "userRoot",
@@ -238,32 +298,7 @@ export default function Settings() {
         </div>
       </div>
 
-      {userProfile ? (
-        <h4 className="text-left text-wrap break-words overflow-hidden">
-          USER: {userProfile?.id}
-        </h4>
-      ) : (
-        <h4>NO USER</h4>
-      )}
-
-      <div className="flex gap-2">
-        {userProfile ? (
-          <TapCounterButton
-            counterLimit={5}
-            className={buttonClass}
-            onClick={() => {
-              logout();
-              toast("Created user profile");
-            }}
-          >
-            Logout
-          </TapCounterButton>
-        ) : (
-          <button className={buttonClass} onClick={createUser}>
-            Create User
-          </button>
-        )}
-      </div>
+      <PreferencesBar />
 
       <IncomingPeers peers={[...(peers ? peers?.values() : [])]} />
     </TopbarLayout>
