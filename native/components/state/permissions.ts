@@ -3,15 +3,26 @@ import { persist } from "zustand/middleware";
 import { ZustandIdbStorage } from "../util";
 import { GlobalInitGroup } from "../constants";
 import {
+  Action,
+  Identity,
   Permission,
+  PermissionResult,
+  createPermission,
   PermissionSchema,
-  PermissionsManager,
+  matchPermission,
+  verifyPermissionSignature,
+  matchPermKey,
+  Authority,
+  RootIdentity,
+  permissionEqual,
+  MatchPerms,
 } from "../permissions";
 import { z } from "zod";
 import { registerRpc } from "../network";
 import { useGlobals } from "./appGlobals";
 import { useUserProfile } from "./userProfile";
 import { useDeviceProfile } from "./deviceProfile";
+import { isEqual } from "lodash";
 
 // Only 1 lock ID for now
 
@@ -19,17 +30,108 @@ interface PermissionCacheState {
   permissionCache: Map<string, Permission>;
   cb: {
     updateCache: (p: Map<string, Permission>) => void;
+    findPermission: (
+      action: Partial<Action> & Pick<Action, "actionId" | "resourceId">,
+    ) => Permission | undefined;
+    createPermission: (
+      permissionInput: Omit<Permission, "cert" | "createdAt">,
+      authorityKind: Authority["authorityKind"],
+      identity: RootIdentity,
+    ) => Promise<Permission>;
+    verifyPermissions: (
+      permission: Permission,
+      action: Action,
+      identity: Identity,
+    ) => Promise<PermissionResult>;
   };
 }
 
 export const usePermissionCache = create<PermissionCacheState>()(
   persist(
-    (set) => {
+    (set, get) => {
       return {
         permissionCache: new Map(),
         cb: {
           updateCache: (cache) => {
             set({ permissionCache: new Map(cache) });
+          },
+          createPermission: async (
+            permissionInput,
+            authorityKind,
+            identity,
+          ) => {
+            const { permissionCache } = get();
+            for (const permission of permissionCache.values()) {
+              // TODO: omg this is all so wrong, none of this is robust holy shit
+              if (permissionEqual(permissionInput, permission)) {
+                console.log("found existing permission");
+                return permission;
+              }
+            }
+
+            const finalPermission = await createPermission(
+              permissionInput,
+              authorityKind,
+              identity,
+            );
+
+            set(({ permissionCache }) => {
+              const newCache = new Map(permissionCache);
+              newCache.set(finalPermission.cert.signature, finalPermission);
+              return { permissionCache: newCache };
+            });
+
+            return finalPermission;
+          },
+          findPermission: (action) => {
+            const { permissionCache } = get();
+            for (const permission of permissionCache.values()) {
+              if (!matchPermKey(action.resourceId, permission.resourceId))
+                continue;
+              if (!matchPermKey(action.actionId, permission.actionId)) continue;
+              if (
+                action.userId &&
+                !matchPermKey([action.userId], permission.userId)
+              )
+                continue;
+              if (
+                action.deviceId &&
+                !matchPermKey([action.deviceId], permission.deviceId)
+              )
+                continue;
+
+              return permission;
+            }
+
+            return undefined;
+          },
+          verifyPermissions: async (permission, action, identity) => {
+            const { cert } = permission;
+            const previousPermission = get().permissionCache.get(
+              cert.signature,
+            );
+            if (
+              !previousPermission ||
+              !isEqual(previousPermission.cert, permission.cert)
+            ) {
+              const valid = await verifyPermissionSignature(
+                permission,
+                identity,
+              );
+              if (!valid) return PermissionResult.CertFailure;
+
+              set(({ permissionCache }) => {
+                const newCache = new Map(permissionCache);
+                newCache.set(permission.cert.signature, permission);
+                return { permissionCache: newCache };
+              });
+            }
+
+            if (!matchPermission(permission, action))
+              return PermissionResult.MatchFailure;
+
+            if (!permission.allow) return PermissionResult.Reject;
+            return PermissionResult.Allow;
           },
         },
       };
@@ -63,12 +165,7 @@ export const AskPermission = registerRpc({
     const { deviceProfile } = useDeviceProfile.getState();
     if (!deviceProfile) return;
 
-    const { permissionCache, cb: permCb } = usePermissionCache.getState();
-    const permissions = new PermissionsManager(
-      deviceProfile.id,
-      userProfile.id,
-      permissionCache,
-    );
+    const { cb: permCb } = usePermissionCache.getState();
 
     const globalsCb = useGlobals.getState().cb;
 
@@ -89,25 +186,24 @@ export const AskPermission = registerRpc({
 
       case "Always Allow":
         permissionAction = {
-          resourceId: [{ __typename: "Any" as const }],
-          actionId: [{ __typename: "Any" as const }],
+          resourceId: [MatchPerms.Any],
+          actionId: [MatchPerms.Any],
           allow: true,
         };
         break;
     }
 
     const permissionInput = {
-      deviceId: [{ __typename: "Exact" as const, value: peerId }],
-      userId: [{ __typename: "Exact" as const, value: userProfile.id }],
+      deviceId: [MatchPerms.exact(peerId)],
+      userId: [MatchPerms.exact(userProfile.id)],
       ...permissionAction,
     };
 
-    const permission = await permissions.createPermission(
+    const permission = await permCb.createPermission(
       permissionInput,
       "userRoot",
       { ...userProfile, ...userProfile.secret },
     );
-    permCb.updateCache(permissions.permissionCache);
 
     yield { permission };
   },

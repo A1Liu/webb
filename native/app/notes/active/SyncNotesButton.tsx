@@ -22,9 +22,9 @@ import {
 import { useUserProfile } from "@/components/state/userProfile";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 import {
+  MatchPerms,
   PermissionResult,
   PermissionSchema,
-  PermissionsManager,
 } from "@/components/permissions";
 import { usePermissionCache } from "@/components/state/permissions";
 import { base64ToBytes, bytesToBase64 } from "@/components/util";
@@ -54,14 +54,8 @@ export const NoteDataFetch = registerRpc({
     const { deviceProfile } = useDeviceProfile.getState();
     if (!deviceProfile) return;
 
-    const { permissionCache, cb: permCb } = usePermissionCache.getState();
-    const permissions = new PermissionsManager(
-      deviceProfile.id,
-      userProfile.id,
-      permissionCache,
-    );
-
-    const verifyResult = await permissions.verifyPermission(
+    const { cb: permCb } = usePermissionCache.getState();
+    const verifyResult = await permCb.verifyPermissions(
       permission,
       {
         deviceId: peerId,
@@ -71,7 +65,6 @@ export const NoteDataFetch = registerRpc({
       },
       userProfile,
     );
-    permCb.updateCache(permissions.permissionCache);
 
     switch (verifyResult) {
       case PermissionResult.Allow:
@@ -110,24 +103,17 @@ const NotePushListener = registerListener({
       return;
     }
 
-    const { permissionCache, cb: permCb } = usePermissionCache.getState();
-    const permissions = new PermissionsManager(
-      deviceProfile.id,
-      userProfile.id,
-      permissionCache,
-    );
-
-    const verifyResult = await permissions.verifyPermission(
+    const { cb: permCb } = usePermissionCache.getState();
+    const verifyResult = await permCb.verifyPermissions(
       permission,
       {
         deviceId: peerId,
         userId: userProfile.id,
-        actionId: ["pushNoteData"],
+        actionId: ["updateNote"],
         resourceId: [],
       },
       userProfile,
     );
-    permCb.updateCache(permissions.permissionCache);
 
     switch (verifyResult) {
       case PermissionResult.Allow:
@@ -157,7 +143,8 @@ const NotePushListener = registerListener({
         id: SYNC_STATUS_TOAST_ID,
       });
 
-      const permission = permissions.findMyPermission({
+      const permission = permCb.findPermission({
+        userId: userProfile.id,
         actionId: ["updateNote"],
         resourceId: [note.id],
       });
@@ -230,25 +217,19 @@ async function syncNotes() {
     return;
   }
 
-  const { permissionCache, cb: permsCb } = usePermissionCache.getState();
-  const permissions = new PermissionsManager(
-    deviceProfile.id,
-    userProfile?.id,
-    permissionCache,
-  );
+  const { cb: permsCb } = usePermissionCache.getState();
 
-  const permission = await permissions.createPermission(
+  const permission = await permsCb.createPermission(
     {
-      deviceId: [{ __typename: "Exact", value: deviceProfile.id }],
-      userId: [{ __typename: "Exact", value: userProfile.id }],
-      resourceId: [{ __typename: "AnyRemainingSlots" }],
-      actionId: [{ __typename: "AnyRemainingSlots" }],
+      deviceId: [MatchPerms.exact(userProfile.id)],
+      userId: [MatchPerms.exact(userProfile.id)],
+      resourceId: [MatchPerms.AnyRemaining],
+      actionId: [MatchPerms.AnyRemaining],
       allow: true,
     },
     "userRoot",
     { ...userProfile, ...userSecret },
   );
-  permsCb.updateCache(permissions.permissionCache);
 
   if (!permission) {
     toast.error(`Failed to create permission!`);

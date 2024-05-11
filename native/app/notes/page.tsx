@@ -8,7 +8,6 @@ import { DefaultTimeFormatter } from "@/components/util";
 import { NoteEditor } from "./active/NoteEditor";
 import { useRequest } from "ahooks";
 import { usePermissionCache } from "@/components/state/permissions";
-import { PermissionsManager } from "@/components/permissions";
 import { useUserProfile } from "@/components/state/userProfile";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { useNavigate } from "react-router-dom";
@@ -24,18 +23,13 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
 
   const { userProfile } = useUserProfile();
   const { deviceProfile } = useDeviceProfile();
-  const { permissionCache } = usePermissionCache();
+  const { permissionCache, cb: permsCb } = usePermissionCache();
 
   const { data: hasAuth, loading } = useRequest(
     async () => {
       if (!userProfile || !deviceProfile) return false;
-
-      const permissions = new PermissionsManager(
-        deviceProfile.id,
-        userProfile?.id,
-        permissionCache,
-      );
-      const perm = permissions.findMyPermission({
+      const perm = permsCb.findPermission({
+        userId: userProfile.id,
         actionId: ["updateNote"],
         resourceId: [noteId],
       });

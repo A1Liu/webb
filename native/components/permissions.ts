@@ -1,6 +1,7 @@
 import stringify from "fast-json-stable-stringify";
 import { isEqual, pick } from "lodash";
 import { z } from "zod";
+import { UserKeyAlgorithm } from "./crypto";
 import { base64ToBytes, bytesToBase64 } from "./util";
 
 export type PermissionMatcher = z.infer<typeof PermissionMatcherSchema>;
@@ -12,6 +13,18 @@ const PermissionMatcherSchema = z
     z.object({ __typename: z.literal("AnyRemainingSlots") }),
   ])
   .array();
+
+export class MatchPerms {
+  static Any = { __typename: "Any" } as const;
+  static AnyRemaining = { __typename: "AnyRemainingSlots" } as const;
+
+  static exact(value: string) {
+    return { __typename: "Exact" as const, value };
+  }
+  static prefix(value: string) {
+    return { __typename: "Prefix" as const, value };
+  }
+}
 
 export type Authority = z.infer<typeof AuthoritySchema>;
 const AuthoritySchema = z.discriminatedUnion("authorityKind", [
@@ -29,9 +42,15 @@ const CertSchema = z.object({
   authority: AuthoritySchema,
 });
 
-export const ActionSchema = z.object({
+export const ActionIdentifierSchema = z.object({
   resourceId: z.string().array(),
   actionId: z.string().array(),
+});
+
+export type Action = z.infer<typeof ActionSchema>;
+export const ActionSchema = ActionIdentifierSchema.extend({
+  deviceId: z.string(),
+  userId: z.string(),
 });
 
 export enum PermissionResult {
@@ -76,87 +95,24 @@ export class PermissionsManager {
     readonly permissionCache: Map<string, Permission> = new Map(),
   ) {}
 
-  findMyPermission(action: { resourceId: string[]; actionId: string[] }) {
-    return this.searchCachedPermissions({
-      deviceId: this.deviceId,
-      userId: this.userId,
-      ...action,
-    });
-  }
-
-  searchCachedPermissions(action: {
-    deviceId: string;
-    userId: string;
-    resourceId: string[];
-    actionId: string[];
-  }) {
-    for (const permission of this.permissionCache.values()) {
-      if (!match([action.deviceId], permission.deviceId)) continue;
-      if (!match([action.userId], permission.userId)) continue;
-      if (!match(action.resourceId, permission.resourceId)) continue;
-      if (!match(action.actionId, permission.actionId)) continue;
-
-      return permission;
-    }
-  }
-
   async createPermission(
     permissionInput: Omit<Permission, "cert" | "createdAt">,
     authorityKind: Authority["authorityKind"],
     identity: RootIdentity,
   ): Promise<Permission> {
-    const permissionFields = pick(permissionInput, [
-      "userId",
-      "resourceId",
-      "deviceId",
-      "actionId",
-    ]);
     for (const permission of this.permissionCache.values()) {
       // TODO: omg this is all so wrong, none of this is robust holy shit
-      if (
-        isEqual(
-          permissionFields,
-          pick(permission, ["userId", "resourceId", "deviceId", "actionId"]),
-        )
-      ) {
+      if (permissionEqual(permissionInput, permission)) {
         console.log("found existing permission");
         return permission;
       }
     }
 
-    const permission: Omit<Permission, "cert"> = {
-      createdAt: new Date(),
-      allow: permissionInput.allow,
-      ...permissionFields,
-    };
-
-    // This is necessary because... something. When being serialized,
-    // for some reason the milliseconds field is sometimes lost,
-    // causing mis-certs.
-    permission.createdAt.setMilliseconds(0);
-    if (permissionInput.expiresAt) {
-      // should not modify inputs
-      permission.expiresAt = new Date(permissionInput.expiresAt);
-      permission.expiresAt.setMilliseconds(0);
-    }
-
-    const json = stringify(permission);
-    const signature = await window.crypto.subtle.sign(
-      { name: "RSA-PSS", saltLength: 32 },
-      identity.privateKey,
-      new TextEncoder().encode(json),
+    const finalPermission = await createPermission(
+      permissionInput,
+      authorityKind,
+      identity,
     );
-
-    const finalPermission = {
-      ...permission,
-      cert: {
-        signature: bytesToBase64(signature),
-        authority: {
-          authorityKind,
-          id: identity.id,
-        },
-      },
-    };
 
     this.permissionCache.set(finalPermission.cert.signature, finalPermission);
 
@@ -167,7 +123,7 @@ export class PermissionsManager {
     permission: Permission,
     identity: Identity,
   ): Promise<boolean> {
-    const { cert, ...permissionData } = permission;
+    const { cert } = permission;
     const previousPermission = this.permissionCache.get(cert.signature);
     if (
       previousPermission &&
@@ -180,30 +136,7 @@ export class PermissionsManager {
       }
     }
 
-    if (cert.authority.id !== identity.id) {
-      return false;
-    }
-
-    const now = new Date();
-    if (permissionData.createdAt > now) {
-      return false;
-    }
-
-    if (
-      permissionData.expiresAt !== undefined &&
-      permissionData.expiresAt < now
-    ) {
-      return false;
-    }
-
-    const json = stringify(permissionData);
-    const valid = await window.crypto.subtle.verify(
-      { name: "RSA-PSS", saltLength: 32 },
-      identity.publicKey,
-      base64ToBytes(cert.signature),
-      new TextEncoder().encode(json),
-    );
-
+    const valid = await verifyPermissionSignature(permission, identity);
     if (valid) {
       this.permissionCache.set(permission.cert.signature, permission);
     }
@@ -213,12 +146,7 @@ export class PermissionsManager {
 
   async verifyPermission(
     permission: Permission,
-    action: {
-      deviceId: string;
-      userId: string;
-      resourceId: string[];
-      actionId: string[];
-    },
+    action: Action,
     identity: Identity,
   ): Promise<PermissionResult> {
     const permissionValid = await this.verifyPermissionSignature(
@@ -227,22 +155,111 @@ export class PermissionsManager {
     );
     if (!permissionValid) return PermissionResult.CertFailure;
 
-    if (!match([action.deviceId], permission.deviceId))
-      return PermissionResult.MatchFailure;
-    if (!match([action.userId], permission.userId))
-      return PermissionResult.MatchFailure;
-    if (!match(action.resourceId, permission.resourceId))
-      return PermissionResult.MatchFailure;
-    if (!match(action.actionId, permission.actionId))
+    if (!matchPermission(permission, action))
       return PermissionResult.MatchFailure;
 
     if (!permission.allow) return PermissionResult.Reject;
-
     return PermissionResult.Allow;
   }
 }
 
-function match(key: string[], permMatcher: PermissionMatcher): boolean {
+export function permissionEqual(
+  perm1: Omit<Permission, "cert" | "createdAt">,
+  perm2: Omit<Permission, "cert" | "createdAt">,
+): boolean {
+  const fieldNames = ["userId", "resourceId", "deviceId", "actionId"] as const;
+
+  // TODO: omg this is all so wrong, none of this is robust holy shit
+  const perm1Fields = pick(perm1, fieldNames);
+  const perm2Fields = pick(perm2, fieldNames);
+
+  return isEqual(perm1Fields, perm2Fields);
+}
+
+export async function createPermission(
+  permissionInput: Omit<Permission, "cert" | "createdAt">,
+  authorityKind: Authority["authorityKind"],
+  identity: RootIdentity,
+): Promise<Permission> {
+  const permission: Omit<Permission, "cert"> = {
+    actionId: permissionInput.actionId,
+    userId: permissionInput.userId,
+    deviceId: permissionInput.deviceId,
+    resourceId: permissionInput.resourceId,
+    allow: permissionInput.allow,
+
+    expiresAt: permissionInput.expiresAt
+      ? getLowPrecisionDate(permissionInput.expiresAt)
+      : undefined,
+    createdAt: getLowPrecisionDate(),
+  };
+
+  const json = stringify(permission);
+  const signature = await window.crypto.subtle.sign(
+    UserKeyAlgorithm,
+    identity.privateKey,
+    new TextEncoder().encode(json),
+  );
+
+  const cert = {
+    signature: bytesToBase64(signature),
+    authority: { authorityKind, id: identity.id },
+  };
+
+  const finalPermission = { ...permission, cert };
+
+  return finalPermission;
+}
+
+export async function verifyPermissionSignature(
+  permission: Permission,
+  identity: Identity,
+): Promise<boolean> {
+  const { cert, ...permissionData } = permission;
+
+  if (cert.authority.id !== identity.id) {
+    return false;
+  }
+
+  const now = getLowPrecisionDate();
+  if (permissionData.createdAt > now) {
+    return false;
+  }
+
+  if (
+    permissionData.expiresAt !== undefined &&
+    permissionData.expiresAt < now
+  ) {
+    return false;
+  }
+
+  const json = stringify(permissionData);
+  const valid = await window.crypto.subtle.verify(
+    UserKeyAlgorithm,
+    identity.publicKey,
+    base64ToBytes(cert.signature),
+    new TextEncoder().encode(json),
+  );
+
+  return valid;
+}
+
+export function matchPermission(
+  permission: Permission,
+  action: Action,
+): boolean {
+  if (!matchPermKey([action.deviceId], permission.deviceId)) return false;
+  if (!matchPermKey([action.userId], permission.userId)) return false;
+  if (!matchPermKey(action.resourceId, permission.resourceId)) return false;
+  if (!matchPermKey(action.actionId, permission.actionId)) return false;
+
+  return true;
+}
+
+export function matchPermKey(
+  key: string[],
+  permMatcher: PermissionMatcher,
+): boolean {
   let matcherIndex = 0;
   for (const matcher of permMatcher) {
     const index = matcherIndex++;
@@ -279,4 +296,16 @@ function match(key: string[], permMatcher: PermissionMatcher): boolean {
   }
 
   return true;
+}
+
+// This is necessary because... something. When being serialized,
+// for some reason the milliseconds field is sometimes lost,
+// causing mis-certs.
+function getLowPrecisionDate(
+  ...params: ConstructorParameters<typeof Date> | []
+): Date {
+  const date = params.length ? new Date() : new Date(...params);
+  date.setMilliseconds(0);
+
+  return date;
 }

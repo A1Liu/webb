@@ -21,7 +21,7 @@ import { z, ZodTypeDef } from "zod";
 import { TapCounterButton } from "@/components/Button";
 import { clear } from "idb-keyval";
 import { usePermissionCache } from "@/components/state/permissions";
-import { PermissionsManager } from "@/components/permissions";
+import { MatchPerms } from "@/components/permissions";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -216,31 +216,19 @@ export default function Settings() {
               const { deviceProfile } = useDeviceProfile.getState();
               if (!userProfile?.secret || !deviceProfile) return false;
 
-              const { permissionCache, cb } = usePermissionCache.getState();
-              const permissions = new PermissionsManager(
-                deviceProfile.id,
-                userProfile?.id,
-                permissionCache,
-              );
+              const { cb } = usePermissionCache.getState();
 
-              await permissions.createPermission(
+              await cb.createPermission(
                 {
-                  deviceId: [{ __typename: "Exact", value: deviceProfile.id }],
-                  userId: [
-                    {
-                      __typename: "Exact",
-                      value: userProfile.id,
-                    },
-                  ],
-                  resourceId: [{ __typename: "Any" }],
-                  actionId: [{ __typename: "Any" }],
+                  deviceId: [MatchPerms.exact(deviceProfile.id)],
+                  userId: [MatchPerms.exact(userProfile.id)],
+                  resourceId: [MatchPerms.Any],
+                  actionId: [MatchPerms.Any],
                   allow: true,
                 },
                 "userRoot",
                 { ...userProfile, ...userProfile.secret },
               );
-
-              cb.updateCache(permissions.permissionCache);
 
               toast.success("Now I have perms!");
             }}

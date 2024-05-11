@@ -18,7 +18,6 @@ import {
 } from "@/components/state/permissions";
 import { useUserProfile } from "@/components/state/userProfile";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
-import { PermissionsManager } from "@/components/permissions";
 import { getNetworkLayerGlobal } from "@/components/network";
 import { useNavigate } from "react-router-dom";
 import * as automerge from "@automerge/automerge";
@@ -30,6 +29,7 @@ import CodeMirror, {
 } from "@uiw/react-codemirror";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import clsx from "clsx";
+import { MatchPerms } from "@/components/permissions";
 
 export const dynamic = "force-static";
 
@@ -142,8 +142,8 @@ async function requestKeyForNote(noteId: string) {
       if (!noteId) throw new Error(``);
       const result = AskPermission.call(peer.id, {
         action: {
-          actionId: [{ __typename: "Exact", value: "updateNote" }],
-          resourceId: [{ __typename: "Exact", value: noteId }],
+          actionId: [MatchPerms.exact("updateNote")],
+          resourceId: [MatchPerms.exact(noteId)],
         },
       });
       for await (const { permission } of result) {
@@ -209,17 +209,12 @@ function useNoteKeyRequest(noteId: string): {
       const { deviceProfile } = useDeviceProfile.getState();
       if (!userProfile || !deviceProfile) return false;
 
-      const { permissionCache } = usePermissionCache.getState();
-      const permissions = new PermissionsManager(
-        deviceProfile.id,
-        userProfile?.id,
-        permissionCache,
-      );
-      const perm = permissions.findMyPermission({
+      const { cb: permsCb } = usePermissionCache.getState();
+      const perm = permsCb.findPermission({
+        userId: userProfile.id,
         actionId: ["updateNote"],
         resourceId: [noteId],
       });
-
       if (perm) return true;
 
       await requestKeyForNote(noteId);
@@ -241,7 +236,7 @@ function useNoteKeyRequest(noteId: string): {
 export function NoteEditor({ noteId }: { noteId: string }) {
   const { userProfile } = useUserProfile();
   const { deviceProfile } = useDeviceProfile();
-  const { permissionCache } = usePermissionCache();
+  const { permissionCache, cb: permsCb } = usePermissionCache();
   const {
     data: hasAuth,
     loading,
@@ -249,17 +244,11 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   } = useRequest(
     async () => {
       if (!userProfile || !deviceProfile) return false;
-
-      const permissions = new PermissionsManager(
-        deviceProfile.id,
-        userProfile?.id,
-        permissionCache,
-      );
-      const perm = permissions.findMyPermission({
+      const perm = permsCb.findPermission({
+        userId: userProfile.id,
         actionId: ["updateNote"],
         resourceId: [noteId],
       });
-
       if (perm) return true;
 
       return false;
