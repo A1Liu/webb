@@ -21,12 +21,12 @@ export default function Home() {
       buttons={[
         {
           type: "link",
-          text: "Settings",
+          text: "⚙️ ",
           href: "/settings",
         },
         {
           type: "button",
-          text: "Refresh",
+          text: "😵",
           onClick: () => window.location.reload(),
         },
       ]}

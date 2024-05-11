@@ -6,6 +6,7 @@ import {
   createUserKeys,
   exportUserPublickKey,
   importUserPublicKey,
+  UserKeyAlgorithm,
 } from "../crypto";
 import { base64ToBytes, bytesToBase64, ZustandIdbStorage } from "../util";
 
@@ -16,11 +17,7 @@ export type UserProfileSerialized = z.infer<typeof UserProfileSerializedSchema>;
 export const UserProfileSerializedSchema = z.object({
   publicAuthUserId: z.string(),
   publicAuthKey: z.string(),
-  secret: z
-    .object({
-      privateAuthKey: z.string(),
-    })
-    .optional(),
+  secret: z.object({ privateAuthKey: z.string() }).optional(),
 });
 
 export interface UserProfile {
@@ -39,10 +36,7 @@ async function deserializeUserProfile(userProfile: UserProfileSerialized) {
     ? await window.crypto.subtle.importKey(
         "pkcs8",
         base64ToBytes(userProfile.secret.privateAuthKey),
-        {
-          name: "RSA-PSS",
-          hash: "SHA-512",
-        },
+        UserKeyAlgorithm,
         true,
         ["sign"],
       )
