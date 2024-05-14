@@ -28,7 +28,6 @@ import { isEqual } from "lodash";
 interface PermissionCacheState {
   permissionCache: Map<string, Permission>;
   cb: {
-    updateCache: (p: Map<string, Permission>) => void;
     findPermission: (action: Action) => Permission | undefined;
     createPermission: (
       permissionInput: Omit<Permission, "cert" | "createdAt">,
@@ -49,9 +48,6 @@ export const usePermissionCache = create<PermissionCacheState>()(
       return {
         permissionCache: new Map(),
         cb: {
-          updateCache: (cache) => {
-            set({ permissionCache: new Map(cache) });
-          },
           createPermission: async (
             permissionInput,
             authorityKind,

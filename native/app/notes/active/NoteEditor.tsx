@@ -33,7 +33,7 @@ import CodeMirror, {
 } from "@uiw/react-codemirror";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import clsx from "clsx";
-import { MatchPerms } from "@/components/permissions";
+import { MatchPerms, PermissionResult } from "@/components/permissions";
 
 export const dynamic = "force-static";
 
@@ -159,17 +159,35 @@ async function requestKeyForNote(note: NoteData) {
   );
 
   if (!firstResult.success) {
-    toast.error(`Couldn't fetch key to unlock file`, {
-      id: toastId,
-    });
+    toast.error(`Couldn't fetch key to unlock file`, { id: toastId });
     return false;
   }
 
   const { permission, peerId } = firstResult.value;
+  const { userProfile } = useUserProfile.getState();
+  const { deviceProfile } = useDeviceProfile.getState();
+  if (!userProfile) {
+    toast.error("Missing user profile", { id: toastId });
+    return;
+  }
 
-  const { permissionCache, cb } = usePermissionCache.getState();
-  permissionCache.set(permission.cert.signature, permission);
-  cb.updateCache(permissionCache);
+  const { cb } = usePermissionCache.getState();
+  const permResult = await cb.verifyPermissions(
+    permission,
+    {
+      userId: userProfile?.id ?? "",
+      deviceId: deviceProfile?.id ?? "",
+      actionId: ["updateNote"],
+      resourceId: [note.folder, note.id],
+    },
+    userProfile,
+  );
+  if (permResult !== PermissionResult.Allow) {
+    toast.error(`Received insufficient permissions ${permResult}`, {
+      id: toastId,
+    });
+    return;
+  }
 
   toast.success(`Successfully added permission!`);
   toast.loading(`Fetching latest data...`, {
