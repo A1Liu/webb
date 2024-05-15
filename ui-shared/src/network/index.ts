@@ -255,7 +255,7 @@ export class NetworkLayer {
   }
 
   async sendData(chunk: Chunk) {
-    this.sendDataRaw(chunk.peerId, chunk);
+    await this.sendDataRaw(chunk.peerId, chunk);
   }
 
   async *rpcCall(
