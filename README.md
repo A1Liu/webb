@@ -8,13 +8,14 @@ Strict design requirements:
 - Never interact with ANY cloud compute except as opt-in
 - Enable safe interaction with untrusted and partially-trusted devices
 - Be resilient against attacks from unauthorized actors
-- Enable direct sharing of device capabilities, e.g. compute, storage
+- Enable direct sharing of device capabilities, e.g. compute, storage, camera
 - Make data encryption & protection easy
 
 Strong design goals:
 - Behave reasonably well in low memory environments
 - Full functionality without ever having an internet connection
 - Support HSM, biometric auth, and other forms of hardware authentication/encryption
+- Adapt to changing capabilities (low battery, camera disabled, etc)
 
 ## Projects
 - Notes.md - A WIP notes app which implements synchronization over WebRTC and protects notes from spyware on untrusted devices.
