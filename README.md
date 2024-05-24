@@ -1,5 +1,7 @@
 # WIP App Framework
-Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WPBVU), Plan 9, and [Automerge](https://automerge.org/).
+An app framework designed for building apps without a cloud or central source of truth.
+Takes local-first design ideas from [Automerge](https://automerge.org/),
+and some ideas about computation from [Userland](https://www.youtube.com/watch?v=gla830WPBVU) and Plan 9.
 
 Strict design requirements:
 - Synchronize data across multiple devices and platforms, without a cloud server/central repository
@@ -11,7 +13,7 @@ Strict design requirements:
 
 Strong design goals:
 - Behave reasonably well in low memory environments
-- Work without ever having an internet connection
+- Full functionality without ever having an internet connection
 - Support HSM, biometric auth, and other forms of hardware authentication/encryption
 
 ## Projects
