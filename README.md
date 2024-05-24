@@ -1,5 +1,22 @@
-# Dev Tool Thing
-Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WPBVU) and Plan 9.
+# WIP App Framework
+Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WPBVU), Plan 9, and [Automerge](https://automerge.org/).
+
+Strict design requirements:
+- Synchronize data across multiple devices and platforms, without a cloud server/central repository
+- Never interact with ANY cloud compute except as opt-in
+- Enable safe interaction with untrusted and partially-trusted devices
+- Be resilient against attacks from unauthorized actors
+- Enable direct sharing of device capabilities, e.g. compute, storage
+- Make data encryption & protection easy
+
+Strong design goals:
+- Behave reasonably well in low memory environments
+- Work without ever having an internet connection
+- Support HSM, biometric auth, and other forms of hardware authentication/encryption
+
+## Projects
+- Notes.md - A WIP notes app which implements synchronization over WebRTC and protects notes from spyware on untrusted devices.
+  Being used as MVP app to iterate on framework designs.
 
 ## Resources
 - Visidata - https://visidata.org
@@ -9,7 +26,6 @@ Entirely based on ideas from [Userland](https://www.youtube.com/watch?v=gla830WP
   - https://www.security.org/vpn/webrtc-leak/
   - https://nordvpn.com/blog/webrtc/
 - iOS setup - https://dev.to/adimac93/tauri-mobile-for-ios-4dp6
-
 
 ### IO
 - Virtual Camera with CoreMediaIO - https://developer.apple.com/documentation/coremediaio
