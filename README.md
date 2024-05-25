@@ -16,10 +16,13 @@ Strong design goals:
 - Full functionality without ever having an internet connection
 - Support HSM, biometric auth, and other forms of hardware authentication/encryption
 - Adapt to changing capabilities (low battery, camera disabled, etc)
+- Enable hot-loading applications via `iframe`, `window.postMessage` (maybe allow something with WASM for server-ish workloads as well)
+- Lots of cross platform support: Android, iOS, desktop, browser plugin, server
 
 ## Projects
 - Notes.md - A WIP notes app which implements synchronization over WebRTC and protects notes from spyware on untrusted devices.
   Being used as MVP app to iterate on framework designs.
+- Upcoming: Browser extension - Add version of platform which integrates with Firefox, running e.g. WASM
 
 ## Resources
 - Visidata - https://visidata.org
