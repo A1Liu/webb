@@ -72,3 +72,13 @@ Strong design goals:
 - qp2p? (supposedly works on mobile) - https://github.com/maidsafe/qp2p
 
 
+## Release
+
+```zsh
+# Import environment variables
+export $(xargs < release-env-vars)
+
+# Run bundler command from the `/native` folder
+npm run bundle
+```
+

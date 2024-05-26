@@ -1,6 +1,6 @@
 name: app
 options:
-  bundleIdPrefix: webb
+  bundleIdPrefix: dev.peerweb
   deploymentTarget:
     iOS: 13.0
 fileGroups: [../../src]
@@ -10,8 +10,8 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: webb
-      PRODUCT_BUNDLE_IDENTIFIER: webb.app
+      PRODUCT_NAME: Notes.md
+      PRODUCT_BUNDLE_IDENTIFIER: dev.peerweb.notes-md
 targetTemplates:
   app:
     type: application

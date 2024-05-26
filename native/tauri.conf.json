@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
-  "productName": "webb",
+  "productName": "Notes-md",
   "version": "0.1.0",
   "build": {
     "beforeBuildCommand": "pnpm build:web",
@@ -8,7 +8,7 @@
     "frontendDist": "./dist",
     "devUrl": "http://localhost:4110"
   },
-  "identifier": "webb",
+  "identifier": "dev.peerweb.notes-md",
   "bundle": {
     "active": true,
     "category": "DeveloperTool",
@@ -49,7 +49,7 @@
       {
         "maximized": false,
         "resizable": true,
-        "title": "webb",
+        "title": "Notes.md",
         "height": 1000,
         "width": 1000
       }

@@ -6,12 +6,14 @@
     unused_variables
 ))]
 
-use tauri::Manager;
+// use tauri::Manager;
 
+/*
 #[tauri::command]
 async fn run_command() -> String {
     return String::new();
 }
+*/
 
 /*
 macro_rules! generate_handler {
