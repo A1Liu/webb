@@ -2,7 +2,7 @@ import React from "react";
 import { toast } from "react-hot-toast";
 import { IncomingPeers } from "@/app/settings/IncomingPeers";
 import { usePlatform } from "@/components/hooks/usePlatform";
-import { buttonClass, TopbarLayout } from "@/components/TopbarLayout";
+import { TopbarLayout } from "@/components/TopbarLayout";
 import { useLockFn, useMemoizedFn } from "ahooks";
 import { usePeers } from "@/components/state/peers";
 import { NoteDataSchema, useNotesState } from "@/components/state/notes";
@@ -18,12 +18,12 @@ import {
   ZustandIdbNotesStorage,
 } from "@/components/state/noteContents";
 import { z, ZodTypeDef } from "zod";
-import { TapCounterButton } from "@/components/Button";
 import { clear } from "idb-keyval";
 import { usePermissionCache } from "@/components/state/permissions";
 import { MatchPerms } from "@/components/permissions";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { Link, useNavigate } from "react-router-dom";
+import { Button, TapCounterButton } from "@/components/design-system/Button";
 
 export const dynamic = "force-static";
 
@@ -47,8 +47,7 @@ function BackupAndRestore<T>({
     <div className="flex gap-2 items-center">
       <p className="font-bold uppercase flex-grow">{title}</p>
 
-      <button
-        className={buttonClass}
+      <Button
         onClick={async () => {
           try {
             toast.loading(`Loading...`, { id: toastId });
@@ -66,10 +65,9 @@ function BackupAndRestore<T>({
         }}
       >
         Backup
-      </button>
+      </Button>
 
-      <button
-        className={buttonClass}
+      <Button
         onClick={async () => {
           try {
             toast.loading(`Loading...`, { id: toastId });
@@ -86,7 +84,7 @@ function BackupAndRestore<T>({
         }}
       >
         Restore
-      </button>
+      </Button>
     </div>
   );
 }
@@ -141,7 +139,6 @@ function PreferencesBar() {
         {userProfile ? (
           <TapCounterButton
             counterLimit={5}
-            className={buttonClass}
             onClick={() => {
               logout();
               toast("Created user profile");
@@ -150,9 +147,7 @@ function PreferencesBar() {
             Logout
           </TapCounterButton>
         ) : (
-          <button className={buttonClass} onClick={createUser}>
-            Create User
-          </button>
+          <Button onClick={createUser}>Create User</Button>
         )}
 
         <div className="flex items-center gap-2 p-2 rounded-md border border-white">
@@ -258,19 +253,14 @@ export default function Settings() {
           <BackupUser />
 
           <Link to={"/"}>
-            <button className={buttonClass}>Home</button>
+            <Button>Home</Button>
           </Link>
 
-          <TapCounterButton
-            counterLimit={5}
-            className={buttonClass}
-            onClick={() => hardReset()}
-          >
+          <TapCounterButton counterLimit={5} onClick={() => hardReset()}>
             HARD RESET
           </TapCounterButton>
 
-          <button
-            className={buttonClass}
+          <Button
             onClick={async () => {
               const { userProfile } = useUserProfile.getState();
               const { deviceProfile } = useDeviceProfile.getState();
@@ -294,7 +284,7 @@ export default function Settings() {
             }}
           >
             Give Self Perms
-          </button>
+          </Button>
         </div>
       </div>
 

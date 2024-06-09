@@ -12,7 +12,6 @@ import {
   useNoteContents,
 } from "@/components/state/noteContents";
 import { NoteDataFetch, SyncNotesButton } from "./SyncNotesButton";
-import { buttonClass } from "@/components/TopbarLayout";
 import { usePeers } from "@/components/state/peers";
 import toast from "react-hot-toast";
 import { base64ToBytes, getFirstSuccess } from "@/components/util";
@@ -34,6 +33,7 @@ import CodeMirror, {
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import clsx from "clsx";
 import { MatchPerms, PermissionResult } from "@/components/permissions";
+import { Button } from "@/components/design-system/Button";
 
 export const dynamic = "force-static";
 
@@ -43,15 +43,15 @@ function ReconnectButton() {
   if (connected) return null;
 
   return (
-    <button
-      className={buttonClass}
+    <Button
+      size="xs"
       onClick={async () => {
         const network = await getNetworkLayerGlobal();
         network.ensureInit();
       }}
     >
       Reconnect
-    </button>
+    </Button>
   );
 }
 
@@ -312,21 +312,16 @@ export function NoteEditor({ noteId }: { noteId: string }) {
           <p className="text-lg">~~ LOCKED ~~</p>
 
           <div className="flex gap-2">
-            <button
-              className={buttonClass}
-              disabled={requestKeyLoading}
-              onClick={() => navigate(-1)}
-            >
+            <Button disabled={requestKeyLoading} onClick={() => navigate(-1)}>
               Go back
-            </button>
+            </Button>
 
-            <button
-              className={buttonClass}
+            <Button
               disabled={requestKeyLoading}
               onClick={() => requestKey().then(() => refresh())}
             >
               Request Key
-            </button>
+            </Button>
           </div>
         </div>
       ) : (

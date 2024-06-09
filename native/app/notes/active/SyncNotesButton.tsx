@@ -1,5 +1,4 @@
 import React from "react";
-import { buttonClass } from "@/components/TopbarLayout";
 import { useLockFn, useRequest } from "ahooks";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { z } from "zod";
@@ -31,6 +30,7 @@ import { base64ToBytes, bytesToBase64 } from "@/components/util";
 import { isEqual, maxBy } from "lodash";
 import * as automerge from "@automerge/automerge";
 import _ from "lodash";
+import { Button } from "@/components/design-system/Button";
 
 const NoteMetadataWithHashSchema = z.object({
   note: NoteDataSchema,
@@ -397,14 +397,14 @@ export function SyncNotesButton() {
   if (isMobile) return null;
 
   return (
-    <button
-      className={buttonClass}
+    <Button
+      size="xs"
       disabled={!peers.size || !userProfile || loading}
       onClick={() => {
         runSynchronization();
       }}
     >
       Sync
-    </button>
+    </Button>
   );
 }

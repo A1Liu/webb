@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import React from "react";
 import { Link } from "react-router-dom";
+import { Button } from "./design-system/Button";
 
 interface TopbarLayoutProps {
   title: string;
@@ -10,9 +11,6 @@ interface TopbarLayoutProps {
   )[];
   children?: React.ReactNode;
 }
-
-export const buttonClass =
-  "bg-sky-700 px-2 py-1 rounded hover:bg-sky-900 p-10 disabled:hover:bg-sky-700 text-xs font-bold";
 
 export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
   // py-24 px-8
@@ -38,18 +36,18 @@ export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
                     to={buttonInfo.href}
                     className="flex"
                   >
-                    <button className={buttonClass}>{buttonInfo.text}</button>
+                    <Button size="xs">{buttonInfo.text}</Button>
                   </Link>
                 );
               case "button":
                 return (
-                  <button
+                  <Button
+                    size="xs"
                     key={`${buttonInfo.type}-${buttonInfo.text}`}
-                    className={buttonClass}
                     onClick={() => buttonInfo.onClick()}
                   >
                     {buttonInfo.text}
-                  </button>
+                  </Button>
                 );
             }
           })}

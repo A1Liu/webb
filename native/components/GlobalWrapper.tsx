@@ -6,7 +6,7 @@ import { AppStateKind, useGlobals } from "./state/appGlobals";
 import { NotesSyncInitGroup } from "./state/notes";
 import { PeerInitGroup } from "./state/peers";
 import { NetworkInitGroup } from "./network";
-import { buttonClass } from "./TopbarLayout";
+import { Button } from "./design-system/Button";
 
 export function GlobalWrapper({ children }: { children: React.ReactNode }) {
   const { state } = useGlobals();
@@ -34,13 +34,9 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
 
             <div className="flex gap-2">
               {state.options.map((value) => (
-                <button
-                  key={value}
-                  className={buttonClass}
-                  onClick={() => state.completion(value)}
-                >
+                <Button key={value} onClick={() => state.completion(value)}>
                   {value}
-                </button>
+                </Button>
               ))}
             </div>
           </div>

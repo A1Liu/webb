@@ -9,6 +9,7 @@ import {
   importUserPublicKey,
   verifyUserKey,
 } from "./crypto";
+import {Button} from "./design-system/Button";
 import { usePlatform } from "./hooks/usePlatform";
 import {
   getNetworkLayerGlobal,
@@ -18,7 +19,6 @@ import {
 import { useGlobals } from "./state/appGlobals";
 import { useDeviceProfile } from "./state/deviceProfile";
 import { useUserProfile } from "./state/userProfile";
-import { buttonClass } from "./TopbarLayout";
 
 const JoinMe = registerRpc({
   name: "JoinMe",
@@ -112,8 +112,7 @@ export function ScanAndConnectButton() {
   }
 
   return (
-    <button
-      className={buttonClass}
+    <Button
       onTouchStart={async () => {
         await globals.runBackgroundFlow(async () => {
           // `windowed: true` actually sets the webview to transparent
@@ -158,6 +157,6 @@ export function ScanAndConnectButton() {
       }}
     >
       scan
-    </button>
+    </Button>
   );
 }
