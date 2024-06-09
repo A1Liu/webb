@@ -9,7 +9,7 @@ import {
   importUserPublicKey,
   verifyUserKey,
 } from "./crypto";
-import {Button} from "./design-system/Button";
+import { Button } from "./design-system/Button";
 import { usePlatform } from "./hooks/usePlatform";
 import {
   getNetworkLayerGlobal,
