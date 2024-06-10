@@ -32,6 +32,9 @@ importers:
       '@floating-ui/react':
         specifier: ^0.26.2
         version: 0.26.2(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@lezer/highlight':
+        specifier: ^1.2.0
+        version: 1.2.0
       '@tauri-apps/api':
         specifier: 2.0.0-beta.6
         version: 2.0.0-beta.6
@@ -41,6 +44,9 @@ importers:
       '@tauri-apps/plugin-clipboard-manager':
         specifier: 2.1.0-beta.0
         version: 2.1.0-beta.0
+      '@uiw/codemirror-themes':
+        specifier: ^4.22.2
+        version: 4.22.2(@codemirror/language@6.10.1)(@codemirror/state@6.4.1)(@codemirror/view@6.26.3)
       '@uiw/react-codemirror':
         specifier: ^4.22.0
         version: 4.22.0(@babel/runtime@7.23.2)(@codemirror/autocomplete@6.16.0(@codemirror/language@6.10.1)(@codemirror/state@6.4.1)(@codemirror/view@6.26.3)(@lezer/common@1.2.1))(@codemirror/language@6.10.1)(@codemirror/lint@6.7.0)(@codemirror/search@6.5.6)(@codemirror/state@6.4.1)(@codemirror/theme-one-dark@6.1.2)(@codemirror/view@6.26.3)(codemirror@6.0.1(@lezer/common@1.2.1))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -1180,6 +1186,13 @@ packages:
       '@codemirror/language': '>=6.0.0'
       '@codemirror/lint': '>=6.0.0'
       '@codemirror/search': '>=6.0.0'
+      '@codemirror/state': '>=6.0.0'
+      '@codemirror/view': '>=6.0.0'
+
+  '@uiw/codemirror-themes@4.22.2':
+    resolution: {integrity: sha512-gsLHn6SUuV5iboBvGrM7YimzLFHQmsNlkGIYs3UaVUJTo/A/ZrKoSJNyPziShLRjBXA2UwKdBTIU6VhHyyaChw==}
+    peerDependencies:
+      '@codemirror/language': '>=6.0.0'
       '@codemirror/state': '>=6.0.0'
       '@codemirror/view': '>=6.0.0'
 
@@ -3857,6 +3870,12 @@ snapshots:
       '@codemirror/language': 6.10.1
       '@codemirror/lint': 6.7.0
       '@codemirror/search': 6.5.6
+      '@codemirror/state': 6.4.1
+      '@codemirror/view': 6.26.3
+
+  '@uiw/codemirror-themes@4.22.2(@codemirror/language@6.10.1)(@codemirror/state@6.4.1)(@codemirror/view@6.26.3)':
+    dependencies:
+      '@codemirror/language': 6.10.1
       '@codemirror/state': 6.4.1
       '@codemirror/view': 6.26.3
 
