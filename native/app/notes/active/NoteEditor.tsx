@@ -27,6 +27,7 @@ import * as automerge from "@automerge/automerge";
 import CodeMirror, {
   BasicSetupOptions,
   EditorView,
+  oneDark,
   ReactCodeMirrorRef,
   ViewUpdate,
 } from "@uiw/react-codemirror";
@@ -56,7 +57,11 @@ function ReconnectButton() {
 }
 
 const FontSizeTheme = EditorView.theme({
-  "&": { fontSize: "16px" },
+  "&": {
+    fontSize: "16px",
+    color: "white",
+    backgroundColor: "#000000",
+  },
   "& *": { fontFamily: "sans-serif" },
   ".cm-content .ͼv": { wordBreak: "break-all" },
 });
@@ -70,6 +75,7 @@ const EditorExtensions = [
   EditorView.lineWrapping,
   markdown({ base: markdownLanguage, codeLanguages: [] }),
   FontSizeTheme,
+  oneDark,
 ];
 
 function createOnChangeHandler(
@@ -123,7 +129,7 @@ function NoteContentEditor() {
     <CodeMirror
       key={noteId}
       ref={editorRef}
-      theme={"dark"}
+      theme={"none"}
       value={doc.contents.toString()}
       height={"100%"}
       width={"100%"}
