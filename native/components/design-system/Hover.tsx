@@ -1,10 +1,11 @@
-import { includeIf } from "@/components/util";
 import {
   useClick,
   useFloating,
   useHover,
   useInteractions,
   useDismiss,
+  shift,
+  offset,
 } from "@floating-ui/react";
 import { ComponentProps } from "react";
 
@@ -14,7 +15,10 @@ interface FloatingProps {
   allowHover?: boolean;
   allowClick?: boolean;
   floatingContent: JSX.Element;
+
   wrapperProps?: Readonly<ComponentProps<"div">>;
+  floatWrapperProps?: Readonly<ComponentProps<"div">>;
+
   children: JSX.Element;
 }
 
@@ -23,22 +27,34 @@ export function Floating({
   setIsOpen,
   allowHover = false,
   allowClick = true,
+  floatingContent,
   wrapperProps = {},
+  floatWrapperProps = {},
   children,
 }: FloatingProps) {
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     onOpenChange: setIsOpen,
+    middleware: [
+      shift({
+        padding: 10,
+      }),
+      offset(10),
+    ],
   });
 
-  const hover = useHover(context);
-  const click = useClick(context);
+  const hover = useHover(context, {
+    enabled: allowHover,
+  });
+  const click = useClick(context, {
+    enabled: allowClick,
+  });
   const dismiss = useDismiss(context);
 
   const { getReferenceProps, getFloatingProps } = useInteractions([
     dismiss,
-    ...includeIf(allowClick, click),
-    ...includeIf(allowHover, hover),
+    click,
+    hover,
   ]);
 
   return (
@@ -50,9 +66,9 @@ export function Floating({
         <div
           ref={refs.setFloating}
           style={floatingStyles}
-          {...getFloatingProps()}
+          {...getFloatingProps(floatWrapperProps)}
         >
-          Floating element
+          {floatingContent}
         </div>
       ) : null}
     </>

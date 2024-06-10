@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { forwardRef } from "react";
 
 type BtnColor = "primary" | "secondary" | "text";
-type BtnSize = "xs" | "sm" | "md";
+type BtnSize = "caption" | "xs" | "sm" | "md";
 type BaseBtnProps = React.ButtonHTMLAttributes<HTMLButtonElement>;
 
 interface ButtonProps extends Omit<BaseBtnProps, ""> {
@@ -13,12 +13,16 @@ interface ButtonProps extends Omit<BaseBtnProps, ""> {
 }
 
 const ColorConfig: Record<BtnColor, string> = {
-  primary: clsx("bg-amber-700 hover:bg-amber-900", "text-gray-300"),
-  secondary: clsx("bg-gray-800 text-amber-900"),
+  primary: clsx(
+    "bg-amber-700 hover:bg-amber-900 text-gray-300",
+    "disabled:bg-stone-800 disabled:text-gray-400",
+  ),
+  secondary: clsx("bg-gray-800 text-amber-700"),
   text: clsx("bg-none hover:bg-stone-700 text-amber-700"),
 };
 
 const SizeConfig: Record<BtnSize, string> = {
+  caption: clsx("px-1 py-0.5 text-xs font-bold"),
   xs: clsx("px-2 py-1 text-xs font-bold"),
   sm: clsx("px-3 py-2 text-sm font-bold"),
   md: clsx(""),
@@ -41,6 +45,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           "rounded flex flex-row items-center justify-center",
           colorClass,
           sizeClass,
+          className,
         )}
         {...props}
       />

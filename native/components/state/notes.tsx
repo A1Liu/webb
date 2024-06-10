@@ -9,7 +9,7 @@ import { useCreation } from "ahooks";
 
 const NoteDataSchemaInternal = z.object({
   id: z.string(),
-  folder: z.string().default("default"),
+  folder: z.string().array().default([]),
   preview: z.string(),
   isTombstone: z.boolean().nullish(),
   commitHeads: z.string().array().readonly().default([]),
@@ -20,13 +20,15 @@ export type NoteData = z.infer<typeof NoteDataSchema>;
 export const NoteDataSchema = NoteDataSchemaInternal;
 
 export interface NoteGlobalState {
-  activeNote: string;
   notes: Map<string, Readonly<NoteData>>;
 
+  activeNote: string;
+  currentFolder: string[];
   createNoteDefaultFolder?: string;
   hideDisallowedFolders?: boolean;
 
   cb: {
+    setCurrentFolder: (path: string[]) => void;
     setHidePreference: (pref: boolean) => void;
     setDefaultFolder: (pref: string) => void;
     updateNote: (
@@ -41,10 +43,10 @@ export interface NoteGlobalState {
 
 const ZERO_TIME = new Date(0);
 
-function createEmptyNote(id: string): NoteData {
+function createEmptyNote(id: string, folder: string[]): NoteData {
   return {
     id,
-    folder: useNotesState.getState().createNoteDefaultFolder ?? "default",
+    folder: folder,
     preview: "",
     commitHeads: [],
     lastUpdateDate: ZERO_TIME,
@@ -55,9 +57,16 @@ export const useNotesState = create<NoteGlobalState>()(
   persist(
     (set, get) => {
       return {
-        activeNote: uuid(),
         notes: new Map(),
+
+        activeNote: uuid(),
+        currentFolder: [],
+
         cb: {
+          setCurrentFolder: (path) => {
+            set({ currentFolder: path });
+          },
+
           setHidePreference: (pref) => {
             set({ hideDisallowedFolders: pref });
           },
@@ -68,7 +77,8 @@ export const useNotesState = create<NoteGlobalState>()(
             set((prev) => {
               const notes = new Map(prev.notes);
               const prevNote: NoteData =
-                notes.get(noteId) ?? createEmptyNote(noteId);
+                notes.get(noteId) ??
+                createEmptyNote(noteId, prev.currentFolder);
 
               const newNote = updater(prevNote);
 
@@ -131,14 +141,19 @@ export const useNotesState = create<NoteGlobalState>()(
 );
 
 export function useNoteMetadata(noteId: string): NoteData {
-  const defaultNote = useCreation(() => createEmptyNote(noteId), [noteId]);
+  const path = useNotesState((state) => state.currentFolder);
+  const defaultNote = useCreation(
+    () => createEmptyNote(noteId, path),
+    [noteId, path],
+  );
   return useNotesState(
     useShallow((state) => state.notes.get(noteId) ?? defaultNote),
   );
 }
 
 const selector = (state: NoteGlobalState) =>
-  state.notes.get(state.activeNote) ?? createEmptyNote(state.activeNote);
+  state.notes.get(state.activeNote) ??
+  createEmptyNote(state.activeNote, state.currentFolder);
 export function useActiveNote(): NoteData {
   return useNotesState(useShallow(selector));
 }
