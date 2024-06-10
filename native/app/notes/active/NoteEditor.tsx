@@ -35,6 +35,7 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import clsx from "clsx";
 import { MatchPerms, PermissionResult } from "@/components/permissions";
 import { Button } from "@/components/design-system/Button";
+import { hyperLink } from "@uiw/codemirror-extensions-hyper-link";
 
 export const dynamic = "force-static";
 
@@ -74,6 +75,7 @@ const EditorBasicSetup: BasicSetupOptions = {
 const EditorExtensions = [
   EditorView.lineWrapping,
   markdown({ base: markdownLanguage, codeLanguages: [] }),
+  hyperLink,
   FontSizeTheme,
   oneDark,
 ];

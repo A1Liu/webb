@@ -13,6 +13,7 @@
     "clipboard-manager:allow-read-text",
     "resources:default",
     "tray:default",
-    "event:default"
+    "event:default",
+    "menu:default"
   ]
 }
