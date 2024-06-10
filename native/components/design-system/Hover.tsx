@@ -14,7 +14,7 @@ interface FloatingProps {
   setIsOpen: (f: boolean) => void;
   allowHover?: boolean;
   allowClick?: boolean;
-  floatingContent: JSX.Element;
+  floatingContent?: JSX.Element;
 
   wrapperProps?: Readonly<ComponentProps<"div">>;
   floatWrapperProps?: Readonly<ComponentProps<"div">>;
@@ -44,10 +44,10 @@ export function Floating({
   });
 
   const hover = useHover(context, {
-    enabled: allowHover,
+    enabled: !!floatingContent && allowHover,
   });
   const click = useClick(context, {
-    enabled: allowClick,
+    enabled: !!floatingContent && allowClick,
   });
   const dismiss = useDismiss(context);
 
@@ -62,7 +62,7 @@ export function Floating({
       <div ref={refs.setReference} {...getReferenceProps()} {...wrapperProps}>
         {children}
       </div>
-      {isOpen ? (
+      {isOpen && floatingContent ? (
         <div
           ref={refs.setFloating}
           style={floatingStyles}

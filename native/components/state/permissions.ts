@@ -165,7 +165,10 @@ export const AskPermission = registerRpc({
 
       case "Allow in Folder":
         permissionAction = {
-          resourceId: [action.resourceId[0]!, MatchPerms.AnyRemaining],
+          resourceId: [
+            ...action.resourceId.slice(0, action.resourceId.length - 1),
+            MatchPerms.AnyRemaining,
+          ],
           actionId: permissionAction.actionId,
           allow: true,
         };

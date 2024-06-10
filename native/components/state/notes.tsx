@@ -24,13 +24,11 @@ export interface NoteGlobalState {
 
   activeNote: string;
   currentFolder: string[];
-  createNoteDefaultFolder?: string;
   hideDisallowedFolders?: boolean;
 
   cb: {
     setCurrentFolder: (path: string[]) => void;
     setHidePreference: (pref: boolean) => void;
-    setDefaultFolder: (pref: string) => void;
     updateNote: (
       id: string,
       updater: (prev: NoteData) => NoteData,
@@ -66,12 +64,8 @@ export const useNotesState = create<NoteGlobalState>()(
           setCurrentFolder: (path) => {
             set({ currentFolder: path });
           },
-
           setHidePreference: (pref) => {
             set({ hideDisallowedFolders: pref });
-          },
-          setDefaultFolder: (pref) => {
-            set({ createNoteDefaultFolder: pref });
           },
           updateNote: (noteId, updater, reorder = false) => {
             set((prev) => {

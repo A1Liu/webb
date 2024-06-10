@@ -119,11 +119,7 @@ function PreferencesBar() {
     cb: { logout, createUserProfile },
   } = useUserProfile();
   const createUser = useLockFn(createUserProfile);
-  const {
-    hideDisallowedFolders,
-    createNoteDefaultFolder,
-    cb: notesCb,
-  } = useNotesState();
+  const { hideDisallowedFolders, cb: notesCb } = useNotesState();
 
   return (
     <div className="flex flex-col gap-2 px-2">
@@ -159,19 +155,6 @@ function PreferencesBar() {
             }}
           />
           Hide unallowed
-        </div>
-
-        <div className="flex flex-col gap-1 text-xs p-2 rounded-md border border-white">
-          Default folder
-          <input
-            className="text-xs text-black"
-            type="text"
-            placeholder="e.g. 'default'"
-            value={createNoteDefaultFolder ?? "default"}
-            onChange={(evt) => {
-              notesCb.setDefaultFolder(evt.target.value);
-            }}
-          />
         </div>
       </div>
     </div>

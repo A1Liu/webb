@@ -13,6 +13,7 @@ import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/design-system/Button";
 import { Floating } from "@/components/design-system/Hover";
+import { isEqual } from "lodash";
 
 export const dynamic = "force-static";
 
@@ -92,8 +93,9 @@ function Breadcrumbs() {
   const [folderName, setFolderName] = useState("");
 
   return (
-    <div className={clsx("flex flex-wrap p-1")}>
+    <div className={clsx("flex flex-wrap p-1 gap-0.5 items-center")}>
       <Button
+        key="/"
         size="caption"
         color="text"
         onClick={() => {
@@ -103,17 +105,24 @@ function Breadcrumbs() {
         /
       </Button>
 
-      {path.map((s, index) => (
+      {path.flatMap((s, index) => [
+        <div key={`div-${index}-${s}`} className="text-xs p-0.5">
+          &gt;
+        </div>,
+
         <Button
+          key={`merp-${index}-${s}`}
           size="caption"
           color="text"
           onClick={() => {
             cb.setCurrentFolder(path.slice(0, index + 1));
           }}
         >
-          &gt; {s}
-        </Button>
-      ))}
+          {s}
+        </Button>,
+      ])}
+
+      <div key="div-/" />
 
       <Floating
         isOpen={isEditing}
@@ -175,7 +184,11 @@ function SelectActiveNote() {
     .filter((note) => !note.isTombstone)
     .reduce(
       ([notes, folders], note) => {
+        if (!isEqual(note.folder.slice(0, path.length), path))
+          return [notes, folders];
+
         if (note.folder.length === path.length) {
+          if (!isEqual(note.folder, path)) return [notes, folders];
           return [[...notes, note], folders];
         }
 
@@ -226,9 +239,10 @@ function SelectActiveNote() {
       >
         {visibleItems === 0 ? <h3>No Notes</h3> : null}
 
-        {[...shownFolders].map((s) => {
+        {[...shownFolders].map((s, index) => {
           return (
             <Button
+              key={`${index}-${s}`}
               color="text"
               onClick={() => {
                 cb.setCurrentFolder([...path, s]);

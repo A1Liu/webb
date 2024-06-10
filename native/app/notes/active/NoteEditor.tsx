@@ -1,6 +1,7 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   NoteData,
+  useActiveNote,
   useNoteMetadata,
   useNotesState,
 } from "@/components/state/notes";
@@ -36,8 +37,180 @@ import clsx from "clsx";
 import { MatchPerms, PermissionResult } from "@/components/permissions";
 import { Button } from "@/components/design-system/Button";
 import { hyperLink } from "@uiw/codemirror-extensions-hyper-link";
+import { Floating } from "@/components/design-system/Hover";
+import { isEqual } from "lodash";
 
 export const dynamic = "force-static";
+
+function FolderPicker({
+  id,
+  initialPath,
+  close,
+}: {
+  id: string;
+  initialPath: string[];
+  close: () => void;
+}) {
+  const [path, setPath] = useState<string[]>(initialPath);
+  const notes = useNotesState((s) => s.notes);
+  const cb = useNotesState((s) => s.cb);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [folderName, setFolderName] = useState("");
+
+  const [, shownFolders] = [...(notes ? notes?.values() : [])]
+    .filter((note) => !note.isTombstone)
+    .reduce(
+      ([notes, folders], note) => {
+        if (!isEqual(note.folder.slice(0, path.length), path))
+          return [notes, folders];
+
+        if (note.folder.length === path.length) {
+          return [[...notes, note], folders];
+        }
+
+        const candidateFolder = note.folder[path.length];
+        if (!candidateFolder) {
+          return [notes, folders];
+        }
+
+        folders.add(candidateFolder);
+
+        return [notes, folders];
+      },
+      [[], new Set<string>()] as [NoteData[], Set<string>],
+    );
+
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+    }
+  }, [isEditing]);
+
+  return (
+    <>
+      <div className="flex flex-wrap min-w-[24rem] gap-0.5 items-center">
+        <Button
+          size="caption"
+          color="text"
+          onClick={() => {
+            setPath([]);
+          }}
+        >
+          /
+        </Button>
+
+        {path.flatMap((s, index) => [
+          <div key={`div-${index}-${s}`} className="text-xs p-0.5">
+            &gt;
+          </div>,
+
+          <Button
+            key={`${index}-${s}`}
+            size="caption"
+            color="text"
+            onClick={() => {
+              setPath(path.slice(0, index + 1));
+            }}
+          >
+            {s}
+          </Button>,
+        ])}
+
+        <input
+          ref={inputRef}
+          type="text"
+          className={clsx(
+            "bg-black border border-slate-200 p-2 text-xs",
+            !isEditing && "hidden",
+          )}
+          value={folderName}
+          onChange={(evt) => {
+            setFolderName(evt.target.value);
+          }}
+          onKeyDown={(evt) => {
+            if (evt.code === "Escape") {
+              evt.preventDefault();
+              evt.stopPropagation();
+              setIsEditing(false);
+              return;
+            }
+            if (evt.code !== "Enter") return;
+
+            setIsEditing(false);
+            setPath([...path, folderName]);
+            setFolderName("");
+          }}
+        />
+
+        {!isEditing ? (
+          <Button
+            size="caption"
+            onClick={() => {
+              setIsEditing(true);
+            }}
+          >
+            +
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col overflow-y-scroll scrollbar-hidden max-h-[32rem]">
+        {[...shownFolders].map((s, index) => {
+          return (
+            <Button
+              key={`${index}-${s}`}
+              color="text"
+              size="xs"
+              onClick={() => {
+                setPath([...path, s]);
+              }}
+            >
+              {s}
+            </Button>
+          );
+        })}{" "}
+      </div>
+
+      <Button
+        onClick={() => {
+          close();
+          cb.updateNote(id, (prev) => ({
+            ...prev,
+            folder: path,
+          }));
+        }}
+      >
+        Move
+      </Button>
+    </>
+  );
+}
+
+function MoveNoteButton() {
+  const { id, folder } = useActiveNote();
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <Floating
+      isOpen={isOpen}
+      setIsOpen={setIsOpen}
+      floatWrapperProps={{
+        className: "flex flex-col p-2 gap-2 border border-slate-300 bg-black",
+      }}
+      floatingContent={
+        <FolderPicker
+          id={id}
+          initialPath={folder}
+          close={() => setIsOpen(false)}
+        />
+      }
+    >
+      <Button size="xs">Move</Button>
+    </Floating>
+  );
+}
 
 function ReconnectButton() {
   const { connected } = usePeers();
@@ -153,7 +326,7 @@ async function requestKeyForNote(note: NoteData) {
         action: {
           actionId: [MatchPerms.exact("updateNote")],
           resourceId: [
-            MatchPerms.exact(note.folder),
+            ...note.folder.map((folder) => MatchPerms.exact(folder)),
             MatchPerms.exact(note.id),
           ],
         },
@@ -186,7 +359,7 @@ async function requestKeyForNote(note: NoteData) {
       userId: userProfile?.id ?? "",
       deviceId: deviceProfile?.id ?? "",
       actionId: ["updateNote"],
-      resourceId: [note.folder, note.id],
+      resourceId: [...note.folder, note.id],
     },
     userProfile,
   );
@@ -244,7 +417,7 @@ function useNoteKeyRequest(note: NoteData): {
         deviceId: deviceProfile.id,
         userId: userProfile.id,
         actionId: ["updateNote"],
-        resourceId: [note.folder, note.id],
+        resourceId: [...note.folder, note.id],
       });
       if (perm) return true;
 
@@ -280,7 +453,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         deviceId: deviceProfile.id,
         userId: userProfile.id,
         actionId: ["updateNote"],
-        resourceId: [note.folder, noteId],
+        resourceId: [...note.folder, noteId],
       });
       if (perm) return true;
 
@@ -313,6 +486,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       <div className="absolute top-2 right-5 flex flex-col gap-2 items-end z-10">
         <SyncNotesButton />
         <ReconnectButton />
+        <MoveNoteButton />
       </div>
 
       {!hasAuth ? (
