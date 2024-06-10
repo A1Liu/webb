@@ -92,7 +92,7 @@ function FolderPicker({
     <>
       <div className="flex flex-wrap min-w-[24rem] gap-0.5 items-center">
         <Button
-          size="caption"
+          size="xs"
           color="text"
           onClick={() => {
             setPath([]);

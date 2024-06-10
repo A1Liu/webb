@@ -22,7 +22,7 @@ const ColorConfig: Record<BtnColor, string> = {
 };
 
 const SizeConfig: Record<BtnSize, string> = {
-  caption: clsx("px-1 py-0.5 text-xs font-bold"),
+  caption: clsx("px-1 py-0.5 text-xs/none font-bold"),
   xs: clsx("px-2 py-1 text-xs font-bold"),
   sm: clsx("px-3 py-2 text-sm font-bold"),
   md: clsx(""),

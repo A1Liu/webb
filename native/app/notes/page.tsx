@@ -96,7 +96,7 @@ function Breadcrumbs() {
     <div className={clsx("flex flex-wrap p-1 gap-0.5 items-center")}>
       <Button
         key="/"
-        size="caption"
+        size="xs"
         color="text"
         onClick={() => {
           cb.setCurrentFolder([]);
