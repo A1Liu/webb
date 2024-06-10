@@ -11,7 +11,7 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: Notes.md
-      PRODUCT_BUNDLE_IDENTIFIER: dev.peerweb.notes-md
+      PRODUCT_BUNDLE_IDENTIFIER: dev.peerweb.notesmd
 targetTemplates:
   app:
     type: application

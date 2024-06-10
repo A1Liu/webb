@@ -65,7 +65,7 @@ export const NoteDataFetch = registerRpc({
         deviceId: peerId,
         userId: userProfile.id,
         actionId: ["updateNote"],
-        resourceId: [noteMetadata.folder, noteId],
+        resourceId: [...noteMetadata.folder, noteId],
       },
       userProfile,
     );
@@ -151,7 +151,7 @@ const NotePushListener = registerListener({
         deviceId: deviceProfile.id,
         userId: userProfile.id,
         actionId: ["updateNote"],
-        resourceId: [note.folder, note.id],
+        resourceId: [...note.folder, note.id],
       });
 
       if (!permission) {
@@ -207,7 +207,7 @@ const NoteListMetadata = registerRpc({
         deviceId: deviceProfile.id,
         userId: userProfile.id,
         actionId: ["updateNote"],
-        resourceId: [note.folder, note.id],
+        resourceId: [...note.folder, note.id],
       });
       if (!perm) {
         continue;
@@ -288,7 +288,7 @@ async function syncNotes() {
           deviceId: peer.id,
           userId: userProfile.id,
           actionId: ["updateNote"],
-          resourceId: [note.folder, note.id],
+          resourceId: [...note.folder, note.id],
         },
         userProfile,
       );

@@ -8,7 +8,7 @@
     "frontendDist": "./dist",
     "devUrl": "http://localhost:4110"
   },
-  "identifier": "dev.peerweb.notes-md",
+  "identifier": "dev.peerweb.notesmd",
   "bundle": {
     "active": true,
     "category": "DeveloperTool",
