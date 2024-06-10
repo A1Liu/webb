@@ -98,7 +98,7 @@ function FolderPicker({
             setPath([]);
           }}
         >
-          /
+          🏠
         </Button>
 
         {path.flatMap((s, index) => [

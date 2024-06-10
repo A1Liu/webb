@@ -102,7 +102,7 @@ function Breadcrumbs() {
           cb.setCurrentFolder([]);
         }}
       >
-        /
+        🏠
       </Button>
 
       {path.flatMap((s, index) => [
