@@ -39,6 +39,7 @@ fn main() {
 
     app_builder.builder = app_builder
         .builder
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_clipboard_manager::init());
 
     app_builder.run();
