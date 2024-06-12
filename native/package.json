@@ -13,7 +13,7 @@
     "build:mac": "CI=true pnpm tauri build",
     "build:ios": "CI=true pnpm tauri ios build",
     "lint:web": "eslint .",
-    "bundle": "rm -rf ./.bundle && pnpm run build:mac && pnpm run build:ios && mkdir -p ./.bundle && mv target/aarch64-apple-darwin/release/bundle/macos/* gen/apple/build/Notes.md.ipa ./.bundle/",
+    "bundle": "rm -rf ./.bundle/* && pnpm run build:mac && pnpm run build:ios && mkdir -p ./.bundle && mv target/aarch64-apple-darwin/release/bundle/macos/* gen/apple/build/Notes.md.ipa ./.bundle/",
     "ts-check": "tsc"
   },
   "dependencies": {
