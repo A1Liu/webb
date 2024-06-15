@@ -1,0 +1,127 @@
+import { z } from "zod";
+
+export interface NetworkContext {
+  abortSignal?: AbortSignal;
+}
+
+export type RawDatagram = z.infer<typeof RawDatagramSchema>;
+export const RawDatagramSchema = z.object({
+  receiver: z.string(),
+  sender: z.string(),
+
+  // Represents a data port on the receiver device. Data ports are independent
+  // from each other.
+  port: z.string(),
+
+  // Represents a transient indicator, used for e.g. correlating RPC calls
+  requestId: z.string(),
+
+  // If you want to close this requestID
+  closeRequestId: z.literal(true).nullish(),
+
+  data: z.unknown().readonly().nullish(),
+});
+
+// This is the interface that connection classes should return to represent a
+// complete message. It does not dictate a wire-format.
+export interface Datagram<Data = unknown> extends Omit<RawDatagram, "data"> {
+  data: Readonly<Data>;
+}
+
+export interface ConnectionDriverInit {
+  deviceInfo: Readonly<DeviceInformation>;
+  submitNewConnection: (conn: Connection) => void;
+}
+
+export interface ConnectionDriver<Address> {
+  id: string;
+  addressSchema: z.Schema<Address, z.ZodTypeDef, unknown>;
+
+  connect(address: Address, ctx?: NetworkContext): Promise<Connection>;
+  validateAddress(address: Address, deviceId: string): void;
+
+  // Closes all connections and deletes all resources
+  close(): Promise<void>;
+}
+
+// Do we need this??!
+// Can we just have the driver use the send/receive api?
+export interface Connection {
+  deviceId: string;
+
+  send<T>(datagram: Datagram<T>, ctx?: NetworkContext): Promise<void>;
+  receive(ctx?: NetworkContext): Promise<RawDatagram>;
+
+  // Closes this connection
+  close(): Promise<void>;
+}
+
+export interface DeviceInformation {
+  deviceId: string;
+  devicePublicKey: CryptoKey;
+  deviceSecretKey: CryptoKey;
+}
+
+export class NetworkLayer {
+  readonly connectionDrivers = new Map<string, ConnectionDriver<unknown>>();
+  constructor(readonly device: Readonly<DeviceInformation>) {}
+
+  addConnectionDefinition<Address>(
+    createDriver: (dev: ConnectionDriverInit) => ConnectionDriver<Address>,
+  ) {
+    const driver = createDriver({
+      deviceInfo: this.device,
+
+      // TODO
+      submitNewConnection: () => {},
+    });
+    this.connectionDrivers.set(driver.id, driver);
+  }
+
+  async send<T>(datagram: Datagram<T>, ctx?: NetworkContext): Promise<void> {
+    console.log(datagram, ctx);
+  }
+
+  async receive(
+    port: string,
+    ctx?: NetworkContext,
+  ): Promise<Datagram<unknown>> {
+    console.log(port, ctx);
+    throw new Error();
+  }
+
+  // TODO: add "sleep"/"wake" methods, for saving battery (as opposed to cleanup)
+  // Should also probably add corresponding methods for connection definitions
+}
+
+// RPC
+//
+// - Alice sends bob a datagram in channel e.g. "chat", request ID "my-req"
+// - Bob, listening on channel "chat" for any message, receives the datagram
+// - Bob sends back response with same parameters, including request ID "my-req"
+// - Alice listens on channel "chat" with same request ID "my-req"
+
+// Channel listener
+//
+// - Alice sends bob a datagram in channel e.g. "command", request ID "my-req"
+// - Bob, listening on channel "command" for any message, receives the datagram
+
+// Cancellation: https://developer.mozilla.org/en-US/docs/Web/API/AbortController
+
+// Stream listener
+//
+// - Alice sends bob a datagram in channel e.g. "download", request ID "my-file"
+// - Bob, listening on channel "download" for any message, receives the datagram
+// - Alice sends bob another datagram to continue the stream, in "download" with
+//   request ID "my-file"
+// - Bob appends these datagrams together
+// - Alice sends bob another datagram to send last bits of data and end the stream,
+//   in "download" with request ID "my-file"
+// - Bob appends this new datagram to the current list, and then ends that stream
+
+// Network
+//
+// Network object contains:
+// - connection adapters, which provide a transport layer, encryption, and
+//   basic device authentication
+// - Channels, which receive datagrams

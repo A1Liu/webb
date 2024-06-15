@@ -2,3 +2,4 @@ packages:
   - "./ui-shared"
   - "./native"
   - "./web"
+  - "./lib/webb-tools"
