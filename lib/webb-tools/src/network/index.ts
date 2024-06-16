@@ -30,29 +30,15 @@ export interface Datagram<Data = unknown> extends Omit<RawDatagram, "data"> {
 
 export interface ConnectionDriverInit {
   deviceInfo: Readonly<DeviceInformation>;
-  submitNewConnection: (conn: Connection) => void;
 }
 
-export interface ConnectionDriver<Address> {
+export interface ConnectionDriver {
   id: string;
-  addressSchema: z.Schema<Address, z.ZodTypeDef, unknown>;
 
-  connect(address: Address, ctx?: NetworkContext): Promise<Connection>;
-  validateAddress(address: Address, deviceId: string): void;
+  sendDatagram<T>(datagram: Datagram<T>, ctx?: NetworkContext): Promise<void>;
+  receiveDatagram(channel: string, ctx?: NetworkContext): Promise<RawDatagram>;
 
   // Closes all connections and deletes all resources
-  close(): Promise<void>;
-}
-
-// Do we need this??!
-// Can we just have the driver use the send/receive api?
-export interface Connection {
-  deviceId: string;
-
-  send<T>(datagram: Datagram<T>, ctx?: NetworkContext): Promise<void>;
-  receive(ctx?: NetworkContext): Promise<RawDatagram>;
-
-  // Closes this connection
   close(): Promise<void>;
 }
 
@@ -63,17 +49,14 @@ export interface DeviceInformation {
 }
 
 export class NetworkLayer {
-  readonly connectionDrivers = new Map<string, ConnectionDriver<unknown>>();
+  readonly connectionDrivers = new Map<string, ConnectionDriver>();
   constructor(readonly device: Readonly<DeviceInformation>) {}
 
-  addConnectionDefinition<Address>(
-    createDriver: (dev: ConnectionDriverInit) => ConnectionDriver<Address>,
+  addConnectionDefinition(
+    createDriver: (dev: ConnectionDriverInit) => ConnectionDriver,
   ) {
     const driver = createDriver({
       deviceInfo: this.device,
-
-      // TODO
-      submitNewConnection: () => {},
     });
     this.connectionDrivers.set(driver.id, driver);
   }
