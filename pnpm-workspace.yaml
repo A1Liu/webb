@@ -2,4 +2,5 @@ packages:
   - "./ui-shared"
   - "./native"
   - "./web"
+  - "./mtg-strategy-tester"
   - "./lib/webb-tools"

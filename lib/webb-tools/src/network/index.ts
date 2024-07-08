@@ -28,14 +28,24 @@ export interface Datagram<Data = unknown> extends Omit<RawDatagram, "data"> {
   data: Readonly<Data>;
 }
 
+export interface AddressedDatagram<Address, Data = unknown>
+  extends Datagram<Data> {
+  toAddress: Address;
+}
+
 export interface ConnectionDriverInit {
   deviceInfo: Readonly<DeviceInformation>;
 }
 
-export interface ConnectionDriver {
+export interface ConnectionDriver<Address> {
   id: string;
+  addressSchema: z.ZodSchema<Address, z.ZodTypeDef, unknown>;
+  myAddress: Address;
 
-  sendDatagram<T>(datagram: Datagram<T>, ctx?: NetworkContext): Promise<void>;
+  sendDatagram<T>(
+    datagram: AddressedDatagram<Address, T>,
+    ctx?: NetworkContext,
+  ): Promise<void>;
   receiveDatagram(channel: string, ctx?: NetworkContext): Promise<RawDatagram>;
 
   // Closes all connections and deletes all resources
@@ -48,21 +58,27 @@ export interface DeviceInformation {
   deviceSecretKey: CryptoKey;
 }
 
+export type Result<T, E = Error> =
+  | { success: true; data: T }
+  | { success: false; /* partialData?: T; */ error: E };
+
 export class NetworkLayer {
-  readonly connectionDrivers = new Map<string, ConnectionDriver>();
+  readonly connectionDrivers = new Map<string, ConnectionDriver<unknown>>();
   constructor(readonly device: Readonly<DeviceInformation>) {}
 
-  addConnectionDefinition(
-    createDriver: (dev: ConnectionDriverInit) => ConnectionDriver,
+  addConnectionDefinition<Address>(
+    createDriver: (dev: ConnectionDriverInit) => ConnectionDriver<Address>,
   ) {
-    const driver = createDriver({
-      deviceInfo: this.device,
-    });
+    const driver = createDriver({ deviceInfo: this.device });
     this.connectionDrivers.set(driver.id, driver);
   }
 
-  async send<T>(datagram: Datagram<T>, ctx?: NetworkContext): Promise<void> {
+  async send<T>(
+    datagram: Datagram<T>,
+    ctx?: NetworkContext,
+  ): Promise<Result<void>> {
     console.log(datagram, ctx);
+    return { success: true, data: undefined };
   }
 
   async receive(
