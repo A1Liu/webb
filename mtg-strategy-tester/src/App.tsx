@@ -2,10 +2,20 @@ import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-import { NetworkLayer } from "@a1liu/webb-tools/network";
 
-const networkLayer = new NetworkLayer({
-})
+// Features
+// 1. Import decklist and make it easy to tag cards in the list
+// 2. Simulate mulligans, and allow the user to run manual runs of the
+//    mulligan phase (draw 7, then decide either "mulligan", "keep", or "bust")
+// 3. Allow the user to create a decision tree which can then be used to
+//    automatically simulate mulligans.
+// 4. Provide standard visibility into deck composition:
+//    - Mana curve
+//    - counts of categories
+//    - counts of symbols & land symbols
+//
+// Thoughts
+// - Extend strategy w/ information on next few draws?
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
