@@ -12,7 +12,7 @@
   "devDependencies": {
     "typescript": "^5",
     "prettier": "^3.0.3",
-    "@tauri-apps/cli": "2.0.0-beta.20"
+    "@tauri-apps/cli": "2.0.0-rc.9"
   },
   "prettier": {
     "trailingComma": "all",
