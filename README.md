@@ -32,6 +32,7 @@ Strong design goals:
   - https://www.security.org/vpn/webrtc-leak/
   - https://nordvpn.com/blog/webrtc/
 - iOS setup - https://dev.to/adimac93/tauri-mobile-for-ios-4dp6
+- Getting client IP in AWS Lambda - https://stackoverflow.com/questions/67777518/get-users-ip-address-in-lambda-with-api-gateway-and-python
 
 ### IO
 - Virtual Camera with CoreMediaIO - https://developer.apple.com/documentation/coremediaio
