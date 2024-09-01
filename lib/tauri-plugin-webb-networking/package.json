@@ -22,7 +22,8 @@
     "pretest": "yarn build"
   },
   "dependencies": {
-    "@tauri-apps/api": ">=2.0.0-beta.6"
+    "@tauri-apps/api": ">=2.0.0-beta.6",
+    "@a1liu/webb-tools": "workspace:*"
   },
   "devDependencies": {
     "@rollup/plugin-typescript": "^11.1.6",
