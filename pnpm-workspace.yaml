@@ -4,4 +4,3 @@ packages:
   - "./web"
   - "./mtg-strategy-tester"
   - "./lib/webb-tools"
-  - "./lib/tauri-plugin-webb-networking"
