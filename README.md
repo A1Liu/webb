@@ -71,6 +71,9 @@ Strong design goals:
 - https://www.browserstack.com/blog/building-secure-native-apps-with-self-signed-ssl-certificates-using-certificate-pinning/
 - https://stackoverflow.com/questions/54452129/how-to-create-ios-nwconnection-for-tls-with-self-signed-cert
 - qp2p? (supposedly works on mobile) - https://github.com/maidsafe/qp2p
+- Web server system
+  - Use web server peer with simple HTTPS + Websockets transport (Or QUIC/webtransport/etc where possible)
+  - Can skip other transport protocols by simply implementing pass-through (which is necessary anyways)
 
 
 ## Release
