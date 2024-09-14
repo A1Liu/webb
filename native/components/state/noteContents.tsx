@@ -6,7 +6,7 @@ import { useCreation } from "ahooks";
 import toast from "react-hot-toast";
 import * as automerge from "@automerge/automerge";
 import { useNotesState } from "./notes";
-import { Future } from "@/../ui-shared/dist/util";
+import { Future } from "@a1liu/webb-ui-shared/util";
 
 interface NoteContentsSerialized {
   noteId: string;

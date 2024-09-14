@@ -3,7 +3,7 @@ import { v4 as uuid } from "uuid";
 import { persist } from "zustand/middleware";
 import { ZustandIdbStorage } from "../util";
 import { GlobalInitGroup } from "../constants";
-import { Future } from "@/../ui-shared/dist/util";
+import { Future } from "@a1liu/webb-ui-shared/util";
 
 export const DeviceProfileHydration = new Future<true>();
 
