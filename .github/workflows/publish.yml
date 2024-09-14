@@ -9,7 +9,6 @@ concurrency:
 
 jobs:
   publish-app:
-    if: false
     permissions:
       contents: write
     strategy:
@@ -26,7 +25,7 @@ jobs:
         with:
           include-rust: true
 
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v0.5.14
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
