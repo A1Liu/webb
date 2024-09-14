@@ -1,16 +1,21 @@
 import {
   ConnectionDriver,
+  ConnectionDriverDefinition,
   ConnectionDriverInit,
   ConnectionRegisterInfo,
   Datagram,
+  DriverPeerKVStore,
   NetworkContext,
   RawDatagram,
 } from "@a1liu/webb-tools/network";
 
-class HttpDriver implements ConnectionDriver {
-  readonly id = "HttpDriver";
+export class HttpDriver implements ConnectionDriver {
+  static readonly id = "HttpDriver";
+  readonly kvStore: DriverPeerKVStore;
 
   constructor(fields: ConnectionDriverInit) {
+    this.kvStore = fields.peerKVStore;
+
     console.log("creating", fields);
   }
 
@@ -34,8 +39,4 @@ class HttpDriver implements ConnectionDriver {
   }
 }
 
-export function createHttpDriver(
-  fields: ConnectionDriverInit,
-): ConnectionDriver {
-  return new HttpDriver(fields);
-}
+HttpDriver satisfies ConnectionDriverDefinition;

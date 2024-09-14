@@ -4,6 +4,11 @@ export interface NetworkContext {
   readonly abortSignal?: AbortSignal;
 }
 
+export interface DriverPeerKVStore {
+  getValue(peerId: string): Promise<unknown>;
+  setValue(peerId: string, value: unknown): Promise<unknown>;
+}
+
 export type RawDatagram = z.infer<typeof RawDatagramSchema>;
 export const RawDatagramSchema = z
   .object({
@@ -32,6 +37,7 @@ export interface Datagram<Data = unknown> extends Omit<RawDatagram, "data"> {
 
 export interface ConnectionDriverInit {
   readonly deviceInfo: Readonly<DeviceInformation>;
+  readonly peerKVStore: DriverPeerKVStore;
 }
 
 export interface ConnectionRegisterInfo {
@@ -40,8 +46,6 @@ export interface ConnectionRegisterInfo {
 }
 
 export interface ConnectionDriver {
-  readonly id: string;
-
   registerConnection({
     peerDeviceId,
     additionalInfo,
@@ -54,6 +58,11 @@ export interface ConnectionDriver {
   close(): Promise<void>;
 }
 
+export interface ConnectionDriverDefinition {
+  readonly id: string;
+  new (dev: ConnectionDriverInit): ConnectionDriver;
+}
+
 export interface DeviceInformation {
   deviceId: string;
   devicePublicKey: CryptoKey;
@@ -62,13 +71,25 @@ export interface DeviceInformation {
 
 export class NetworkLayer {
   readonly connectionDrivers = new Map<string, ConnectionDriver>();
-  constructor(readonly device: Readonly<DeviceInformation>) {}
+  constructor(
+    readonly device: Readonly<DeviceInformation>,
+    readonly peerKVStore: DriverPeerKVStore,
+  ) {}
 
-  addConnectionDefinition(
-    createDriver: (dev: ConnectionDriverInit) => ConnectionDriver,
-  ) {
-    const driver = createDriver({ deviceInfo: this.device });
-    this.connectionDrivers.set(driver.id, driver);
+  addConnectionDefinition(createDriver: ConnectionDriverDefinition) {
+    const peerKVStore = this.peerKVStore;
+    const driver = new createDriver({
+      deviceInfo: this.device,
+      peerKVStore: {
+        async getValue(peerId) {
+          return peerKVStore.getValue(createDriver.id + ":" + peerId);
+        },
+        async setValue(peerId, value) {
+          return peerKVStore.setValue(createDriver.id + ":" + peerId, value);
+        },
+      },
+    });
+    this.connectionDrivers.set(createDriver.id, driver);
   }
 
   async send<T>(
