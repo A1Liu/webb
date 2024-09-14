@@ -5,22 +5,24 @@ export interface NetworkContext {
 }
 
 export type RawDatagram = z.infer<typeof RawDatagramSchema>;
-export const RawDatagramSchema = z.object({
-  receiver: z.string(),
-  sender: z.string(),
+export const RawDatagramSchema = z
+  .object({
+    receiver: z.string(),
+    sender: z.string(),
 
-  // Represents a data port on the receiver device. Data ports are independent
-  // from each other.
-  port: z.string(),
+    // Represents a data port on the receiver device. Data ports are independent
+    // from each other.
+    port: z.string(),
 
-  // Represents a transient indicator, used for e.g. correlating RPC calls
-  requestId: z.string(),
+    // Represents a transient indicator, used for e.g. correlating RPC calls
+    requestId: z.string(),
 
-  // If you want to close this requestID
-  closeRequestId: z.literal(true).nullish(),
+    // If you want to close this requestID
+    closeRequestId: z.literal(true).nullish(),
 
-  data: z.unknown().readonly().nullish(),
-}).readonly();
+    data: z.unknown().readonly().nullish(),
+  })
+  .readonly();
 
 // This is the interface that connection classes should return to represent a
 // complete message. It does not dictate a wire-format.
@@ -36,16 +38,14 @@ export interface ConnectionDriver {
   readonly id: string;
 
   registerConnection({
-    peerDeviceId, additionalInfo
+    peerDeviceId,
+    additionalInfo,
   }: {
     peerDeviceId: string;
-    additionalInfo: unknown
+    additionalInfo: unknown;
   }): Promise<{ success: boolean }>;
 
-  sendDatagram<T>(
-    datagram: Datagram<T>,
-    ctx?: NetworkContext,
-  ): Promise<void>;
+  sendDatagram<T>(datagram: Datagram<T>, ctx?: NetworkContext): Promise<void>;
   receiveDatagram(channel: string, ctx?: NetworkContext): Promise<RawDatagram>;
 
   // Closes all connections and deletes all resources
