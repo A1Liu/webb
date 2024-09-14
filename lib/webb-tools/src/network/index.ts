@@ -34,16 +34,18 @@ export interface ConnectionDriverInit {
   readonly deviceInfo: Readonly<DeviceInformation>;
 }
 
+export interface ConnectionRegisterInfo {
+  peerDeviceId: string;
+  additionalInfo: unknown;
+}
+
 export interface ConnectionDriver {
   readonly id: string;
 
   registerConnection({
     peerDeviceId,
     additionalInfo,
-  }: {
-    peerDeviceId: string;
-    additionalInfo: unknown;
-  }): Promise<{ success: boolean }>;
+  }: ConnectionRegisterInfo): Promise<{ success: boolean }>;
 
   sendDatagram<T>(datagram: Datagram<T>, ctx?: NetworkContext): Promise<void>;
   receiveDatagram(channel: string, ctx?: NetworkContext): Promise<RawDatagram>;
@@ -57,10 +59,6 @@ export interface DeviceInformation {
   devicePublicKey: CryptoKey;
   deviceSecretKey: CryptoKey;
 }
-
-export type Result<T, E = Error> =
-  | { success: true; data: T }
-  | { success: false; /* partialData?: T; */ error: E };
 
 export class NetworkLayer {
   readonly connectionDrivers = new Map<string, ConnectionDriver>();
@@ -76,9 +74,9 @@ export class NetworkLayer {
   async send<T>(
     datagram: Datagram<T>,
     ctx?: NetworkContext,
-  ): Promise<Result<void>> {
+  ): Promise<{ success: boolean }> {
     console.log(datagram, ctx);
-    return { success: true, data: undefined };
+    return { success: true };
   }
 
   async receive(

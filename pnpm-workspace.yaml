@@ -2,6 +2,5 @@ packages:
   - "./ui-shared"
   - "./native"
   - "./web"
-  - "./mtg-strategy-tester"
   - "./lib/webb-tools"
-  - "./tauri-plugin-webb-quic"
+  - "./lib/webb-http-driver"

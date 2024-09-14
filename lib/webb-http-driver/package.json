@@ -1,5 +1,5 @@
 {
-  "name": "@a1liu/webb-tools",
+  "name": "@a1liu/webb-http-driver",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,15 +9,12 @@
     "build": "tsc"
   },
   "exports": {
-    "./network": "./dist/network/index.js"
+    "/": "./dist/index.js"
   },
   "typesVersions": {
     "*": {
-      "util": [
-        "dist/util.d.ts"
-      ],
-      "network": [
-        "dist/network/index.d.ts"
+      "/": [
+        "dist/index.d.ts"
       ]
     }
   },
