@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export interface NetworkContext {
-  abortSignal?: AbortSignal;
+  readonly abortSignal?: AbortSignal;
 }
 
 export type RawDatagram = z.infer<typeof RawDatagramSchema>;
@@ -20,30 +20,30 @@ export const RawDatagramSchema = z.object({
   closeRequestId: z.literal(true).nullish(),
 
   data: z.unknown().readonly().nullish(),
-});
+}).readonly();
 
 // This is the interface that connection classes should return to represent a
 // complete message. It does not dictate a wire-format.
 export interface Datagram<Data = unknown> extends Omit<RawDatagram, "data"> {
-  data: Readonly<Data>;
-}
-
-export interface AddressedDatagram<Address, Data = unknown>
-  extends Datagram<Data> {
-  toAddress: Address;
+  readonly data: Readonly<Data>;
 }
 
 export interface ConnectionDriverInit {
-  deviceInfo: Readonly<DeviceInformation>;
+  readonly deviceInfo: Readonly<DeviceInformation>;
 }
 
-export interface ConnectionDriver<Address> {
-  id: string;
-  addressSchema: z.ZodSchema<Address, z.ZodTypeDef, unknown>;
-  myAddress: Address;
+export interface ConnectionDriver {
+  readonly id: string;
+
+  registerConnection({
+    peerDeviceId, additionalInfo
+  }: {
+    peerDeviceId: string;
+    additionalInfo: unknown
+  }): Promise<{ success: boolean }>;
 
   sendDatagram<T>(
-    datagram: AddressedDatagram<Address, T>,
+    datagram: Datagram<T>,
     ctx?: NetworkContext,
   ): Promise<void>;
   receiveDatagram(channel: string, ctx?: NetworkContext): Promise<RawDatagram>;
@@ -63,11 +63,11 @@ export type Result<T, E = Error> =
   | { success: false; /* partialData?: T; */ error: E };
 
 export class NetworkLayer {
-  readonly connectionDrivers = new Map<string, ConnectionDriver<unknown>>();
+  readonly connectionDrivers = new Map<string, ConnectionDriver>();
   constructor(readonly device: Readonly<DeviceInformation>) {}
 
-  addConnectionDefinition<Address>(
-    createDriver: (dev: ConnectionDriverInit) => ConnectionDriver<Address>,
+  addConnectionDefinition(
+    createDriver: (dev: ConnectionDriverInit) => ConnectionDriver,
   ) {
     const driver = createDriver({ deviceInfo: this.device });
     this.connectionDrivers.set(driver.id, driver);
