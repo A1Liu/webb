@@ -7,14 +7,14 @@
     "core:webview:default",
     "core:webview:allow-internal-toggle-devtools",
     "core:window:default",
-    "app:default",
+    "core:default",
     "clipboard-manager:default",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",
-    "resources:default",
-    "tray:default",
-    "event:default",
+    "core:resources:default",
+    "core:tray:default",
+    "core:event:default",
     "shell:allow-open",
-    "menu:default"
+    "core:menu:default"
   ]
 }
