@@ -13,7 +13,7 @@ runs:
       uses: awalsh128/cache-apt-pkgs-action@latest
       if: runner.os == 'Linux' && inputs.include-rust == 'true'
       with:
-        packages: libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+        packages: libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
         version: 1.0
 
     - uses: pnpm/action-setup@v4
@@ -41,6 +41,10 @@ runs:
     - name: Install Rust stable
       if: inputs.include-rust == 'true'
       uses: dtolnay/rust-toolchain@stable
+      with:
+        # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
+        targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
 
     - name: Cache Rust dependencies
       id: rust-cache-check
