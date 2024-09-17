@@ -10,6 +10,7 @@
     "build:web": "vite build",
     "start:web": "vite start",
     "format": "prettier --write .",
+    "build:desktop": "pnpm tauri build",
     "build:mac": "CI=true pnpm tauri build",
     "build:ios": "CI=true pnpm tauri ios build",
     "lint:web": "eslint .",
