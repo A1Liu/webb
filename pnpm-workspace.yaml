@@ -1,6 +1,6 @@
 packages:
-  - "./ui-shared"
   - "./native"
   - "./web"
   - "./lib/webb-tools"
   - "./lib/webb-http-driver"
+  - "./lib/ui-shared"

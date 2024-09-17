@@ -35,7 +35,6 @@ jobs:
           include-rust: true
 
       - run: pnpm run build-libs
-      - run: pnpm run --filter ./ui-shared build
 
       - uses: tauri-apps/tauri-action@v0.5.14
         env:
