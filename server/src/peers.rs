@@ -1,12 +1,29 @@
+use axum::Json;
+use http::StatusCode;
 use leptos::*;
+use serde::{Deserialize, Serialize};
 
 #[server(PingPeer, "/api")]
 pub async fn ping_peer() -> Result<(), ServerFnError> {
     return Ok(());
 }
 
-pub async fn ping_endpoint() -> &'static str {
-    return "Hello, World!";
+#[derive(Deserialize)]
+pub struct PingParams {
+    pub device_id: String,
+}
+#[derive(Serialize)]
+pub struct PingOutput {
+    pub received_device_id: String,
+}
+
+pub async fn ping_endpoint(Json(payload): Json<PingParams>) -> (StatusCode, Json<PingOutput>) {
+    return (
+        StatusCode::OK,
+        Json(PingOutput {
+            received_device_id: payload.device_id,
+        }),
+    );
 }
 
 #[component]

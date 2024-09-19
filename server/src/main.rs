@@ -22,7 +22,7 @@ async fn main() {
     // build our application with a route
     let app = Router::new()
         .leptos_routes(&leptos_options, routes, App)
-        .route("/api/ping", routing::get(peers::ping_endpoint))
+        .route("/api/ping", routing::post(peers::ping_endpoint))
         .fallback(file_and_error_handler)
         .with_state(leptos_options);
 
