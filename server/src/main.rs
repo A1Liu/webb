@@ -1,11 +1,13 @@
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
+    use axum::routing;
     use axum::Router;
     use leptos::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
     use server::app::*;
     use server::fileserv::file_and_error_handler;
+    use server::peers;
 
     // Setting get_configuration(None) means we'll be using cargo-leptos's env values
     // For deployment these variables are:
@@ -20,6 +22,7 @@ async fn main() {
     // build our application with a route
     let app = Router::new()
         .leptos_routes(&leptos_options, routes, App)
+        .route("/api/ping", routing::get(peers::ping_endpoint))
         .fallback(file_and_error_handler)
         .with_state(leptos_options);
 
