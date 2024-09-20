@@ -1,5 +1,3 @@
-use axum::Json;
-use http::StatusCode;
 use leptos::*;
 use serde::{Deserialize, Serialize};
 
@@ -17,10 +15,13 @@ pub struct PingOutput {
     pub received_device_id: String,
 }
 
-pub async fn ping_endpoint(Json(payload): Json<PingParams>) -> (StatusCode, Json<PingOutput>) {
+#[cfg(feature = "ssr")]
+pub async fn ping_endpoint(
+    axum::Json(payload): axum::Json<PingParams>,
+) -> (http::StatusCode, axum::Json<PingOutput>) {
     return (
-        StatusCode::OK,
-        Json(PingOutput {
+        http::StatusCode::OK,
+        axum::Json(PingOutput {
             received_device_id: payload.device_id,
         }),
     );
