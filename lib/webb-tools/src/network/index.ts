@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { v4 as uuid } from "uuid";
 
 export interface NetworkContext {
   readonly abortSignal?: AbortSignal;
@@ -9,6 +10,8 @@ export interface DriverPeerKVStore {
   setValue(peerId: string, value: unknown): Promise<unknown>;
 }
 
+// This is the interface that connection classes should return to represent a
+// complete message. It does not dictate a wire-format.
 export type RawDatagram = z.infer<typeof RawDatagramSchema>;
 export const RawDatagramSchema = z
   .object({
@@ -25,19 +28,14 @@ export const RawDatagramSchema = z
     // If you want to close this requestID
     closeRequestId: z.literal(true).nullish(),
 
-    data: z.unknown().readonly().nullish(),
+    data: z.unknown().nullish(),
   })
   .readonly();
-
-// This is the interface that connection classes should return to represent a
-// complete message. It does not dictate a wire-format.
-export interface Datagram<Data = unknown> extends Omit<RawDatagram, "data"> {
-  readonly data: Readonly<Data>;
-}
 
 export interface ConnectionDriverInit {
   readonly deviceInfo: Readonly<DeviceInformation>;
   readonly peerKVStore: DriverPeerKVStore;
+  readonly receiveDatagram: (datagram: RawDatagram) => void;
 }
 
 export interface ConnectionRegisterInfo {
@@ -51,8 +49,7 @@ export interface ConnectionDriver {
     additionalInfo,
   }: ConnectionRegisterInfo): Promise<{ success: boolean }>;
 
-  sendDatagram<T>(datagram: Datagram<T>, ctx?: NetworkContext): Promise<void>;
-  receiveDatagram(channel: string, ctx?: NetworkContext): Promise<RawDatagram>;
+  sendDatagram(datagram: RawDatagram, ctx?: NetworkContext): Promise<void>;
 
   // Closes all connections and deletes all resources
   close(): Promise<void>;
@@ -88,24 +85,78 @@ export class NetworkLayer {
           return peerKVStore.setValue(createDriver.id + ":" + peerId, value);
         },
       },
+
+      receiveDatagram: (datagram) => {
+        // TODO: receive datagram logic goes here
+      },
     });
     this.connectionDrivers.set(createDriver.id, driver);
   }
 
-  async send<T>(
-    datagram: Datagram<T>,
+  async send(
+    datagram: RawDatagram,
     ctx?: NetworkContext,
   ): Promise<{ success: boolean }> {
-    console.log(datagram, ctx);
-    return { success: true };
+    for (const driver of this.connectionDrivers.values()) {
+      try {
+        await driver.sendDatagram(datagram, ctx);
+        return { success: true };
+      } catch (e) {}
+    }
+
+    return { success: false };
   }
 
-  async receive(
-    port: string,
-    ctx?: NetworkContext,
-  ): Promise<Datagram<unknown>> {
+  async receive(port: string, ctx?: NetworkContext): Promise<RawDatagram> {
     console.log(port, ctx);
     throw new Error();
+  }
+
+  async *rpcCall(
+    datagram: Pick<RawDatagram, "receiver" | "sender" | "port" | "data">,
+  ): AsyncGenerator<RawDatagram> {
+    const requestId = uuid();
+    await this.send({ ...datagram, requestId });
+
+    while (true) {
+      const chunk = await this.receive(`rpc:${requestId}`);
+      if (chunk.closeRequestId) break;
+
+      yield chunk;
+    }
+  }
+
+  async rpcSingleExec(
+    port: string,
+    rpc: (data: RawDatagram) => AsyncGenerator<unknown>,
+  ): Promise<void> {
+    const request = await this.receive(port);
+    const id = request.requestId;
+    if (!id) {
+      console.error(
+        "RPC request didn't contain RPC id",
+        JSON.stringify(request),
+      );
+      return;
+    }
+
+    for await (const resp of rpc(request)) {
+      await this.send({
+        sender: this.device.deviceId,
+        receiver: request.sender,
+        port: `rpc:${id}`,
+        requestId: id,
+        data: resp as Readonly<unknown>,
+      });
+    }
+
+    await this.send({
+      sender: this.device.deviceId,
+      receiver: request.sender,
+      port: `rpc:${id}`,
+      requestId: id,
+      closeRequestId: true,
+    });
   }
 
   // TODO: add "sleep"/"wake" methods, for saving battery (as opposed to cleanup)
