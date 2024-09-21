@@ -118,12 +118,15 @@ export class NetworkLayer {
   }
 
   async send(
-    datagram: RawDatagram,
+    datagram: Omit<RawDatagram, "sender">,
     ctx?: NetworkContext,
   ): Promise<{ success: boolean }> {
     for (const driver of this.connectionDrivers.values()) {
       try {
-        await driver.sendDatagram(datagram, ctx);
+        await driver.sendDatagram(
+          { ...datagram, sender: this.device.deviceId },
+          ctx,
+        );
         return { success: true };
       } catch (e) {}
     }
@@ -142,7 +145,7 @@ export class NetworkLayer {
   }
 
   async *rpcCall(
-    datagram: Pick<RawDatagram, "receiver" | "sender" | "port" | "data">,
+    datagram: Pick<RawDatagram, "receiver" | "port" | "data">,
   ): AsyncGenerator<RawDatagram> {
     const requestId = uuid();
     await this.send({ ...datagram, requestId });
@@ -171,7 +174,6 @@ export class NetworkLayer {
 
     for await (const resp of rpc(request)) {
       await this.send({
-        sender: this.device.deviceId,
         receiver: request.sender,
         port: `rpc:${id}`,
         requestId: id,
@@ -180,7 +182,6 @@ export class NetworkLayer {
     }
 
     await this.send({
-      sender: this.device.deviceId,
       receiver: request.sender,
       port: `rpc:${id}`,
       requestId: id,
