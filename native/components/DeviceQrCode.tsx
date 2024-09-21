@@ -175,7 +175,7 @@ export function ScanAndConnectButton() {
               <div className="flex justify-between">
                 <h3 className="font-bold text-lg">Connect</h3>
 
-                <button onClick={() => setIsOpen(false)}>X</button>
+                <button className="self-start" onClick={() => setIsOpen(false)}>X</button>
               </div>
 
               <input
