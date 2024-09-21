@@ -86,7 +86,7 @@ export class NetworkLayer {
         },
       },
 
-      receiveDatagram: (datagram) => {
+      receiveDatagram: (_datagram) => {
         // TODO: receive datagram logic goes here
       },
     });

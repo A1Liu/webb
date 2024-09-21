@@ -1,0 +1,29 @@
+{
+  "name": "@a1liu/webb-peerjs-driver",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "format": "prettier --write .",
+    "ts-check": "tsc",
+    "build": "tsc"
+  },
+  "exports": {
+    "/": "./dist/index.js"
+  },
+  "typesVersions": {
+    "*": {
+      "/": [
+        "dist/index.d.ts"
+      ]
+    }
+  },
+  "dependencies": {
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4",
+    "@a1liu/webb-tools": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.2"
+  }
+}

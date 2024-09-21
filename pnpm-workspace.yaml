@@ -3,4 +3,5 @@ packages:
   - "./web"
   - "./lib/webb-tools"
   - "./lib/webb-http-driver"
+  - "./lib/webb-peerjs-driver"
   - "./lib/ui-shared"

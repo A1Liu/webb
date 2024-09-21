@@ -3,12 +3,12 @@ import {
   ConnectionDriverDefinition,
   ConnectionDriverInit,
   ConnectionRegisterInfo,
+  RawDatagram,
   DriverPeerKVStore,
   NetworkContext,
-  RawDatagram,
 } from "@a1liu/webb-tools/network";
 
-export class HttpDriver implements ConnectionDriver {
+export class PeerjsDriver implements ConnectionDriver {
   static readonly id = "HttpDriver";
   readonly kvStore: DriverPeerKVStore;
 
@@ -34,4 +34,4 @@ export class HttpDriver implements ConnectionDriver {
   }
 }
 
-HttpDriver satisfies ConnectionDriverDefinition;
+PeerjsDriver satisfies ConnectionDriverDefinition;
