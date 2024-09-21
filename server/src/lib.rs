@@ -4,6 +4,8 @@ pub mod error_template;
 pub mod fileserv;
 pub mod peers;
 
+pub mod util;
+
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {
