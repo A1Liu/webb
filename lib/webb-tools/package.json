@@ -9,7 +9,19 @@
     "build": "tsc"
   },
   "exports": {
+    ".": "./dist/index.js",
+    "./util": "./dist/util.js",
     "./network": "./dist/network/index.js"
+  },
+  "typesVersions": {
+    "*": {
+      "util": [
+        "dist/util.d.ts"
+      ],
+      "network": [
+        "dist/network/index.d.ts"
+      ]
+    }
   },
   "dependencies": {
     "uuid": "^9.0.1",

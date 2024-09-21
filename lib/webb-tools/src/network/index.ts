@@ -38,6 +38,7 @@ export interface ConnectionDriverInit {
   readonly deviceInfo: Readonly<DeviceInformation>;
   readonly peerKVStore: DriverPeerKVStore;
   readonly receiveDatagram: (datagram: RawDatagram) => void;
+  readonly statusChannel: Channel<NetworkUpdate>;
 }
 
 export interface ConnectionRegisterInfo {
@@ -46,10 +47,9 @@ export interface ConnectionRegisterInfo {
 }
 
 export interface ConnectionDriver {
-  registerConnection({
-    peerDeviceId,
-    additionalInfo,
-  }: ConnectionRegisterInfo): Promise<{ success: boolean }>;
+  registerConnection(
+    regInfo: ConnectionRegisterInfo,
+  ): Promise<{ success: boolean }>;
 
   sendDatagram(datagram: RawDatagram, ctx?: NetworkContext): Promise<void>;
 
@@ -66,7 +66,21 @@ export interface DeviceInformation {
   deviceId: string;
 }
 
+export type NetworkUpdate =
+  | {
+      type: "networkStatus";
+      status: "disconnected" | "connecting" | "connected";
+    }
+  | {
+      type: "networkError";
+      errorType: string;
+    }
+  | { type: "peerConnected"; peer: { deviceId: string } }
+  | { type: "connInfo"; event: string; msg: string }
+  | { type: "peerDisconnected"; peerId: string };
+
 export class NetworkLayer {
+  readonly statusChannel = new Channel<NetworkUpdate>(Infinity);
   readonly connectionDrivers = new Map<string, ConnectionDriver>();
   private readonly channels = new Map<string, Channel<RawDatagram>>();
 
@@ -88,6 +102,7 @@ export class NetworkLayer {
         },
       },
 
+      statusChannel: this.statusChannel,
       receiveDatagram: (datagram) => {
         // TODO: receive datagram logic goes here
 
