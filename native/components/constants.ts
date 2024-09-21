@@ -1,4 +1,4 @@
-import { memoize } from "@a1liu/webb-ui-shared/util";
+import { memoize } from "@a1liu/webb-tools/util";
 import toast from "react-hot-toast";
 
 export const EnvFlags = {

@@ -3,7 +3,7 @@ import { isNotNil } from "ramda";
 import { z } from "zod";
 import { toast } from "react-hot-toast";
 import { get, set, del } from "idb-keyval";
-import { Future, getOrCompute, timeout } from "@a1liu/webb-ui-shared/util";
+import { Future, getOrCompute, timeout } from "@a1liu/webb-tools/util";
 import { debounce, DebounceSettings } from "lodash";
 
 type Result<T> =

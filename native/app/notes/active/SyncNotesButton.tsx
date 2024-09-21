@@ -3,7 +3,7 @@ import { useLockFn, useRequest } from "ahooks";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { z } from "zod";
 import toast from "react-hot-toast";
-import { getOrCompute } from "@a1liu/webb-ui-shared/util";
+import { getOrCompute } from "@a1liu/webb-tools/util";
 import {
   NoteData,
   NoteDataSchema,
