@@ -64,8 +64,6 @@ export interface ConnectionDriverDefinition {
 
 export interface DeviceInformation {
   deviceId: string;
-  devicePublicKey: CryptoKey;
-  deviceSecretKey: CryptoKey;
 }
 
 export class NetworkLayer {

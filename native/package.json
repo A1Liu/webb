@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@a1liu/webb-ui-shared": "workspace:*",
+    "@a1liu/webb-tools": "workspace:*",
+    "@a1liu/webb-peerjs-driver": "workspace:*",
     "@automerge/automerge": "2.1.7",
     "@codemirror/lang-markdown": "^6.2.5",
     "@floating-ui/react": "^0.26.2",

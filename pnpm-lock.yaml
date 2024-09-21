@@ -81,6 +81,12 @@ importers:
 
   native:
     dependencies:
+      '@a1liu/webb-peerjs-driver':
+        specifier: workspace:*
+        version: link:../lib/webb-peerjs-driver
+      '@a1liu/webb-tools':
+        specifier: workspace:*
+        version: link:../lib/webb-tools
       '@a1liu/webb-ui-shared':
         specifier: workspace:*
         version: link:../lib/ui-shared

@@ -16,7 +16,11 @@
     //
     // Albert Liu, Apr 03, 2024 Wed 00:23
     "module": "es2020",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
+
+    // Eventually going to use this: https://github.com/andrewbranch/example-subpath-exports-ts-compat
+    // to figure out what to do about `moduleResolution`
+
     "plugins": [
       {
         "name": "next"
