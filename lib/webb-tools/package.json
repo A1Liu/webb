@@ -11,16 +11,6 @@
   "exports": {
     "./network": "./dist/network/index.js"
   },
-  "typesVersions": {
-    "*": {
-      "util": [
-        "dist/util.d.ts"
-      ],
-      "network": [
-        "dist/network/index.d.ts"
-      ]
-    }
-  },
   "dependencies": {
     "uuid": "^9.0.1",
     "zod": "^3.22.4"
