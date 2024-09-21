@@ -22,7 +22,7 @@ import {
 } from "@/components/state/permissions";
 import { useUserProfile } from "@/components/state/userProfile";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
-import { getNetworkLayerGlobal } from "@/components/network";
+import { getPeerjsDriverGlobal } from "@/components/network";
 import { useNavigate } from "react-router-dom";
 import * as automerge from "@automerge/automerge";
 import CodeMirror, {
@@ -221,8 +221,8 @@ function ReconnectButton() {
     <Button
       size="xs"
       onClick={async () => {
-        const network = await getNetworkLayerGlobal();
-        network.ensureInit();
+        const driver = await getPeerjsDriverGlobal();
+        driver.ensureInit();
       }}
     >
       Reconnect
@@ -322,7 +322,7 @@ async function requestKeyForNote(note: NoteData) {
   const { peers } = usePeers.getState();
   const firstResult = await getFirstSuccess(
     [...peers.values()].map(async (peer) => {
-      const result = AskPermission.call(peer.id, {
+      const result = AskPermission.call(peer.deviceId, {
         action: {
           actionId: [MatchPerms.exact("updateNote")],
           resourceId: [
@@ -332,7 +332,7 @@ async function requestKeyForNote(note: NoteData) {
         },
       });
       for await (const { permission } of result) {
-        return { peerId: peer.id, permission };
+        return { peerId: peer.deviceId, permission };
       }
 
       throw new Error(``);

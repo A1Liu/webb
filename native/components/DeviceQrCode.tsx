@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { z } from "zod";
 import { GlobalInitGroup } from "./constants";
+import { v4 as uuid } from "uuid";
 import {
   exportUserPublickKey,
   importUserPublicKey,
@@ -146,9 +147,10 @@ export function ScanAndConnectButton() {
               await MayIJoinListener.send(device.deviceId, {});
             } else {
               const network = await getNetworkLayerGlobal();
-              network.sendData({
-                peerId: result.content,
-                channel: "debug",
+              network.send({
+                receiver: result.content,
+                port: "debug",
+                requestId: uuid(),
                 data: "peer connect",
               });
             }

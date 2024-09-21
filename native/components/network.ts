@@ -1,6 +1,7 @@
 import toast from "react-hot-toast";
 import { z, ZodTypeDef } from "zod";
 import { NetworkLayer } from "@a1liu/webb-tools/network";
+import { PeerjsDriver } from "@a1liu/webb-peerjs-driver";
 import { InitGroup } from "./constants";
 import { v4 as uuid } from "uuid";
 import {
@@ -13,7 +14,10 @@ export const NetworkInitGroup = new InitGroup("network");
 export const getPeerjsDriverGlobal = NetworkInitGroup.registerValue({
   field: "peerjsDriver",
   eagerInit: true,
-  create: async () => {},
+  create: async () => {
+    const networkLayer = await getNetworkLayerGlobal();
+    return networkLayer.addConnectionDefinition(PeerjsDriver);
+  },
 });
 
 export const getNetworkLayerGlobal = NetworkInitGroup.registerValue({
@@ -27,6 +31,7 @@ export const getNetworkLayerGlobal = NetworkInitGroup.registerValue({
       // TODO: simplify this
       throw new Error("WTF Device Profile should be available at this point");
     }
+
     const network = new NetworkLayer(
       { deviceId: id },
       {

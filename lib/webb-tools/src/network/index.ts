@@ -89,9 +89,12 @@ export class NetworkLayer {
     readonly peerKVStore: DriverPeerKVStore,
   ) {}
 
-  addConnectionDefinition(createDriver: ConnectionDriverDefinition) {
+  addConnectionDefinition<T extends ConnectionDriver>(createDriver: {
+    readonly id: string;
+    new (dev: ConnectionDriverInit): T;
+  }): T {
     const peerKVStore = this.peerKVStore;
-    const driver = new createDriver({
+    const driver: T = new createDriver({
       deviceInfo: this.device,
       peerKVStore: {
         async getValue(peerId) {
@@ -115,6 +118,8 @@ export class NetworkLayer {
       },
     });
     this.connectionDrivers.set(createDriver.id, driver);
+
+    return driver;
   }
 
   async send(

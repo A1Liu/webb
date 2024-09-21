@@ -44,7 +44,7 @@ function IncomingPeer({ peer }: { peer: Peer }) {
           className="text-left text-ellipsis basis-0 grow overflow-hidden"
           onClick={() => setOpen((prev) => !prev)}
         >
-          {peer.name ?? peer.id.replaceAll("-", "")}
+          {peer.name ?? peer.deviceId.replaceAll("-", "")}
         </button>
 
         <div className="flex gap-2">
@@ -52,7 +52,7 @@ function IncomingPeer({ peer }: { peer: Peer }) {
             className="bg-sky-700 p-2 rounded hover:bg-sky-900"
             onClick={async () => {
               try {
-                await DebugListener.send(peer.id, "hi");
+                await DebugListener.send(peer.deviceId, "hi");
               } catch (e) {
                 toast.error(String(e));
               }
@@ -67,7 +67,7 @@ function IncomingPeer({ peer }: { peer: Peer }) {
         <button
           className="bg-sky-700 p-2 rounded hover:bg-sky-900"
           onClick={() => {
-            cb.deletePeer(peer.id);
+            cb.deletePeer(peer.deviceId);
           }}
         >
           delete
@@ -76,7 +76,7 @@ function IncomingPeer({ peer }: { peer: Peer }) {
         <button
           className="bg-sky-700 p-2 rounded hover:bg-sky-900"
           onClick={async () => {
-            const rpcResult = DebugRpc.call(peer.id, "hello world!");
+            const rpcResult = DebugRpc.call(peer.deviceId, "hello world!");
             for await (const result of rpcResult) {
               toast(result);
             }
@@ -95,11 +95,11 @@ function IncomingPeer({ peer }: { peer: Peer }) {
   );
 }
 
-export function IncomingPeers({ peers }: { peers: { id: string }[] }) {
+export function IncomingPeers({ peers }: { peers: { deviceId: string }[] }) {
   return (
     <div className="flex flex-col gap-2">
       {peers.map((peer) => (
-        <IncomingPeer key={peer.id} peer={peer} />
+        <IncomingPeer key={peer.deviceId} peer={peer} />
       ))}
     </div>
   );

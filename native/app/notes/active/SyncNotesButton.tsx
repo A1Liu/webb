@@ -277,7 +277,7 @@ async function syncNotes() {
 
   let totalCount = 0;
   for (const peer of peers.values()) {
-    const stream = NoteListMetadata.call(peer.id, {});
+    const stream = NoteListMetadata.call(peer.deviceId, {});
 
     // TODO: Check that permissions are properly sent over
 
@@ -285,7 +285,7 @@ async function syncNotes() {
       const verified = await permsCb.verifyPermissions(
         permission,
         {
-          deviceId: peer.id,
+          deviceId: peer.deviceId,
           userId: userProfile.id,
           actionId: ["updateNote"],
           resourceId: [...note.folder, note.id],
@@ -300,7 +300,7 @@ async function syncNotes() {
         versions: [],
       }));
 
-      versions.push({ peerId: peer.id, note });
+      versions.push({ peerId: peer.deviceId, note });
 
       toast.loading(`Syncing ... fetching notes (${++totalCount})`, {
         id: ACTIVE_SYNC_STATUS_TOAST_ID,
@@ -337,7 +337,7 @@ async function syncNotes() {
     let doc = localDoc?.state.doc;
 
     for (const peer of peers.values()) {
-      const result = NoteDataFetch.call(peer.id, {
+      const result = NoteDataFetch.call(peer.deviceId, {
         noteId: note.id,
         permission,
       });
