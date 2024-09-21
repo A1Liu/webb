@@ -172,7 +172,11 @@ export function ScanAndConnectButton() {
             justify-center bg-opacity-30 bg-slate-500 z-50 p-4"
           >
             <div className="p-4 flex flex-col gap-2 bg-black border border-white rounded-md text-white">
-              <h3 className="font-bold text-lg">Connect</h3>
+              <div className="flex justify-between">
+                <h3 className="font-bold text-lg">Connect</h3>
+
+                <button onClick={() => setIsOpen(false)}>X</button>
+              </div>
 
               <input
                 type="text"
