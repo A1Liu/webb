@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { v4 as uuid } from "uuid";
+import { Channel } from "./channel";
+import { getOrCompute } from "../util";
 
 export interface NetworkContext {
   readonly abortSignal?: AbortSignal;
@@ -68,6 +70,8 @@ export interface DeviceInformation {
 
 export class NetworkLayer {
   readonly connectionDrivers = new Map<string, ConnectionDriver>();
+  private readonly channels = new Map<string, Channel<RawDatagram>>();
+
   constructor(
     readonly device: Readonly<DeviceInformation>,
     readonly peerKVStore: DriverPeerKVStore,
@@ -86,8 +90,15 @@ export class NetworkLayer {
         },
       },
 
-      receiveDatagram: (_datagram) => {
+      receiveDatagram: (datagram) => {
         // TODO: receive datagram logic goes here
+
+        const channel = getOrCompute(
+          this.channels,
+          datagram.port,
+          () => new Channel<RawDatagram>(Infinity),
+        );
+        channel.send(datagram);
       },
     });
     this.connectionDrivers.set(createDriver.id, driver);
@@ -107,9 +118,14 @@ export class NetworkLayer {
     return { success: false };
   }
 
-  async receive(port: string, ctx?: NetworkContext): Promise<RawDatagram> {
-    console.log(port, ctx);
-    throw new Error();
+  async receive(port: string, _ctx?: NetworkContext): Promise<RawDatagram> {
+    const channel = getOrCompute(
+      this.channels,
+      port,
+      () => new Channel<RawDatagram>(Infinity),
+    );
+
+    return channel.pop();
   }
 
   async *rpcCall(
