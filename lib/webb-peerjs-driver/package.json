@@ -21,6 +21,7 @@
   "dependencies": {
     "uuid": "^9.0.1",
     "zod": "^3.22.4",
+    "peerjs": "^1.5.2",
     "@a1liu/webb-tools": "workspace:*"
   },
   "devDependencies": {

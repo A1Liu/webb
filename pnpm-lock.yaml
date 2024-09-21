@@ -52,6 +52,9 @@ importers:
       '@a1liu/webb-tools':
         specifier: workspace:*
         version: link:../webb-tools
+      peerjs:
+        specifier: ^1.5.2
+        version: 1.5.2
       uuid:
         specifier: ^9.0.1
         version: 9.0.1
