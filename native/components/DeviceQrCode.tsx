@@ -1,5 +1,6 @@
 import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
 import { toCanvas } from "qrcode";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { z } from "zod";
@@ -113,6 +114,8 @@ export function ScanAndConnectButton() {
   const { userProfile } = useUserProfile();
   const { loading, runAsync: connectToDevice } = useRequest(
     async (text: string) => {
+      const toastId = toast.loading("Connecting...");
+
       const myProfile = useUserProfile.getState().userProfile;
       const device = parseDeviceQrCode(text);
 
@@ -126,7 +129,10 @@ export function ScanAndConnectButton() {
 
           for await (const { success } of result) {
             if (!success) {
-              toast.error(`Error during JoinMe`);
+              toast.error(`Error during JoinMe`, {
+                id: toastId,
+              });
+              return;
             }
           }
         } else if (device.userId) {
@@ -140,7 +146,13 @@ export function ScanAndConnectButton() {
             data: "peer connect",
           });
         }
+
+        toast.success("Connected!", {
+          id: toastId,
+        });
       });
+
+      setIsOpen(false);
     },
     {
       debounceWait: 1000,
@@ -152,7 +164,29 @@ export function ScanAndConnectButton() {
 
   if (!isMobile) {
     if (userProfile) {
-      return null;
+      return (
+        <Button
+          onClick={async () => {
+            const { userProfile } = useUserProfile.getState();
+            const { deviceProfile } = useDeviceProfile.getState();
+            if (!deviceProfile) {
+              toast.error("ERROR: DON'T HAvE DEVICE PROFILE???");
+              return;
+            }
+
+            const qrData: DeviceQrData = {
+              deviceId: deviceProfile.id,
+              userId: userProfile?.id,
+            };
+
+            await writeText(JSON.stringify(qrData));
+
+            toast.success(`Wrote device info to clipboard`);
+          }}
+        >
+          Copy device info
+        </Button>
+      );
     }
 
     return (
@@ -175,7 +209,9 @@ export function ScanAndConnectButton() {
               <div className="flex justify-between">
                 <h3 className="font-bold text-lg">Connect</h3>
 
-                <button className="self-start" onClick={() => setIsOpen(false)}>X</button>
+                <button className="self-start" onClick={() => setIsOpen(false)}>
+                  X
+                </button>
               </div>
 
               <input
