@@ -248,6 +248,7 @@ export class PermissionCache {
 
   private _updateCouner = 0;
 
+  // TODO: save user ID and device ID here
   constructor(
     dbName: string = "webb-tools",
     storeName: string = "PermissionCache",

@@ -16,6 +16,9 @@ export const FileMetadataSchema = z.object({
   resolutionAlgorithm: z.nativeEnum(ResolutionAlgorithm),
 });
 
+// Maybe this should still be in zustand?
+// We can make zustand use a better persistence layer maybe
+
 export class FileMetadataStore {
   private readonly inMemoryCache: Map<string, FileMetadata> = new Map();
   private readonly persistentStore: IndexedDbStore<FileMetadata>;
@@ -36,5 +39,13 @@ export class FileMetadataStore {
     })();
 
     [this.pushUpdate, this.observable] = Observable.create();
+  }
+
+  getNote(id: string) {}
+
+  *[Symbol.iterator](): Iterator<FileMetadata> {
+    for (const file of this.inMemoryCache.values()) {
+      yield file;
+    }
   }
 }
