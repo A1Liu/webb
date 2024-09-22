@@ -102,3 +102,25 @@ export function getOrCompute<T>(
 
   return newValue;
 }
+
+// TODO: RxJS or similar thing
+export class Observable {
+  private subscribers: (() => void)[] = [];
+
+  private pushUpdate() {
+    this.subscribers.forEach((s) => s());
+  }
+
+  static create(): [() => void, Observable] {
+    const o = new Observable();
+    return [() => o.pushUpdate(), o];
+  }
+
+  subscribe(cb: () => void) {
+    this.subscribers.push(cb);
+  }
+
+  unsubscribe(cb: () => void) {
+    this.subscribers = this.subscribers.filter((sub) => sub !== cb);
+  }
+}
