@@ -3,6 +3,7 @@ import { Observable } from "./util";
 import { IndexedDbStore } from "./store";
 
 export enum ResolutionAlgorithm {
+  YataCrdt = "YATA_CRDT",
   ReadOnly = "READ_ONLY",
 }
 
