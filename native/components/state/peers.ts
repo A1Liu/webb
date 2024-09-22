@@ -1,12 +1,12 @@
 import { create } from "zustand";
-import { PeerData } from "@a1liu/webb-ui-shared/network";
 import { persist } from "zustand/middleware";
 import { ZustandIdbStorage } from "../util";
 import { InitGroup } from "../constants";
 import { toast } from "react-hot-toast";
 import { getNetworkLayerGlobal } from "../network";
 
-export interface Peer extends PeerData {
+export interface Peer {
+  deviceId: string;
   name?: string;
   connected?: boolean;
   lastConnected?: Date;
@@ -18,7 +18,7 @@ interface PeersState {
   connected: boolean;
   peers: Map<string, Peer>;
   cb: {
-    updatePeer: (peer: PeerData & Partial<Peer>) => void;
+    updatePeer: (peer: { deviceId: string } & Partial<Peer>) => void;
     deletePeer: (peerId: string) => void;
   };
 }
@@ -40,8 +40,8 @@ export const usePeers = create<PeersState>()(
           updatePeer: (peer) => {
             set((prev) => {
               const peers = new Map(prev.peers);
-              const prevPeer: Partial<Peer> = peers.get(peer.id) ?? {};
-              peers.set(peer.id, { ...prevPeer, ...peer });
+              const prevPeer: Partial<Peer> = peers.get(peer.deviceId) ?? {};
+              peers.set(peer.deviceId, { ...prevPeer, ...peer });
 
               return { peers };
             });
@@ -53,7 +53,7 @@ export const usePeers = create<PeersState>()(
       name: "peers-storage",
       storage: ZustandIdbStorage,
       skipHydration: true,
-      partialize: ({ cb, ...rest }) => ({
+      partialize: ({ connected, cb, ...rest }) => ({
         ...rest,
       }),
     },
@@ -75,7 +75,7 @@ PeerInitGroup.registerValue({
 PeerInitGroup.registerInit("networkLayer", async () => {
   const network = await getNetworkLayerGlobal();
   const { cb } = usePeers.getState();
-  network.ensureInit();
+
   async function initListener() {
     while (true) {
       const { connected } = usePeers.getState();
@@ -124,7 +124,7 @@ PeerInitGroup.registerInit("networkLayer", async () => {
 
         case "peerDisconnected":
           // TODO: Set this up with more info about peers
-          cb.updatePeer({ id: update.peerId, connected: false });
+          cb.updatePeer({ deviceId: update.peerId, connected: false });
           break;
 
         case "connInfo":

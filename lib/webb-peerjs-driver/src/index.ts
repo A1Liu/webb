@@ -33,13 +33,16 @@ export class PeerConnection {
 export class PeerjsDriver implements ConnectionDriver {
   static readonly id = "PeerjsDriver";
 
+  private readonly connections = new Map<string, PeerConnection>();
+
   private readonly deviceId: string;
   private readonly receiveDatagram: (datagram: RawDatagram) => void;
-  private readonly connections = new Map<string, PeerConnection>();
+  private readonly statusChannel: ConnectionDriverInit["statusChannel"];
 
   constructor(fields: ConnectionDriverInit) {
     this.deviceId = fields.deviceInfo.deviceId;
     this.receiveDatagram = fields.receiveDatagram;
+    this.statusChannel = fields.statusChannel;
 
     console.log("creating", fields);
   }
@@ -51,10 +54,20 @@ export class PeerjsDriver implements ConnectionDriver {
       const peer = new peerjs.Peer(network.deviceId, { debug: 2 });
 
       peer.on("open", () => {
+        network.statusChannel.send({
+          type: "networkStatus",
+          status: "connected",
+        });
+
         fut.resolve(peer);
 
         peer.on("connection", (conn) => {
           conn.on("open", () => {
+            network.statusChannel.send({
+              type: "peerConnected",
+              peer: { deviceId: conn.peer },
+            });
+
             network.addDataChannel(conn);
 
             // Ensure that the peer connection is added to the channel
@@ -62,11 +75,23 @@ export class PeerjsDriver implements ConnectionDriver {
           });
         });
       });
-      peer.on("error", (_e) => {});
+      peer.on("error", (e) => {
+        network.statusChannel.send({ type: "networkError", errorType: e.type });
+      });
+
       peer.on("disconnected", () => {
+        network.statusChannel.send({
+          type: "networkStatus",
+          status: "disconnected",
+        });
         network.reset();
       });
+
       peer.on("close", () => {
+        network.statusChannel.send({
+          type: "networkStatus",
+          status: "disconnected",
+        });
         network.reset();
       });
     });
@@ -87,14 +112,27 @@ export class PeerjsDriver implements ConnectionDriver {
 
       this.receiveDatagram({ ...chunk });
     });
-    conn.on("error", (_evt) => {
+    conn.on("error", (evt) => {
+      this.statusChannel.send({
+        type: "connInfo",
+        event: "error",
+        msg: evt.type,
+      });
       conn.close();
     });
     conn.on("close", () => {
+      this.statusChannel.send({ type: "peerDisconnected", peerId });
+
       this.getPeer(peerId).dataChannels.delete(conn);
       this.reset();
     });
     conn.on("iceStateChanged", (evt) => {
+      this.statusChannel.send({
+        type: "connInfo",
+        event: "iceStateChanged",
+        msg: evt,
+      });
+
       if (evt === "disconnected") {
         conn.close();
       }
@@ -120,6 +158,11 @@ export class PeerjsDriver implements ConnectionDriver {
     const peer = peerFut.value ?? (await peerFut.promise);
     const conn = peer.connect(peerId, { serialization: "binary" });
     conn.on("open", () => {
+      this.statusChannel.send({
+        type: "peerConnected",
+        peer: { deviceId: peerId },
+      });
+
       this.addDataChannel(conn);
       fut.resolve(conn);
     });
@@ -132,6 +175,7 @@ export class PeerjsDriver implements ConnectionDriver {
   });
 
   ensureInit() {
+    console.log("ensuring init");
     this._peerGetter();
   }
 
@@ -162,6 +206,7 @@ export class PeerjsDriver implements ConnectionDriver {
     console.log("registering ", peerDeviceId, additionalInfo);
     throw new Error("Method not implemented.");
   }
+
   async sendDatagram(
     datagram: RawDatagram,
     _ctx?: NetworkContext,

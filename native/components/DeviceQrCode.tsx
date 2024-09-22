@@ -1,9 +1,11 @@
 import { Format, scan } from "@tauri-apps/plugin-barcode-scanner";
 import { toCanvas } from "qrcode";
-import { useEffect, useRef } from "react";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { z } from "zod";
 import { GlobalInitGroup } from "./constants";
+import { v4 as uuid } from "uuid";
 import {
   exportUserPublickKey,
   importUserPublicKey,
@@ -19,6 +21,7 @@ import {
 import { useGlobals } from "./state/appGlobals";
 import { useDeviceProfile } from "./state/deviceProfile";
 import { useUserProfile } from "./state/userProfile";
+import { useRequest } from "ahooks";
 
 const JoinMe = registerRpc({
   name: "JoinMe",
@@ -105,14 +108,138 @@ export function DeviceQr() {
 
 export function ScanAndConnectButton() {
   const { isMobile } = usePlatform();
+  const [isOpen, setIsOpen] = useState(false);
+  const [text, setText] = useState("");
   const globals = useGlobals((s) => s.cb);
+  const { userProfile } = useUserProfile();
+  const { loading, runAsync: connectToDevice } = useRequest(
+    async (text: string) => {
+      const toastId = toast.loading("Connecting...");
+
+      const myProfile = useUserProfile.getState().userProfile;
+      const device = parseDeviceQrCode(text);
+
+      await Promise.resolve(null).then(async () => {
+        if (myProfile) {
+          const userPublicKey = await exportUserPublickKey(myProfile.publicKey);
+          const result = JoinMe.call(device.deviceId, {
+            userId: myProfile.id,
+            userPublicKey,
+          });
+
+          for await (const { success } of result) {
+            if (!success) {
+              toast.error(`Error during JoinMe`, {
+                id: toastId,
+              });
+              return;
+            }
+          }
+        } else if (device.userId) {
+          await MayIJoinListener.send(device.deviceId, {});
+        } else {
+          const network = await getNetworkLayerGlobal();
+          network.send({
+            receiver: text,
+            port: "debug",
+            requestId: uuid(),
+            data: "peer connect",
+          });
+        }
+
+        toast.success("Connected!", {
+          id: toastId,
+        });
+      });
+
+      setIsOpen(false);
+    },
+    {
+      debounceWait: 1000,
+      debounceLeading: true,
+      debounceTrailing: false,
+      manual: true,
+    },
+  );
 
   if (!isMobile) {
-    return null;
+    if (userProfile) {
+      return (
+        <Button
+          onClick={async () => {
+            const { userProfile } = useUserProfile.getState();
+            const { deviceProfile } = useDeviceProfile.getState();
+            if (!deviceProfile) {
+              toast.error("ERROR: DON'T HAvE DEVICE PROFILE???");
+              return;
+            }
+
+            const qrData: DeviceQrData = {
+              deviceId: deviceProfile.id,
+              userId: userProfile?.id,
+            };
+
+            await writeText(JSON.stringify(qrData));
+
+            toast.success(`Wrote device info to clipboard`);
+          }}
+        >
+          Copy device info
+        </Button>
+      );
+    }
+
+    return (
+      <>
+        <Button
+          disabled={loading}
+          onClick={() => {
+            setIsOpen(true);
+          }}
+        >
+          Connect
+        </Button>
+
+        {isOpen ? (
+          <div
+            className="fixed top-0 bottom-0 left-0 right-0 flex items-center
+            justify-center bg-opacity-30 bg-slate-500 z-50 p-4"
+          >
+            <div className="p-4 flex flex-col gap-2 bg-black border border-white rounded-md text-white">
+              <div className="flex justify-between">
+                <h3 className="font-bold text-lg">Connect</h3>
+
+                <button className="self-start" onClick={() => setIsOpen(false)}>
+                  X
+                </button>
+              </div>
+
+              <input
+                type="text"
+                className="bg-black border border-slate-200 p-2"
+                value={text}
+                onChange={(evt) => setText(evt.target.value)}
+              />
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={async () => {
+                    await connectToDevice(text);
+                  }}
+                >
+                  Submit
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </>
+    );
   }
 
   return (
     <Button
+      disabled={loading}
       onTouchStart={async () => {
         await globals.runBackgroundFlow(async () => {
           // `windowed: true` actually sets the webview to transparent
@@ -124,35 +251,7 @@ export function ScanAndConnectButton() {
             formats: [Format.QRCode],
           });
 
-          const myProfile = useUserProfile.getState().userProfile;
-          const device = parseDeviceQrCode(result.content);
-
-          Promise.resolve(null).then(async () => {
-            if (myProfile) {
-              const userPublicKey = await exportUserPublickKey(
-                myProfile.publicKey,
-              );
-              const result = JoinMe.call(device.deviceId, {
-                userId: myProfile.id,
-                userPublicKey,
-              });
-
-              for await (const { success } of result) {
-                if (!success) {
-                  toast.error(`Error during JoinMe`);
-                }
-              }
-            } else if (device.userId) {
-              await MayIJoinListener.send(device.deviceId, {});
-            } else {
-              const network = await getNetworkLayerGlobal();
-              network.sendData({
-                peerId: result.content,
-                channel: "debug",
-                data: "peer connect",
-              });
-            }
-          });
+          await connectToDevice(result.content);
         });
       }}
     >

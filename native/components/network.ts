@@ -1,13 +1,27 @@
 import toast from "react-hot-toast";
 import { z, ZodTypeDef } from "zod";
-import { NetworkLayer } from "@a1liu/webb-ui-shared/network";
+import { NetworkLayer } from "@a1liu/webb-tools/network";
+import { PeerjsDriver } from "@a1liu/webb-peerjs-driver";
 import { InitGroup } from "./constants";
+import { v4 as uuid } from "uuid";
 import {
   DeviceProfileHydration,
   useDeviceProfile,
 } from "./state/deviceProfile";
 
 export const NetworkInitGroup = new InitGroup("network");
+
+export const getPeerjsDriverGlobal = NetworkInitGroup.registerValue({
+  field: "peerjsDriver",
+  eagerInit: true,
+  create: async () => {
+    const networkLayer = await getNetworkLayerGlobal();
+    const driver = networkLayer.addConnectionDefinition(PeerjsDriver);
+    driver.ensureInit();
+
+    return driver;
+  },
+});
 
 export const getNetworkLayerGlobal = NetworkInitGroup.registerValue({
   field: "networkLayer",
@@ -20,8 +34,20 @@ export const getNetworkLayerGlobal = NetworkInitGroup.registerValue({
       // TODO: simplify this
       throw new Error("WTF Device Profile should be available at this point");
     }
-    const network = new NetworkLayer(id);
-    network.ensureInit();
+
+    const network = new NetworkLayer(
+      { deviceId: id },
+      {
+        async getValue(peerId) {
+          const strVal = localStorage.getItem(peerId);
+          if (strVal === null) return null;
+          return JSON.parse(strVal);
+        },
+        async setValue(peerId, value) {
+          localStorage.setItem(peerId, JSON.stringify(value));
+        },
+      },
+    );
 
     return network;
   },
@@ -63,7 +89,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
                 );
                 return;
               }
-              yield* rpc(chunk.peerId, result.data);
+              yield* rpc(chunk.sender, result.data);
             });
           } catch (error) {
             console.error(`Failed running RPC: ${field}`, error);
@@ -81,9 +107,9 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
           const network = await getNetworkLayerGlobal();
 
           const dataFetchResult = network.rpcCall({
-            peerId,
-            channel: field,
-            data: data,
+            receiver: peerId,
+            port: field,
+            data,
           });
 
           for await (const chunk of dataFetchResult) {
@@ -133,7 +159,7 @@ function createListener<T>({
 
     while (true) {
       try {
-        const chunk = await network.recv({ channel });
+        const chunk = await network.receive(channel);
 
         // TODO remove throw
         const result = schema.safeParse(chunk.data);
@@ -150,7 +176,7 @@ function createListener<T>({
           );
         }
 
-        await listener(chunk.peerId, result.data);
+        await listener(chunk.sender, result.data);
       } catch (error) {
         console.error(`Failed in Listener: ${channel}`, error);
         toast.error(`Failed in Listener: ${channel}`);
@@ -163,10 +189,10 @@ function createListener<T>({
   return {
     send: async (peerId, data) => {
       const network = await getNetworkLayerGlobal();
-      await network.sendData({
-        peerId,
-        channel,
-        ignorePeerIdForChannel: true,
+      await network.send({
+        receiver: peerId,
+        port: channel,
+        requestId: uuid(),
         data,
       });
     },

@@ -3,6 +3,7 @@ import { GlobalInitGroup } from "../constants";
 
 enum Platform {
   MacOS = "MacOS",
+  Windows = "Windows",
   IPhone = "iPhone",
 }
 
@@ -20,6 +21,12 @@ export const usePlatform = create<PlatformInfo>(() => {
 
 function getPlatformInfo(): Omit<PlatformInfo, "cb"> {
   switch (navigator.platform.toLowerCase()) {
+    case "win32":
+      return {
+        platform: Platform.Windows,
+        isMobile: false,
+      };
+
     case "macintel":
       return {
         platform: Platform.MacOS,
