@@ -53,7 +53,7 @@ export const usePeers = create<PeersState>()(
       name: "peers-storage",
       storage: ZustandIdbStorage,
       skipHydration: true,
-      partialize: ({ cb, ...rest }) => ({
+      partialize: ({ connected, cb, ...rest }) => ({
         ...rest,
       }),
     },

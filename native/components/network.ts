@@ -16,7 +16,10 @@ export const getPeerjsDriverGlobal = NetworkInitGroup.registerValue({
   eagerInit: true,
   create: async () => {
     const networkLayer = await getNetworkLayerGlobal();
-    return networkLayer.addConnectionDefinition(PeerjsDriver);
+    const driver = networkLayer.addConnectionDefinition(PeerjsDriver);
+    driver.ensureInit();
+
+    return driver;
   },
 });
 

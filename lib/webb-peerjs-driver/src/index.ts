@@ -68,7 +68,6 @@ export class PeerjsDriver implements ConnectionDriver {
               peer: { deviceId: conn.peer },
             });
 
-
             network.addDataChannel(conn);
 
             // Ensure that the peer connection is added to the channel
@@ -159,7 +158,10 @@ export class PeerjsDriver implements ConnectionDriver {
     const peer = peerFut.value ?? (await peerFut.promise);
     const conn = peer.connect(peerId, { serialization: "binary" });
     conn.on("open", () => {
-      this.statusChannel.send({ type: "peerConnected", peer: { deviceId: peerId } });
+      this.statusChannel.send({
+        type: "peerConnected",
+        peer: { deviceId: peerId },
+      });
 
       this.addDataChannel(conn);
       fut.resolve(conn);
