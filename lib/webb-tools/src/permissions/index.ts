@@ -4,6 +4,7 @@ import isEqual from "lodash/isEqual";
 import { z } from "zod";
 import { UserKeyAlgorithm, base64ToBytes, bytesToBase64 } from "./crypto";
 import { IndexedDbStore } from "../store";
+import { Observable } from "../util";
 
 export type PermissionMatcher = z.infer<typeof PermissionMatcherSchema>;
 const PermissionMatcherSchema = z
@@ -242,6 +243,9 @@ export class PermissionCache {
   private readonly persistentStore: IndexedDbStore<Permission>;
   private readonly cacheHydration: Promise<Map<string, Permission>>;
 
+  readonly observable: Observable;
+  private readonly pushUpdate: () => void;
+
   private _updateCouner = 0;
 
   constructor(
@@ -257,6 +261,8 @@ export class PermissionCache {
 
       return this.inMemoryCache;
     })();
+
+    [this.pushUpdate, this.observable] = Observable.create();
   }
 
   get updateCounter() {
@@ -266,6 +272,7 @@ export class PermissionCache {
   addPermission(permission: Permission) {
     this.inMemoryCache.set(permission.cert.signature, permission);
     this.persistentStore.setValue([permission.cert.signature], permission);
+    this.pushUpdate();
     this._updateCouner += 1;
   }
 
@@ -289,11 +296,7 @@ export class PermissionCache {
       identity,
     );
 
-    cache.set(finalPermission.cert.signature, finalPermission);
-    this.persistentStore.setValue(
-      [finalPermission.cert.signature],
-      finalPermission,
-    );
+    this.addPermission(finalPermission);
 
     return finalPermission;
   }

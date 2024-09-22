@@ -1,24 +1,10 @@
 import { IDBPDatabase, openDB } from "idb";
-import { z } from "zod";
 
 export interface KVStore<T> extends AsyncIterable<[string[], T]> {
   getValue(key: string[]): Promise<T>;
   setValue(key: string[], value: T): Promise<void>;
   setValues(pairs: [string[], T][]): Promise<void>;
 }
-
-export enum ResolutionAlgorithm {
-  ReadOnly = "READ_ONLY",
-}
-
-export type FileMetadata = z.infer<typeof FileMetadataSchema>;
-export const FileMetadataSchema = z.object({
-  id: z.string(),
-  folder: z.string().array().default([]),
-  lastUpdateDate: z.coerce.date(),
-  expiration: z.coerce.date().nullish(),
-  resolutionAlgorithm: z.nativeEnum(ResolutionAlgorithm),
-});
 
 export class IndexedDbStore<T> implements KVStore<T> {
   private readonly db: Promise<IDBPDatabase<unknown>>;
