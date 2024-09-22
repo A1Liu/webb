@@ -19,8 +19,8 @@
     "ts-check": "tsc"
   },
   "dependencies": {
-    "@a1liu/webb-tools": "workspace:*",
     "@a1liu/webb-peerjs-driver": "workspace:*",
+    "@a1liu/webb-tools": "workspace:*",
     "@automerge/automerge": "2.1.7",
     "@codemirror/lang-markdown": "^6.2.5",
     "@floating-ui/react": "^0.26.2",
@@ -45,6 +45,7 @@
     "ramda": "^0.29.1",
     "react": "^18",
     "react-dom": "^18.2.0",
+    "react-error-boundary": "^4.0.13",
     "react-hook-form": "^7.48.2",
     "react-hot-toast": "^2.4.1",
     "react-router-dom": "^6.23.0",

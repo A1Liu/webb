@@ -23,6 +23,7 @@ import { usePermissionCache } from "@/components/state/permissions";
 import { MatchPerms } from "@/components/permissions";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { Link, useNavigate } from "react-router-dom";
+import { ErrorBoundary } from "react-error-boundary";
 import { Button, TapCounterButton } from "@/components/design-system/Button";
 
 export const dynamic = "force-static";
@@ -273,7 +274,9 @@ export default function Settings() {
 
       <PreferencesBar />
 
-      <IncomingPeers peers={[...(peers ? peers?.values() : [])]} />
+      <ErrorBoundary fallback={<div>Something went wrong</div>}>
+        <IncomingPeers peers={[...(peers ? peers?.values() : [])]} />
+      </ErrorBoundary>
     </TopbarLayout>
   );
 }
