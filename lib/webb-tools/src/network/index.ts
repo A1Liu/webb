@@ -36,7 +36,6 @@ export const RawDatagramSchema = z
 
 export interface ConnectionDriverInit {
   readonly deviceInfo: Readonly<DeviceInformation>;
-  readonly peerKVStore: DriverPeerKVStore;
   readonly receiveDatagram: (datagram: RawDatagram) => void;
   readonly statusChannel: Channel<NetworkUpdate>;
 }
@@ -84,27 +83,14 @@ export class NetworkLayer {
   readonly connectionDrivers = new Map<string, ConnectionDriver>();
   private readonly channels = new Map<string, Channel<RawDatagram>>();
 
-  constructor(
-    readonly device: Readonly<DeviceInformation>,
-    readonly peerKVStore: DriverPeerKVStore,
-  ) {}
+  constructor(readonly device: Readonly<DeviceInformation>) {}
 
   addConnectionDefinition<T extends ConnectionDriver>(createDriver: {
     readonly id: string;
     new (dev: ConnectionDriverInit): T;
   }): T {
-    const peerKVStore = this.peerKVStore;
     const driver: T = new createDriver({
       deviceInfo: this.device,
-      peerKVStore: {
-        async getValue(peerId) {
-          return peerKVStore.getValue(createDriver.id + ":" + peerId);
-        },
-        async setValue(peerId, value) {
-          return peerKVStore.setValue(createDriver.id + ":" + peerId, value);
-        },
-      },
-
       statusChannel: this.statusChannel,
       receiveDatagram: (datagram) => {
         // TODO: receive datagram logic goes here

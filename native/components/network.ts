@@ -35,19 +35,7 @@ export const getNetworkLayerGlobal = NetworkInitGroup.registerValue({
       throw new Error("WTF Device Profile should be available at this point");
     }
 
-    const network = new NetworkLayer(
-      { deviceId: id },
-      {
-        async getValue(peerId) {
-          const strVal = localStorage.getItem(peerId);
-          if (strVal === null) return null;
-          return JSON.parse(strVal);
-        },
-        async setValue(peerId, value) {
-          localStorage.setItem(peerId, JSON.stringify(value));
-        },
-      },
-    );
+    const network = new NetworkLayer({ deviceId: id });
 
     return network;
   },
