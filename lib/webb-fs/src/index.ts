@@ -50,7 +50,7 @@ export class FileMetadataStore {
     this.persistentStore = persistentStore;
     this.cacheHydration = (async () => {
       for await (const [, file] of persistentStore) {
-        this.inMemoryCache.set(file.id, file);
+        this.inMemoryCache.set(file.uuid, file);
       }
     })();
 
