@@ -1,6 +1,4 @@
 import { z } from "zod";
-import { Observable } from "./util";
-import { IndexedDbStore } from "./store";
 
 /*
  * FileMetadata
