@@ -56,3 +56,5 @@ export const FileMetadataSchema = z.object({
   contentHash: z.string(),
 });
 
+
+// Add simpler functions first, before working on storage/etc
