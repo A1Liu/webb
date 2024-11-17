@@ -12,9 +12,9 @@
     ".": "./dist/index.js"
   },
   "dependencies": {
+    "@a1liu/webb-tools": "workspace:*",
     "uuid": "^9.0.1",
-    "zod": "^3.22.4",
-    "@a1liu/webb-tools": "workspace:*"
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/uuid": "^9.0.2"
