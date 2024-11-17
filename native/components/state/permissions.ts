@@ -2,12 +2,18 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { ZustandIdbStorage } from "../util";
 import { GlobalInitGroup } from "../constants";
+import { z } from "zod";
+import { registerRpc } from "../network";
+import { useGlobals } from "./appGlobals";
+import { useUserProfile } from "./userProfile";
+import { useDeviceProfile } from "./deviceProfile";
+import { isEqual } from "lodash";
 import {
+  createPermission,
   Action,
   Identity,
   Permission,
   PermissionResult,
-  createPermission,
   PermissionSchema,
   matchPermission,
   verifyPermissionSignature,
@@ -15,13 +21,7 @@ import {
   RootIdentity,
   permissionEqual,
   MatchPerms,
-} from "../permissions";
-import { z } from "zod";
-import { registerRpc } from "../network";
-import { useGlobals } from "./appGlobals";
-import { useUserProfile } from "./userProfile";
-import { useDeviceProfile } from "./deviceProfile";
-import { isEqual } from "lodash";
+} from "@a1liu/webb-tools/permissions";
 
 // Only 1 lock ID for now
 
