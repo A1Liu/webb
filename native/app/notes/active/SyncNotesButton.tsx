@@ -24,7 +24,7 @@ import {
   MatchPerms,
   PermissionResult,
   PermissionSchema,
-} from "@/components/permissions";
+} from "@a1liu/webb-tools/permissions";
 import { usePermissionCache } from "@/components/state/permissions";
 import { base64ToBytes, bytesToBase64 } from "@/components/util";
 import { isEqual, maxBy } from "lodash";

@@ -20,7 +20,7 @@ import {
 import { z, ZodTypeDef } from "zod";
 import { clear } from "idb-keyval";
 import { usePermissionCache } from "@/components/state/permissions";
-import { MatchPerms } from "@/components/permissions";
+import { MatchPerms } from "@a1liu/webb-tools/permissions";
 import { useDeviceProfile } from "@/components/state/deviceProfile";
 import { Link, useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
