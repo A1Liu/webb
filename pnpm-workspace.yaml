@@ -5,3 +5,4 @@ packages:
   - "./lib/webb-http-driver"
   - "./lib/webb-peerjs-driver"
   - "./lib/ui-shared"
+  - "./lib/webb-fs"

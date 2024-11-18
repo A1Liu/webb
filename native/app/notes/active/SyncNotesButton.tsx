@@ -282,7 +282,7 @@ async function syncNotes() {
     // TODO: Check that permissions are properly sent over
 
     for await (const { note, permission } of stream) {
-      const verified = await permsCb.verifyPermissions(
+      const permissionResult = await permsCb.verifyPermissions(
         permission,
         {
           deviceId: peer.deviceId,
@@ -292,7 +292,7 @@ async function syncNotes() {
         },
         userProfile,
       );
-      if (!verified) {
+      if (permissionResult !== PermissionResult.Allow) {
         continue;
       }
 
