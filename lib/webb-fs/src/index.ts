@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  Action,
+  Permission,
+  PermissionResult,
+} from "@a1liu/webb-tools/permissions";
 
 /*
  * FileMetadata
@@ -54,5 +59,30 @@ export const FileMetadataSchema = z.object({
   contentHash: z.string(),
 });
 
-
 // Add simpler functions first, before working on storage/etc
+
+async function synchronousFileUpdate({}: {
+  myDeviceId: string;
+  deviceIds: string[];
+  permission: Permission;
+  privateKey: CryptoKey;
+  verifyPermissions: (
+    permission: Permission,
+    action: Action,
+  ) => Promise<PermissionResult>;
+}) {
+}
+
+/* Synchronous version of file update protocol, slow:
+ *
+ * - User-triggered
+ * - Single peer does synchronizing
+ * - Exchange all metadata
+ * - Check permissions of all peers for all files
+ * - Merge metadata of files with valid permissions
+ *   - exchange metadata of files which do not need a content hash update
+ * - Exchange contents for files which need content merging
+ * - Perform content merging
+ * - Compute hash
+ * - Send updated contents & hash to peers
+ */
