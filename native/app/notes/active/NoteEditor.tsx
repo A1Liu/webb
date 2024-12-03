@@ -34,7 +34,7 @@ import CodeMirror, {
 } from "@uiw/react-codemirror";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import clsx from "clsx";
-import { MatchPerms, PermissionResult } from "@/components/permissions";
+import { MatchPerms, PermissionResult } from "@a1liu/webb-tools/permissions";
 import { Button } from "@/components/design-system/Button";
 import { hyperLink } from "@uiw/codemirror-extensions-hyper-link";
 import { Floating } from "@/components/design-system/Hover";
