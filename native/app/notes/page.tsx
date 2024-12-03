@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/design-system/Button";
 import { Floating } from "@/components/design-system/Hover";
 import { isEqual } from "lodash";
+import { FileActions } from "@a1liu/webb-fs";
 
 export const dynamic = "force-static";
 
@@ -35,7 +36,7 @@ function ActiveNoteButton({ note }: { note: NoteData }) {
       const perm = permsCb.findPermission({
         deviceId: deviceProfile.id,
         userId: userProfile.id,
-        actionId: ["updateNote"],
+        actionId: FileActions.update,
         resourceId: [...note.folder, noteId],
       });
 

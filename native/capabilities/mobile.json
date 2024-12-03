@@ -6,6 +6,7 @@
   "permissions": [
     "barcode-scanner:allow-scan",
     "barcode-scanner:allow-cancel",
-    "clipboard-manager:default"
+    "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-text"
   ]
 }
