@@ -31,7 +31,7 @@ import { isEqual, maxBy } from "lodash";
 import * as automerge from "@automerge/automerge";
 import _ from "lodash";
 import { Button } from "@/components/design-system/Button";
-import {FileActions} from "@a1liu/webb-fs"
+import { FileActions } from "@a1liu/webb-fs";
 
 const NoteMetadataWithHashSchema = z.object({
   note: NoteDataSchema,
