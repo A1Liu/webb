@@ -39,6 +39,7 @@ import { Button } from "@/components/design-system/Button";
 import { hyperLink } from "@uiw/codemirror-extensions-hyper-link";
 import { Floating } from "@/components/design-system/Hover";
 import { isEqual } from "lodash";
+import { FileActions } from "@a1liu/webb-fs";
 
 export const dynamic = "force-static";
 
@@ -324,7 +325,7 @@ async function requestKeyForNote(note: NoteData) {
     [...peers.values()].map(async (peer) => {
       const result = AskPermission.call(peer.deviceId, {
         action: {
-          actionId: [MatchPerms.exact("updateNote")],
+          actionId: FileActions.update.map(MatchPerms.exact),
           resourceId: [
             ...note.folder.map((folder) => MatchPerms.exact(folder)),
             MatchPerms.exact(note.id),
@@ -358,7 +359,7 @@ async function requestKeyForNote(note: NoteData) {
     {
       userId: userProfile?.id ?? "",
       deviceId: deviceProfile?.id ?? "",
-      actionId: ["updateNote"],
+      actionId: FileActions.update,
       resourceId: [...note.folder, note.id],
     },
     userProfile,
@@ -416,7 +417,7 @@ function useNoteKeyRequest(note: NoteData): {
       const perm = permsCb.findPermission({
         deviceId: deviceProfile.id,
         userId: userProfile.id,
-        actionId: ["updateNote"],
+        actionId: FileActions.update,
         resourceId: [...note.folder, note.id],
       });
       if (perm) return true;
@@ -452,7 +453,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       const perm = permsCb.findPermission({
         deviceId: deviceProfile.id,
         userId: userProfile.id,
-        actionId: ["updateNote"],
+        actionId: FileActions.update,
         resourceId: [...note.folder, noteId],
       });
       if (perm) return true;

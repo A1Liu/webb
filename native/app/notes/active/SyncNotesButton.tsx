@@ -151,7 +151,7 @@ const NotePushListener = registerListener({
       const permission = permCb.findPermission({
         deviceId: deviceProfile.id,
         userId: userProfile.id,
-        actionId: ["updateNote"],
+        actionId: FileActions.update,
         resourceId: [...note.folder, note.id],
       });
 
@@ -288,7 +288,7 @@ async function syncNotes() {
         {
           deviceId: peer.deviceId,
           userId: userProfile.id,
-          actionId: ["updateNote"],
+          actionId: FileActions.update,
           resourceId: [...note.folder, note.id],
         },
         userProfile,
