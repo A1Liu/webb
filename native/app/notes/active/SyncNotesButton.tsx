@@ -31,6 +31,7 @@ import { isEqual, maxBy } from "lodash";
 import * as automerge from "@automerge/automerge";
 import _ from "lodash";
 import { Button } from "@/components/design-system/Button";
+import {FileActions} from "@a1liu/webb-fs"
 
 const NoteMetadataWithHashSchema = z.object({
   note: NoteDataSchema,
@@ -64,7 +65,7 @@ export const NoteDataFetch = registerRpc({
       {
         deviceId: peerId,
         userId: userProfile.id,
-        actionId: ["updateNote"],
+        actionId: FileActions.update,
         resourceId: [...noteMetadata.folder, noteId],
       },
       userProfile,
@@ -113,7 +114,7 @@ const NotePushListener = registerListener({
       {
         deviceId: peerId,
         userId: userProfile.id,
-        actionId: ["updateNote"],
+        actionId: FileActions.update,
         resourceId: [],
       },
       userProfile,
@@ -206,7 +207,7 @@ const NoteListMetadata = registerRpc({
       const perm = cb.findPermission({
         deviceId: deviceProfile.id,
         userId: userProfile.id,
-        actionId: ["updateNote"],
+        actionId: FileActions.read,
         resourceId: [...note.folder, note.id],
       });
       if (!perm) {

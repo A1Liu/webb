@@ -46,6 +46,11 @@ export const FileMetadataSchema = z.object({
   // Always just use the latest date during merging.
   lastUpdateDate: z.coerce.date(),
 
+  // The last time this file's content was updated. Should be an ISO-formatted string.
+  //
+  // Always just use the latest date during merging.
+  lastContentUpdateDate: z.coerce.date(),
+
   // When this file will stop being valid. Not all files will have an expiration
   // date. When deleting files, we simply write an expiration date to the file,
   // and then once it actually expires we delete the file.
@@ -70,8 +75,7 @@ async function synchronousFileUpdate({}: {
     permission: Permission,
     action: Action,
   ) => Promise<PermissionResult>;
-}) {
-}
+}) {}
 
 /* Synchronous version of file update protocol, slow:
  *
@@ -86,3 +90,9 @@ async function synchronousFileUpdate({}: {
  * - Compute hash
  * - Send updated contents & hash to peers
  */
+
+export const FileActions = {
+  update: ["webb", "fs", "update"],
+  create: ["webb", "fs", "create"],
+  read: ["webb", "fs", "read"],
+} as const;

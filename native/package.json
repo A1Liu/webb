@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@a1liu/webb-peerjs-driver": "workspace:*",
+    "@a1liu/webb-fs": "workspace:*",
     "@a1liu/webb-tools": "workspace:*",
     "@automerge/automerge": "2.1.7",
     "@codemirror/lang-markdown": "^6.2.5",

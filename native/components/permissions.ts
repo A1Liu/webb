@@ -12,7 +12,8 @@ const PermissionMatcherSchema = z
     z.object({ __typename: z.literal("Any") }),
     z.object({ __typename: z.literal("AnyRemainingSlots") }),
   ])
-  .array();
+  .array()
+  .readonly();
 
 export class MatchPerms {
   static Any = { __typename: "Any" } as const;
@@ -43,8 +44,8 @@ const CertSchema = z.object({
 });
 
 export const ActionIdentifierSchema = z.object({
-  resourceId: z.string().array(),
-  actionId: z.string().array(),
+  resourceId: z.string().array().readonly(),
+  actionId: z.string().array().readonly(),
 });
 
 export type Action = z.infer<typeof ActionSchema>;
@@ -183,7 +184,7 @@ export function matchPermission(
 }
 
 export function matchPermKey(
-  key: string[],
+  key: readonly string[],
   permMatcher: PermissionMatcher,
 ): boolean {
   let matcherIndex = 0;
