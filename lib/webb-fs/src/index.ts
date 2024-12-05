@@ -4,6 +4,7 @@ import {
   Permission,
   PermissionResult,
 } from "@a1liu/webb-tools/permissions";
+import { NetworkLayer } from "@a1liu/webb-tools/network";
 
 /*
  * FileMetadata
@@ -71,6 +72,7 @@ async function synchronousFileUpdate({}: {
   deviceIds: string[];
   permission: Permission;
   privateKey: CryptoKey;
+  network: NetworkLayer;
   verifyPermissions: (
     permission: Permission,
     action: Action,
