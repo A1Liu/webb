@@ -4,6 +4,7 @@ import {
   Permission,
   PermissionResult,
 } from "@a1liu/webb-tools/permissions";
+import { NetworkLayer } from "@a1liu/webb-tools/network";
 
 /*
  * FileMetadata
@@ -65,17 +66,27 @@ export const FileMetadataSchema = z.object({
 });
 
 // Add simpler functions first, before working on storage/etc
-
-async function synchronousFileUpdate({}: {
+async function synchronousFileUpdate({
+  network,
+  deviceIds,
+}: {
   myDeviceId: string;
   deviceIds: string[];
   permission: Permission;
   privateKey: CryptoKey;
+  network: NetworkLayer;
   verifyPermissions: (
     permission: Permission,
     action: Action,
   ) => Promise<PermissionResult>;
-}) {}
+}) {
+  for (const deviceId of deviceIds) {
+    const metadata = network.rpcCall({
+      receiver: deviceId,
+      port: FileRpcActions.listMetadata,
+    });
+  }
+}
 
 /* Synchronous version of file update protocol, slow:
  *
@@ -90,6 +101,10 @@ async function synchronousFileUpdate({}: {
  * - Compute hash
  * - Send updated contents & hash to peers
  */
+
+export const FileRpcActions = {
+  listMetadata: "FileListMetadata",
+} as const;
 
 export const FileActions = {
   update: ["webb", "fs", "update"],
