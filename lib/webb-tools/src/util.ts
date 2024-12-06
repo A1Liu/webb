@@ -125,6 +125,26 @@ export class Observable {
   }
 }
 
+export const Struct = {
+  allNotNil: function structAllNotNil<T extends Record<string, unknown>>(
+    t: Required<T>,
+  ):
+    | { ok: true; data: { [K in keyof T]: NonNullable<T[K]> } }
+    | { ok: false; missing: (keyof T)[] } {
+    const nullishFields = Object.entries(t).filter(
+      ([_k, v]) => v === null || v === undefined,
+    );
+    if (nullishFields.length > 0) {
+      return { ok: false, missing: nullishFields.map(([k]) => k) };
+    }
+
+    return {
+      ok: true,
+      data: { ...t } as unknown as { [K in keyof T]: NonNullable<T[K]> },
+    };
+  },
+};
+
 export const PromStruct = {
   allSettled: async function promStructAllSettled<
     T extends Record<string, Promise<unknown>>,

@@ -3,7 +3,7 @@ import { useLockFn, useRequest } from "ahooks";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { z } from "zod";
 import toast from "react-hot-toast";
-import { getOrCompute } from "@a1liu/webb-tools/util";
+import { Struct, getOrCompute } from "@a1liu/webb-tools/util";
 import {
   NoteData,
   NoteDataSchema,
@@ -50,16 +50,16 @@ export const NoteDataFetch = registerRpc({
     console.debug(`received NoteDataFetch req`, peerId);
 
     const { notes } = useNotesState.getState();
-    const noteMetadata = notes.get(noteId);
-    if (!noteMetadata) return;
-
-    const { userProfile } = useUserProfile.getState();
-    if (!userProfile) return;
-
-    const { deviceProfile } = useDeviceProfile.getState();
-    if (!deviceProfile) return;
-
     const { cb: permCb } = usePermissionCache.getState();
+
+    const result = Struct.allNotNil({
+      noteMetadata: notes.get(noteId),
+      userProfile: useUserProfile.getState().userProfile,
+    });
+    if (!result.ok) return;
+
+    const { userProfile, noteMetadata } = result.data;
+
     const verifyResult = await permCb.verifyPermissions(
       permission,
       {
@@ -96,17 +96,15 @@ const NotePushListener = registerListener({
     permission: PermissionSchema,
   }),
   listener: async (peerId, { notes, permission }) => {
-    const { userProfile } = useUserProfile.getState();
-    if (!userProfile) {
-      console.debug(`Device has no user, refusing to sync`);
+    const nilCheck = Struct.allNotNil({
+      userProfile: useUserProfile.getState().userProfile,
+      deviceProfile: useDeviceProfile.getState().deviceProfile,
+    });
+    if (!nilCheck.ok) {
+      console.debug(`Sync missing config: ${nilCheck.missing.join(",")}`);
       return;
     }
-
-    const { deviceProfile } = useDeviceProfile.getState();
-    if (!deviceProfile) {
-      console.debug(`Device has no user, refusing to sync`);
-      return;
-    }
+    const { userProfile, deviceProfile } = nilCheck.data;
 
     const { cb: permCb } = usePermissionCache.getState();
     const verifyResult = await permCb.verifyPermissions(
@@ -196,12 +194,17 @@ const NoteListMetadata = registerRpc({
   input: z.object({}),
   output: NoteMetadataWithHashSchema,
   rpc: async function* (peerId, {}) {
-    const { deviceProfile } = useDeviceProfile.getState();
-    const { userProfile } = useUserProfile.getState();
+    const nilCheck = Struct.allNotNil({
+      userProfile: useUserProfile.getState().userProfile,
+      deviceProfile: useDeviceProfile.getState().deviceProfile,
+    });
+    if (!nilCheck.ok) {
+      console.debug(`Sync missing config: ${nilCheck.missing.join(",")}`);
+      return;
+    }
+    const { userProfile, deviceProfile } = nilCheck.data;
     const { cb } = usePermissionCache.getState();
     console.debug(`received NoteListMetadata req`, peerId);
-
-    if (!deviceProfile || !userProfile) return;
 
     for await (const note of listNoteMetadataUpdateHashes()) {
       const perm = cb.findPermission({
@@ -220,25 +223,19 @@ const NoteListMetadata = registerRpc({
 });
 
 async function syncNotes() {
-  const { peers } = usePeers.getState();
-  if (!peers) {
-    toast.error(`No peers to synchronize with!`);
+  const userProfileNullable = useUserProfile.getState().userProfile;
+  const nilCheck = Struct.allNotNil({
+    userProfile: userProfileNullable,
+    userSecret: userProfileNullable?.secret,
+    deviceProfile: useDeviceProfile.getState().deviceProfile,
+    peers: usePeers.getState().peers,
+  });
+  if (!nilCheck.ok) {
+    console.debug(`SYNC_NOTES missing config: ${nilCheck.missing.join(",")}`);
     return;
   }
 
-  const { userProfile } = useUserProfile.getState();
-  const userSecret = userProfile?.secret;
-  if (!userSecret) {
-    toast.error(`No UserProfile to synchronize with!`);
-    return;
-  }
-
-  const { deviceProfile } = useDeviceProfile.getState();
-  if (!deviceProfile) {
-    toast.error(`No Device ID to synchronize with!`);
-    return;
-  }
-
+  const { userProfile, userSecret, deviceProfile, peers } = nilCheck.data;
   const { cb: permsCb } = usePermissionCache.getState();
 
   const permission = await permsCb.createPermission(
