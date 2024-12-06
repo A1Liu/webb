@@ -6,3 +6,4 @@
 *.jar filter=lfs diff=lfs merge=lfs -text
 *.md text eol=lf
 .gitignore text eol=lf
+**/.gitignore text eol=lf
