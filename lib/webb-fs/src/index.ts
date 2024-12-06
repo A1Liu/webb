@@ -67,7 +67,7 @@ export const FileMetadataSchema = z.object({
 
 // Add simpler functions first, before working on storage/etc
 
-async function synchronousFileUpdate({}: {
+async function synchronousFileUpdate({ network, deviceIds }: {
   myDeviceId: string;
   deviceIds: string[];
   permission: Permission;
@@ -77,7 +77,13 @@ async function synchronousFileUpdate({}: {
     permission: Permission,
     action: Action,
   ) => Promise<PermissionResult>;
-}) {}
+}) {
+  deviceIds
+  network.rpcCall({
+    receiver: 
+  });
+
+}
 
 /* Synchronous version of file update protocol, slow:
  *

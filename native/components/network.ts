@@ -59,29 +59,27 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
   output: Out;
   rpc: (peerId: string, i: z.infer<In>) => AsyncGenerator<z.infer<Out>>;
 }): RpcHandler<z.infer<In>, z.infer<Out>> {
-  const field = `rpc-${name}`;
-
   const getValue = group.registerValue({
-    field,
+    field: name,
     eagerInit: true,
     create: () => {
       async function task() {
         const network = await getNetworkLayerGlobal();
         while (true) {
           try {
-            await network.rpcSingleExec(field, async function* (chunk) {
+            await network.rpcSingleExec(name, async function*(chunk) {
               const result = input.safeParse(chunk.data);
               if (!result.success) {
                 toast.error(
-                  `${field} had invalid input: ${JSON.stringify(chunk)}`,
+                  `${name} had invalid input: ${JSON.stringify(chunk)}`,
                 );
                 return;
               }
               yield* rpc(chunk.sender, result.data);
             });
           } catch (error) {
-            console.error(`Failed running RPC: ${field}`, error);
-            toast.error(`Failed running RPC: ${field} ${error}`);
+            console.error(`Failed running RPC: ${name}`, error);
+            toast.error(`Failed running RPC: ${name} ${error}`);
           }
         }
       }
@@ -90,13 +88,13 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
       task();
 
       // Call
-      return async function* (peerId: string, data: In): AsyncGenerator<Out> {
+      return async function*(peerId: string, data: In): AsyncGenerator<Out> {
         try {
           const network = await getNetworkLayerGlobal();
 
           const dataFetchResult = network.rpcCall({
             receiver: peerId,
-            port: field,
+            port: name,
             data,
           });
 
@@ -104,7 +102,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
             const result = output.safeParse(chunk.data);
             if (!result.success) {
               toast.error(
-                `${field} had invalid output: ${JSON.stringify(chunk)}`,
+                `${name} had invalid output: ${JSON.stringify(chunk)}`,
               );
               return;
             }
