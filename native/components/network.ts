@@ -67,7 +67,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
         const network = await getNetworkLayerGlobal();
         while (true) {
           try {
-            await network.rpcSingleExec(name, async function*(chunk) {
+            await network.rpcSingleExec(name, async function* (chunk) {
               const result = input.safeParse(chunk.data);
               if (!result.success) {
                 toast.error(
@@ -88,7 +88,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
       task();
 
       // Call
-      return async function*(peerId: string, data: In): AsyncGenerator<Out> {
+      return async function* (peerId: string, data: In): AsyncGenerator<Out> {
         try {
           const network = await getNetworkLayerGlobal();
 
