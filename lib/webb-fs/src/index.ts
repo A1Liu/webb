@@ -17,11 +17,6 @@ import { getOrCompute } from "@a1liu/webb-tools/util";
  * - Read - Read contents, metadata
  */
 
-export enum ResolutionAlgorithm {
-  YataCrdt = "YATA_CRDT",
-  ReadOnly = "READ_ONLY",
-}
-
 export type FileMetadata = z.infer<typeof FileMetadataSchema>;
 export const FileMetadataSchema = z.object({
   // UUID of the file.
@@ -36,7 +31,7 @@ export const FileMetadataSchema = z.object({
   // with different data. Eventually this should be a string, and resolution
   // algorithms should be plugin-based.
   // !! IMMUTABLE !!
-  resolutionAlgorithm: z.nativeEnum(ResolutionAlgorithm),
+  // resolutionAlgorithm: z.nativeEnum(ResolutionAlgorithm),
 
   // Path of the file. The easiest default is to simply use the uuid. This is
   // what the permissions will match against.
@@ -60,7 +55,7 @@ export const FileMetadataSchema = z.object({
   //
   // If the most recent update time has a null expiration, use null; otherwise,
   // use the latest expiration date.
-  expiration: z.coerce.date().nullish(),
+  expiration: z.coerce.date().nullish().default(null),
 
   // SHA-2 hash of the contents of the file. Used to short-circuit edits.
   // After resolution, this gets updated to be the sha-2 of the most recent contents.
@@ -102,11 +97,14 @@ export async function synchronousFileUpdate({
   ) => Promise<PermissionResult>;
   listNoteMetadataUpdateHashes: () => AsyncGenerator<FileMetadata>;
 }) {
+  // TODO: Perm init?
+
   const noteVersions = new Map<string, Map<string, FileMetadata>>();
   for await (const file of listNoteMetadataUpdateHashes()) {
     noteVersions.set(file.uuid, new Map([[myDeviceId, file]]));
   }
 
+  // Fetch all available metadata
   for (const deviceId of deviceIds) {
     const metadata = FileNetworkActions.listMetadata.call(
       network,
@@ -122,6 +120,31 @@ export async function synchronousFileUpdate({
       getOrCompute(noteVersions, file.uuid, () => new Map()).set(
         myDeviceId,
         file,
+      );
+    }
+  }
+
+  // Sync notes
+  for (const [noteId, notesByPeer] of noteVersions.entries()) {
+    const notes = [...notesByPeer.values()];
+    const { ...mostRecentNote } = notes.reduce(
+      (left: FileMetadata, right: FileMetadata): FileMetadata => {
+        if (!left) return right;
+        if (left.lastUpdateDate < right.lastUpdateDate) return right;
+
+        return left;
+      },
+    );
+    if (!mostRecentNote) continue;
+
+    if (mostRecentNote.expiration) {
+      mostRecentNote.expiration = notes.reduce(
+        (date: Date | null, file: FileMetadata): Date | null => {
+          if (!file.expiration || !date) return date ?? file.expiration;
+          if (date > file.expiration) return date;
+          return file.expiration;
+        },
+        null,
       );
     }
   }
