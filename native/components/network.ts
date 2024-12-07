@@ -114,32 +114,6 @@ export function registerRpcHandler<In, Out>({
   };
 }
 
-export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
-  name,
-  rpc,
-  group,
-  input,
-  output,
-}: {
-  name: string;
-  group: InitGroup;
-  input: In;
-  output: Out;
-  rpc: (peerId: string, i: z.infer<In>) => AsyncGenerator<z.infer<Out>>;
-}): RpcHandler<z.infer<In>, z.infer<Out>> {
-  const rpcDefinition = NetworkLayer.createRpc({
-    name,
-    input,
-    output,
-  });
-
-  return registerRpcHandler({
-    group,
-    rpc: rpcDefinition,
-    handler: rpc,
-  });
-}
-
 interface Listener<T> {
   send: (peerId: string, data: T) => Promise<void>;
 }
