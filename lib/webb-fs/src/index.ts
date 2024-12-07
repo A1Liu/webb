@@ -3,6 +3,7 @@ import {
   Action,
   Permission,
   PermissionResult,
+  PermissionSchema,
 } from "@a1liu/webb-tools/permissions";
 import { NetworkLayer } from "@a1liu/webb-tools/network";
 import { getOrCompute } from "@a1liu/webb-tools/util";
@@ -66,8 +67,25 @@ export const FileMetadataSchema = z.object({
   contentHash: z.string(),
 });
 
+export const FileNetworkActions = {
+  fetch: NetworkLayer.createRpc({
+    name: "FileFetch",
+    input: z.object({}),
+    output: z.object({}),
+  }),
+  pushMetadataUpdates: { name: "FilePushMetadataUpdates" },
+  listMetadata: NetworkLayer.createRpc({
+    name: "FileListMetadata",
+    input: z.object({}),
+    output: z.object({
+      file: FileMetadataSchema,
+      permission: PermissionSchema.optional(),
+    }),
+  }),
+} as const;
+
 // Add simpler functions first, before working on storage/etc
-async function synchronousFileUpdate({
+export async function synchronousFileUpdate({
   network,
   myDeviceId,
   deviceIds,
@@ -85,15 +103,27 @@ async function synchronousFileUpdate({
   listNoteMetadataUpdateHashes: () => AsyncGenerator<FileMetadata>;
 }) {
   const noteVersions = new Map<string, Map<string, FileMetadata>>();
-  for await (const note of listNoteMetadataUpdateHashes()) {
-    noteVersions.set(note.uuid, new Map([[myDeviceId, note]]));
+  for await (const file of listNoteMetadataUpdateHashes()) {
+    noteVersions.set(file.uuid, new Map([[myDeviceId, file]]));
   }
 
   for (const deviceId of deviceIds) {
-    const metadata = network.rpcCall({
-      receiver: deviceId,
-      port: FileRpcActions.listMetadata,
-    });
+    const metadata = FileNetworkActions.listMetadata.call(
+      network,
+      deviceId,
+      {},
+    );
+    for await (const result of metadata) {
+      if (!result.success) continue;
+      const { file, permission: _perm } = result.data;
+
+      // TODO: test permission
+
+      getOrCompute(noteVersions, file.uuid, () => new Map()).set(
+        myDeviceId,
+        file,
+      );
+    }
   }
 }
 
@@ -110,10 +140,6 @@ async function synchronousFileUpdate({
  * - Compute hash
  * - Send updated contents & hash to peers
  */
-
-export const FileRpcActions = {
-  listMetadata: "FileListMetadata",
-} as const;
 
 export const FileActions = {
   update: ["webb", "fs", "update"],
