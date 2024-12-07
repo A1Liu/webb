@@ -58,7 +58,7 @@ export interface ConnectionDriver {
 
 export interface ConnectionDriverDefinition {
   readonly id: string;
-  new(dev: ConnectionDriverInit): ConnectionDriver;
+  new (dev: ConnectionDriverInit): ConnectionDriver;
 }
 
 export interface DeviceInformation {
@@ -67,13 +67,13 @@ export interface DeviceInformation {
 
 export type NetworkUpdate =
   | {
-    type: "networkStatus";
-    status: "disconnected" | "connecting" | "connected";
-  }
+      type: "networkStatus";
+      status: "disconnected" | "connecting" | "connected";
+    }
   | {
-    type: "networkError";
-    errorType: string;
-  }
+      type: "networkError";
+      errorType: string;
+    }
   | { type: "peerConnected"; peer: { deviceId: string } }
   | { type: "connInfo"; event: string; msg: string }
   | { type: "peerDisconnected"; peerId: string };
@@ -99,11 +99,11 @@ export class NetworkLayer {
   readonly connectionDrivers = new Map<string, ConnectionDriver>();
   private readonly channels = new Map<string, Channel<RawDatagram>>();
 
-  constructor(readonly device: Readonly<DeviceInformation>) { }
+  constructor(readonly device: Readonly<DeviceInformation>) {}
 
   addConnectionDefinition<T extends ConnectionDriver>(createDriver: {
     readonly id: string;
-    new(dev: ConnectionDriverInit): T;
+    new (dev: ConnectionDriverInit): T;
   }): T {
     const driver: T = new createDriver({
       deviceInfo: this.device,
@@ -135,7 +135,7 @@ export class NetworkLayer {
           ctx,
         );
         return { success: true };
-      } catch (e) { }
+      } catch (e) {}
     }
 
     return { success: false };
@@ -204,7 +204,7 @@ export class NetworkLayer {
     const { name, input, output } = args;
     return {
       name,
-      call: async function*(network, peerId, input) {
+      call: async function* (network, peerId, input) {
         const dataFetchResult = network.rpcCall({
           receiver: peerId,
           port: name,
@@ -215,8 +215,8 @@ export class NetworkLayer {
           yield output.safeParse(chunk.data);
         }
       },
-      singleExec: async function(network, run) {
-        await network.rpcSingleExec(name, async function*(chunk) {
+      singleExec: async function (network, run) {
+        await network.rpcSingleExec(name, async function* (chunk) {
           const result = input.safeParse(chunk.data);
           yield* run(chunk.sender, result);
         });
@@ -260,4 +260,4 @@ export class NetworkLayer {
 //   basic device authentication
 // - Channels, which receive datagrams
 
-export function createRpcDefinition() { }
+export function createRpcDefinition() {}

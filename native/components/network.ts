@@ -47,7 +47,9 @@ interface RpcHandler<In, Out> {
 }
 
 export function registerRpcHandler<In, Out>({
-  group, rpc, handler
+  group,
+  rpc,
+  handler,
 }: {
   group: InitGroup;
   rpc: RpcDefinition<In, Out>;
@@ -62,7 +64,7 @@ export function registerRpcHandler<In, Out>({
         const network = await getNetworkLayerGlobal();
         while (true) {
           try {
-            await rpc.singleExec(network, async function*(peerId, result) {
+            await rpc.singleExec(network, async function* (peerId, result) {
               if (!result.success) {
                 toast.error(
                   `${name} had invalid input: ${JSON.stringify(result.error)}`,
@@ -82,7 +84,7 @@ export function registerRpcHandler<In, Out>({
       task();
 
       // Call
-      return async function*(peerId: string, data: In): AsyncGenerator<Out> {
+      return async function* (peerId: string, data: In): AsyncGenerator<Out> {
         try {
           const network = await getNetworkLayerGlobal();
 
@@ -110,7 +112,6 @@ export function registerRpcHandler<In, Out>({
       return rpcValue(peerId, i);
     },
   };
-
 }
 
 export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
@@ -129,7 +130,7 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
   const rpcDefinition = NetworkLayer.createRpc({
     name,
     input,
-    output
+    output,
   });
 
   return registerRpcHandler({
