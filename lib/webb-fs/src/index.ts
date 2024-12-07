@@ -5,6 +5,7 @@ import {
   PermissionResult,
 } from "@a1liu/webb-tools/permissions";
 import { NetworkLayer } from "@a1liu/webb-tools/network";
+import { getOrCompute } from "@a1liu/webb-tools/util";
 
 /*
  * FileMetadata
@@ -68,18 +69,26 @@ export const FileMetadataSchema = z.object({
 // Add simpler functions first, before working on storage/etc
 async function synchronousFileUpdate({
   network,
+  myDeviceId,
   deviceIds,
+  listNoteMetadataUpdateHashes,
 }: {
   myDeviceId: string;
   deviceIds: string[];
-  permission: Permission;
+  syncPermission: Permission;
   privateKey: CryptoKey;
   network: NetworkLayer;
   verifyPermissions: (
     permission: Permission,
     action: Action,
   ) => Promise<PermissionResult>;
+  listNoteMetadataUpdateHashes: () => AsyncGenerator<FileMetadata>;
 }) {
+  const noteVersions = new Map<string, Map<string, FileMetadata>>();
+  for await (const note of listNoteMetadataUpdateHashes()) {
+    noteVersions.set(note.uuid, new Map([[myDeviceId, note]]));
+  }
+
   for (const deviceId of deviceIds) {
     const metadata = network.rpcCall({
       receiver: deviceId,

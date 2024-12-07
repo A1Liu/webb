@@ -1,6 +1,6 @@
 import toast from "react-hot-toast";
 import { z, ZodTypeDef } from "zod";
-import { NetworkLayer } from "@a1liu/webb-tools/network";
+import { NetworkLayer, RpcDefinition } from "@a1liu/webb-tools/network";
 import { PeerjsDriver } from "@a1liu/webb-peerjs-driver";
 import { InitGroup } from "./constants";
 import { v4 as uuid } from "uuid";
@@ -46,19 +46,14 @@ interface RpcHandler<In, Out> {
   call: (peerId: string, i: In) => AsyncGenerator<Out>;
 }
 
-export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
-  name,
-  rpc,
-  group,
-  input,
-  output,
+export function registerRpcHandler<In, Out>({
+  group, rpc, handler
 }: {
-  name: string;
   group: InitGroup;
-  input: In;
-  output: Out;
-  rpc: (peerId: string, i: z.infer<In>) => AsyncGenerator<z.infer<Out>>;
-}): RpcHandler<z.infer<In>, z.infer<Out>> {
+  rpc: RpcDefinition<In, Out>;
+  handler: (peerId: string, i: In) => AsyncGenerator<Out>;
+}): RpcHandler<In, Out> {
+  const name = rpc.name;
   const getValue = group.registerValue({
     field: name,
     eagerInit: true,
@@ -67,15 +62,14 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
         const network = await getNetworkLayerGlobal();
         while (true) {
           try {
-            await network.rpcSingleExec(name, async function* (chunk) {
-              const result = input.safeParse(chunk.data);
+            await rpc.singleExec(network, async function*(peerId, result) {
               if (!result.success) {
                 toast.error(
-                  `${name} had invalid input: ${JSON.stringify(chunk)}`,
+                  `${name} had invalid input: ${JSON.stringify(result.error)}`,
                 );
                 return;
               }
-              yield* rpc(chunk.sender, result.data);
+              yield* handler(peerId, result.data);
             });
           } catch (error) {
             console.error(`Failed running RPC: ${name}`, error);
@@ -88,21 +82,14 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
       task();
 
       // Call
-      return async function* (peerId: string, data: In): AsyncGenerator<Out> {
+      return async function*(peerId: string, data: In): AsyncGenerator<Out> {
         try {
           const network = await getNetworkLayerGlobal();
 
-          const dataFetchResult = network.rpcCall({
-            receiver: peerId,
-            port: name,
-            data,
-          });
-
-          for await (const chunk of dataFetchResult) {
-            const result = output.safeParse(chunk.data);
+          for await (const result of rpc.call(network, peerId, data)) {
             if (!result.success) {
               toast.error(
-                `${name} had invalid output: ${JSON.stringify(chunk)}`,
+                `${name} had invalid output: ${JSON.stringify(result.error)}`,
               );
               return;
             }
@@ -123,6 +110,33 @@ export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
       return rpcValue(peerId, i);
     },
   };
+
+}
+
+export function registerRpc<In extends z.ZodSchema, Out extends z.ZodSchema>({
+  name,
+  rpc,
+  group,
+  input,
+  output,
+}: {
+  name: string;
+  group: InitGroup;
+  input: In;
+  output: Out;
+  rpc: (peerId: string, i: z.infer<In>) => AsyncGenerator<z.infer<Out>>;
+}): RpcHandler<z.infer<In>, z.infer<Out>> {
+  const rpcDefinition = NetworkLayer.createRpc({
+    name,
+    input,
+    output
+  });
+
+  return registerRpcHandler({
+    group,
+    rpc: rpcDefinition,
+    handler: rpc,
+  });
 }
 
 interface Listener<T> {
