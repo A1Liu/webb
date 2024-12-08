@@ -3,7 +3,6 @@ import { persist } from "zustand/middleware";
 import { ZustandIdbStorage } from "../util";
 import { GlobalInitGroup } from "../constants";
 import { z } from "zod";
-import { registerRpc } from "../network";
 import { useGlobals } from "./appGlobals";
 import { useUserProfile } from "./userProfile";
 import { useDeviceProfile } from "./deviceProfile";
@@ -22,12 +21,7 @@ import {
   permissionEqual,
   MatchPerms,
 } from "@a1liu/webb-tools/permissions";
-import { z } from "zod";
 import { registerRpcHandler } from "../network";
-import { useGlobals } from "./appGlobals";
-import { useUserProfile } from "./userProfile";
-import { useDeviceProfile } from "./deviceProfile";
-import { isEqual } from "lodash";
 import { NetworkLayer } from "@a1liu/webb-tools/network";
 
 // Only 1 lock ID for now
@@ -146,7 +140,7 @@ export const AskPermission = registerRpcHandler({
     }),
     output: z.object({ permission: PermissionSchema }),
   }),
-  handler: async function* (peerId, { action }) {
+  handler: async function*(peerId, { action }) {
     const { userProfile } = useUserProfile.getState();
     if (!userProfile?.secret) return;
 
