@@ -5,7 +5,6 @@ import { usePlatform } from "@/components/hooks/usePlatform";
 import { TopbarLayout } from "@/components/TopbarLayout";
 import { useLockFn, useMemoizedFn } from "ahooks";
 import { usePeers } from "@/components/state/peers";
-import { NoteDataSchema, useNotesState } from "@/components/state/notes";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { DeviceQr, ScanAndConnectButton } from "@/components/DeviceQrCode";
 import {
@@ -13,10 +12,6 @@ import {
   UserProfileSerializedSchema,
   useUserProfile,
 } from "@/components/state/userProfile";
-import {
-  updateNoteDocAsync,
-  ZustandIdbNotesStorage,
-} from "@/components/state/noteContents";
 import { z, ZodTypeDef } from "zod";
 import { clear } from "idb-keyval";
 import { usePermissionCache } from "@/components/state/permissions";
@@ -120,7 +115,6 @@ function PreferencesBar() {
     cb: { logout, createUserProfile },
   } = useUserProfile();
   const createUser = useLockFn(createUserProfile);
-  const { hideDisallowedFolders, cb: notesCb } = useNotesState();
 
   return (
     <div className="flex flex-col gap-2 px-2">
@@ -146,17 +140,6 @@ function PreferencesBar() {
         ) : (
           <Button onClick={createUser}>Create User</Button>
         )}
-
-        <div className="flex items-center gap-2 p-2 rounded-md border border-white">
-          <input
-            type="checkbox"
-            checked={!!hideDisallowedFolders}
-            onChange={(evt) => {
-              notesCb.setHidePreference(evt.target.checked);
-            }}
-          />
-          Hide unallowed
-        </div>
       </div>
     </div>
   );
@@ -165,7 +148,6 @@ function PreferencesBar() {
 export default function Settings() {
   const { platform } = usePlatform();
   const { peers } = usePeers();
-  const notesCb = useNotesState((s) => s.cb);
   const navigate = useNavigate();
   const hardReset = useMemoizedFn(async () => {
     await clear();
@@ -194,45 +176,6 @@ export default function Settings() {
 
         <div className="flex flex-col gap-2">
           <ScanAndConnectButton />
-
-          <BackupAndRestore
-            title={"notes"}
-            toastId={"write-note-data"}
-            schema={NoteDataSchema.extend({
-              text: z.string().nullish(),
-            }).array()}
-            fetchData={async () => {
-              return await Promise.all(
-                [...useNotesState.getState().notes.values()].map(
-                  async (note) => {
-                    const text =
-                      (
-                        await ZustandIdbNotesStorage.getItem(note.id)
-                      )?.state.doc.contents?.toString() ?? "";
-                    return {
-                      ...note,
-                      text,
-                    };
-                  },
-                ),
-              );
-            }}
-            writeData={async (notes) => {
-              notesCb.updateNotesFromSync(
-                notes.map(({ text, ...note }) => note),
-              );
-
-              let index = 0;
-              for (const note of notes) {
-                toast.loading(`Writing note data... ${++index}`, {
-                  id: "write-note-data",
-                });
-
-                if (!note.text) continue;
-                await updateNoteDocAsync(note.id, note.text);
-              }
-            }}
-          />
 
           <BackupUser />
 

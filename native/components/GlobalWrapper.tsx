@@ -3,7 +3,6 @@ import clsx from "clsx";
 import { useEffect } from "react";
 import { GlobalInitGroup } from "./constants";
 import { AppStateKind, useGlobals } from "./state/appGlobals";
-import { NotesSyncInitGroup } from "./state/notes";
 import { PeerInitGroup } from "./state/peers";
 import { NetworkInitGroup } from "./network";
 import { Button } from "./design-system/Button";
@@ -15,7 +14,6 @@ export function GlobalWrapper({ children }: { children: React.ReactNode }) {
     GlobalInitGroup.init();
     NetworkInitGroup.init();
     PeerInitGroup.init();
-    NotesSyncInitGroup.init();
   }, []);
 
   return (

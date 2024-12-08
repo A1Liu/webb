@@ -125,7 +125,7 @@ export async function synchronousFileUpdate({
   }
 
   // Sync notes
-  for (const [noteId, notesByPeer] of noteVersions.entries()) {
+  for (const [_noteId, notesByPeer] of noteVersions.entries()) {
     const notes = [...notesByPeer.values()];
     const { ...mostRecentNote } = notes.reduce(
       (left: FileMetadata, right: FileMetadata): FileMetadata => {
