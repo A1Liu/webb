@@ -1,6 +1,4 @@
 import { TopbarLayout } from "@/components/TopbarLayout";
-import { useNavigate } from "react-router-dom";
-import { useDeviceProfile } from "../components/state/deviceProfile";
 
 export const dynamic = "force-static";
 
