@@ -140,7 +140,7 @@ export const AskPermission = registerRpcHandler({
     }),
     output: z.object({ permission: PermissionSchema }),
   }),
-  handler: async function*(peerId, { action }) {
+  handler: async function* (peerId, { action }) {
     const { userProfile } = useUserProfile.getState();
     if (!userProfile?.secret) return;
 
