@@ -4,8 +4,9 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { z } from "zod";
 import { GlobalInitGroup } from "../../components/constants";
-import { registerListener, registerRpc } from "../../components/network";
+import { registerListener, registerRpcHandler } from "../../components/network";
 import { Peer, usePeers } from "../../components/state/peers";
+import { NetworkLayer } from "@a1liu/webb-tools/network";
 
 const DebugListener = registerListener({
   group: GlobalInitGroup,
@@ -16,12 +17,14 @@ const DebugListener = registerListener({
   },
 });
 
-const DebugRpc = registerRpc({
+const DebugRpc = registerRpcHandler({
   group: GlobalInitGroup,
-  name: "DebugRpc",
-  input: z.string(),
-  output: z.string(),
-  rpc: async function* (_peerId, input) {
+  rpc: NetworkLayer.createRpc({
+    name: "DebugRpc",
+    input: z.string(),
+    output: z.string(),
+  }),
+  handler: async function* (_peerId, input) {
     toast("rpc called");
     yield* input.split(" ");
   },

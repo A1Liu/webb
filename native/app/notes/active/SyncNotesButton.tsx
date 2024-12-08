@@ -11,7 +11,7 @@ import {
   useNotesState,
 } from "@/components/state/notes";
 import { usePeers } from "@/components/state/peers";
-import { registerRpc, registerListener } from "@/components/network";
+import { registerListener, registerRpcHandler } from "@/components/network";
 import {
   NoteDoc,
   NoteDocData,
@@ -32,6 +32,7 @@ import * as automerge from "@automerge/automerge";
 import _ from "lodash";
 import { Button } from "@/components/design-system/Button";
 import { FileActions } from "@a1liu/webb-fs";
+import { NetworkLayer } from "@a1liu/webb-tools/network";
 
 const NoteMetadataWithHashSchema = z.object({
   note: NoteDataSchema,
@@ -41,12 +42,14 @@ const NoteMetadataWithHashSchema = z.object({
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
 
-export const NoteDataFetch = registerRpc({
-  name: "NoteDataFetch",
+export const NoteDataFetch = registerRpcHandler({
   group: NotesSyncInitGroup,
-  input: z.object({ noteId: z.string(), permission: PermissionSchema }),
-  output: z.object({ noteId: z.string(), textData: z.string() }),
-  rpc: async function* (peerId, { noteId, permission }) {
+  rpc: NetworkLayer.createRpc({
+    name: "NoteDataFetch",
+    input: z.object({ noteId: z.string(), permission: PermissionSchema }),
+    output: z.object({ noteId: z.string(), textData: z.string() }),
+  }),
+  handler: async function* (peerId, { noteId, permission }) {
     console.debug(`received NoteDataFetch req`, peerId);
 
     const { notes } = useNotesState.getState();
@@ -188,12 +191,14 @@ async function* listNoteMetadataUpdateHashes() {
   }
 }
 
-const NoteListMetadata = registerRpc({
-  name: "NoteListMetadata",
+const NoteListMetadata = registerRpcHandler({
   group: NotesSyncInitGroup,
-  input: z.object({}),
-  output: NoteMetadataWithHashSchema,
-  rpc: async function* (peerId, {}) {
+  rpc: NetworkLayer.createRpc({
+    name: "NoteListMetadata",
+    input: z.object({}),
+    output: NoteMetadataWithHashSchema,
+  }),
+  handler: async function* (peerId, {}) {
     const nilCheck = Struct.allNotNil({
       userProfile: useUserProfile.getState().userProfile,
       deviceProfile: useDeviceProfile.getState().deviceProfile,
