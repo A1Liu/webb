@@ -21,11 +21,7 @@
     // Eventually going to use this: https://github.com/andrewbranch/example-subpath-exports-ts-compat
     // to figure out what to do about `moduleResolution`
 
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
+    "plugins": [],
     "types": ["vite/client"],
     "baseUrl": ".",
     "paths": {
