@@ -16,19 +16,22 @@ import { usePlatform } from "./hooks/usePlatform";
 import {
   getNetworkLayerGlobal,
   registerListener,
-  registerRpc,
+  registerRpcHandler,
 } from "./network";
 import { useGlobals } from "./state/appGlobals";
 import { useDeviceProfile } from "./state/deviceProfile";
 import { useUserProfile } from "./state/userProfile";
 import { useRequest } from "ahooks";
+import { NetworkLayer } from "@a1liu/webb-tools/network";
 
-const JoinMe = registerRpc({
-  name: "JoinMe",
+const JoinMe = registerRpcHandler({
   group: GlobalInitGroup,
-  input: z.object({ userId: z.string(), userPublicKey: z.string() }),
-  output: z.object({ success: z.boolean() }),
-  rpc: async function* (_peerId, { userId, userPublicKey }) {
+  rpc: NetworkLayer.createRpc({
+    name: "JoinMe",
+    input: z.object({ userId: z.string(), userPublicKey: z.string() }),
+    output: z.object({ success: z.boolean() }),
+  }),
+  handler: async function* (_peerId, { userId, userPublicKey }) {
     const publicAuthKey = await importUserPublicKey(userPublicKey);
 
     const verified = await verifyUserKey(publicAuthKey, userId);

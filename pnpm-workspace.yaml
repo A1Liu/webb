@@ -1,7 +1,6 @@
 packages:
   - "./native"
-  - "./web"
   - "./lib/webb-tools"
   - "./lib/webb-http-driver"
   - "./lib/webb-peerjs-driver"
-  - "./lib/ui-shared"
+  - "./lib/webb-fs"

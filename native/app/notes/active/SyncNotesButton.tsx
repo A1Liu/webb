@@ -3,7 +3,7 @@ import { useLockFn, useRequest } from "ahooks";
 import { usePlatform } from "@/components/hooks/usePlatform";
 import { z } from "zod";
 import toast from "react-hot-toast";
-import { getOrCompute } from "@a1liu/webb-tools/util";
+import { Struct, getOrCompute } from "@a1liu/webb-tools/util";
 import {
   NoteData,
   NoteDataSchema,
@@ -11,7 +11,7 @@ import {
   useNotesState,
 } from "@/components/state/notes";
 import { usePeers } from "@/components/state/peers";
-import { registerRpc, registerListener } from "@/components/network";
+import { registerListener, registerRpcHandler } from "@/components/network";
 import {
   NoteDoc,
   NoteDocData,
@@ -31,6 +31,8 @@ import { isEqual, maxBy } from "lodash";
 import * as automerge from "@automerge/automerge";
 import _ from "lodash";
 import { Button } from "@/components/design-system/Button";
+import { FileActions } from "@a1liu/webb-fs";
+import { NetworkLayer } from "@a1liu/webb-tools/network";
 
 const NoteMetadataWithHashSchema = z.object({
   note: NoteDataSchema,
@@ -40,31 +42,33 @@ const NoteMetadataWithHashSchema = z.object({
 const SYNC_STATUS_TOAST_ID = "sync-status-toast-id";
 const ACTIVE_SYNC_STATUS_TOAST_ID = "active-sync-status-toast-id";
 
-export const NoteDataFetch = registerRpc({
-  name: "NoteDataFetch",
+export const NoteDataFetch = registerRpcHandler({
   group: NotesSyncInitGroup,
-  input: z.object({ noteId: z.string(), permission: PermissionSchema }),
-  output: z.object({ noteId: z.string(), textData: z.string() }),
-  rpc: async function* (peerId, { noteId, permission }) {
+  rpc: NetworkLayer.createRpc({
+    name: "NoteDataFetch",
+    input: z.object({ noteId: z.string(), permission: PermissionSchema }),
+    output: z.object({ noteId: z.string(), textData: z.string() }),
+  }),
+  handler: async function* (peerId, { noteId, permission }) {
     console.debug(`received NoteDataFetch req`, peerId);
 
     const { notes } = useNotesState.getState();
-    const noteMetadata = notes.get(noteId);
-    if (!noteMetadata) return;
-
-    const { userProfile } = useUserProfile.getState();
-    if (!userProfile) return;
-
-    const { deviceProfile } = useDeviceProfile.getState();
-    if (!deviceProfile) return;
-
     const { cb: permCb } = usePermissionCache.getState();
+
+    const result = Struct.allNotNil({
+      noteMetadata: notes.get(noteId),
+      userProfile: useUserProfile.getState().userProfile,
+    });
+    if (!result.ok) return;
+
+    const { userProfile, noteMetadata } = result.data;
+
     const verifyResult = await permCb.verifyPermissions(
       permission,
       {
         deviceId: peerId,
         userId: userProfile.id,
-        actionId: ["updateNote"],
+        actionId: FileActions.update,
         resourceId: [...noteMetadata.folder, noteId],
       },
       userProfile,
@@ -95,17 +99,15 @@ const NotePushListener = registerListener({
     permission: PermissionSchema,
   }),
   listener: async (peerId, { notes, permission }) => {
-    const { userProfile } = useUserProfile.getState();
-    if (!userProfile) {
-      console.debug(`Device has no user, refusing to sync`);
+    const nilCheck = Struct.allNotNil({
+      userProfile: useUserProfile.getState().userProfile,
+      deviceProfile: useDeviceProfile.getState().deviceProfile,
+    });
+    if (!nilCheck.ok) {
+      console.debug(`Sync missing config: ${nilCheck.missing.join(",")}`);
       return;
     }
-
-    const { deviceProfile } = useDeviceProfile.getState();
-    if (!deviceProfile) {
-      console.debug(`Device has no user, refusing to sync`);
-      return;
-    }
+    const { userProfile, deviceProfile } = nilCheck.data;
 
     const { cb: permCb } = usePermissionCache.getState();
     const verifyResult = await permCb.verifyPermissions(
@@ -113,7 +115,7 @@ const NotePushListener = registerListener({
       {
         deviceId: peerId,
         userId: userProfile.id,
-        actionId: ["updateNote"],
+        actionId: FileActions.update,
         resourceId: [],
       },
       userProfile,
@@ -150,7 +152,7 @@ const NotePushListener = registerListener({
       const permission = permCb.findPermission({
         deviceId: deviceProfile.id,
         userId: userProfile.id,
-        actionId: ["updateNote"],
+        actionId: FileActions.update,
         resourceId: [...note.folder, note.id],
       });
 
@@ -189,24 +191,31 @@ async function* listNoteMetadataUpdateHashes() {
   }
 }
 
-const NoteListMetadata = registerRpc({
-  name: "NoteListMetadata",
+const NoteListMetadata = registerRpcHandler({
   group: NotesSyncInitGroup,
-  input: z.object({}),
-  output: NoteMetadataWithHashSchema,
-  rpc: async function* (peerId, {}) {
-    const { deviceProfile } = useDeviceProfile.getState();
-    const { userProfile } = useUserProfile.getState();
+  rpc: NetworkLayer.createRpc({
+    name: "NoteListMetadata",
+    input: z.object({}),
+    output: NoteMetadataWithHashSchema,
+  }),
+  handler: async function* (peerId, {}) {
+    const nilCheck = Struct.allNotNil({
+      userProfile: useUserProfile.getState().userProfile,
+      deviceProfile: useDeviceProfile.getState().deviceProfile,
+    });
+    if (!nilCheck.ok) {
+      console.debug(`Sync missing config: ${nilCheck.missing.join(",")}`);
+      return;
+    }
+    const { userProfile, deviceProfile } = nilCheck.data;
     const { cb } = usePermissionCache.getState();
     console.debug(`received NoteListMetadata req`, peerId);
-
-    if (!deviceProfile || !userProfile) return;
 
     for await (const note of listNoteMetadataUpdateHashes()) {
       const perm = cb.findPermission({
         deviceId: deviceProfile.id,
         userId: userProfile.id,
-        actionId: ["updateNote"],
+        actionId: FileActions.read,
         resourceId: [...note.folder, note.id],
       });
       if (!perm) {
@@ -219,25 +228,19 @@ const NoteListMetadata = registerRpc({
 });
 
 async function syncNotes() {
-  const { peers } = usePeers.getState();
-  if (!peers) {
-    toast.error(`No peers to synchronize with!`);
+  const userProfileNullable = useUserProfile.getState().userProfile;
+  const nilCheck = Struct.allNotNil({
+    userProfile: userProfileNullable,
+    userSecret: userProfileNullable?.secret,
+    deviceProfile: useDeviceProfile.getState().deviceProfile,
+    peers: usePeers.getState().peers,
+  });
+  if (!nilCheck.ok) {
+    console.debug(`SYNC_NOTES missing config: ${nilCheck.missing.join(",")}`);
     return;
   }
 
-  const { userProfile } = useUserProfile.getState();
-  const userSecret = userProfile?.secret;
-  if (!userSecret) {
-    toast.error(`No UserProfile to synchronize with!`);
-    return;
-  }
-
-  const { deviceProfile } = useDeviceProfile.getState();
-  if (!deviceProfile) {
-    toast.error(`No Device ID to synchronize with!`);
-    return;
-  }
-
+  const { userProfile, userSecret, deviceProfile, peers } = nilCheck.data;
   const { cb: permsCb } = usePermissionCache.getState();
 
   const permission = await permsCb.createPermission(
@@ -282,17 +285,17 @@ async function syncNotes() {
     // TODO: Check that permissions are properly sent over
 
     for await (const { note, permission } of stream) {
-      const verified = await permsCb.verifyPermissions(
+      const permissionResult = await permsCb.verifyPermissions(
         permission,
         {
           deviceId: peer.deviceId,
           userId: userProfile.id,
-          actionId: ["updateNote"],
+          actionId: FileActions.update,
           resourceId: [...note.folder, note.id],
         },
         userProfile,
       );
-      if (!verified) {
+      if (permissionResult !== PermissionResult.Allow) {
         continue;
       }
 

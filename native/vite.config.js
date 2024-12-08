@@ -10,7 +10,7 @@ export default defineConfig({
     target: "esnext",
     commonjsOptions: {
       // include: [],
-      exclude: [/@a1liu\/webb-ui-shared/],
+      // exclude: [/@a1liu\/webb-ui-shared/],
     },
   },
 });

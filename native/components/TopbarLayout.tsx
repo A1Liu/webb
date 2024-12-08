@@ -15,7 +15,7 @@ interface TopbarLayoutProps {
 export function TopbarLayout({ title, buttons, children }: TopbarLayoutProps) {
   // py-24 px-8
   return (
-    <main className={clsx("flex h-full flex-col")}>
+    <main className={clsx("flex h-full flex-col bg-black text-white")}>
       <div className="flex justify-between items-center pl-2 pr-5 py-1 w-full border-b border-slate-400">
         <div className="flex gap-2 items-center">
           {import.meta.env.DEV ? (

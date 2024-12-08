@@ -124,3 +124,85 @@ export class Observable {
     this.subscribers = this.subscribers.filter((sub) => sub !== cb);
   }
 }
+
+export const Struct = {
+  allNotNil: function structAllNotNil<T extends Record<string, unknown>>(
+    t: Required<T>,
+  ):
+    | { ok: true; data: { [K in keyof T]: NonNullable<T[K]> } }
+    | { ok: false; missing: (keyof T)[] } {
+    const nullishFields = Object.entries(t).filter(
+      ([_k, v]) => v === null || v === undefined,
+    );
+    if (nullishFields.length > 0) {
+      return { ok: false, missing: nullishFields.map(([k]) => k) };
+    }
+
+    return {
+      ok: true,
+      data: { ...t } as unknown as { [K in keyof T]: NonNullable<T[K]> },
+    };
+  },
+};
+
+export const PromStruct = {
+  allSettled: async function promStructAllSettled<
+    T extends Record<string, Promise<unknown>>,
+  >(
+    t: T,
+  ): Promise<
+    | { ok: true; results: { [K in keyof T]: Awaited<T[K]> } }
+    | {
+        ok: false;
+        results: { [K in keyof T]?: Awaited<T[K]> };
+        errors: { [K in keyof T]?: Error };
+      }
+  > {
+    const resultsArray = await Promise.all(
+      Object.entries(t).map(
+        async ([key, value]): Promise<[keyof T, unknown, Error | null]> => {
+          try {
+            return [key, await value, null];
+          } catch (e) {
+            return [key, null, e instanceof Error ? e : new Error(String(e))];
+          }
+        },
+      ),
+    );
+
+    let ok = true;
+    const results: any = {};
+    const errors: { [K in keyof T]?: Error } = {};
+
+    for (const [key, result, error] of resultsArray) {
+      if (error) {
+        errors[key] = error;
+        ok = false;
+      } else {
+        results[key] = result;
+      }
+    }
+
+    return { ok, results, errors };
+  },
+
+  all: async function promStructAll<T extends Record<string, Promise<unknown>>>(
+    t: T,
+  ): Promise<{ [K in keyof T]: Awaited<T[K]> }> {
+    const resultsArray = await Promise.all(
+      Object.entries(t).map(
+        async ([key, value]): Promise<[keyof T, unknown]> => {
+          return [key, await value];
+        },
+      ),
+    );
+
+    const results: any = {};
+
+    for (const [key, result] of resultsArray) {
+      results[key] = result;
+    }
+
+    return results;
+  },
+};

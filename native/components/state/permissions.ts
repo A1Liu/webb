@@ -22,6 +22,13 @@ import {
   permissionEqual,
   MatchPerms,
 } from "@a1liu/webb-tools/permissions";
+import { z } from "zod";
+import { registerRpcHandler } from "../network";
+import { useGlobals } from "./appGlobals";
+import { useUserProfile } from "./userProfile";
+import { useDeviceProfile } from "./deviceProfile";
+import { isEqual } from "lodash";
+import { NetworkLayer } from "@a1liu/webb-tools/network";
 
 // Only 1 lock ID for now
 
@@ -130,14 +137,16 @@ GlobalInitGroup.registerInit("PermissionCacheState", () => {
   usePermissionCache.persist.rehydrate();
 });
 
-export const AskPermission = registerRpc({
-  name: "AskPermission",
+export const AskPermission = registerRpcHandler({
   group: GlobalInitGroup,
-  input: z.object({
-    action: PermissionSchema.pick({ resourceId: true, actionId: true }),
+  rpc: NetworkLayer.createRpc({
+    name: "AskPermission",
+    input: z.object({
+      action: PermissionSchema.pick({ resourceId: true, actionId: true }),
+    }),
+    output: z.object({ permission: PermissionSchema }),
   }),
-  output: z.object({ permission: PermissionSchema }),
-  rpc: async function* (peerId, { action }) {
+  handler: async function* (peerId, { action }) {
     const { userProfile } = useUserProfile.getState();
     if (!userProfile?.secret) return;
 

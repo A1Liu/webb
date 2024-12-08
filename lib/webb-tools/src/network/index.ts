@@ -78,6 +78,22 @@ export type NetworkUpdate =
   | { type: "connInfo"; event: string; msg: string }
   | { type: "peerDisconnected"; peerId: string };
 
+export interface RpcDefinition<In, Out> {
+  name: string;
+  call: (
+    network: NetworkLayer,
+    peerId: string,
+    i: In,
+  ) => AsyncGenerator<z.SafeParseReturnType<unknown, Out>>;
+  singleExec: (
+    network: NetworkLayer,
+    run: (
+      peerId: string,
+      result: z.SafeParseReturnType<unknown, In>,
+    ) => AsyncGenerator<Out>,
+  ) => Promise<void>;
+}
+
 export class NetworkLayer {
   readonly statusChannel = new Channel<NetworkUpdate>(Infinity);
   readonly connectionDrivers = new Map<string, ConnectionDriver>();
@@ -180,6 +196,34 @@ export class NetworkLayer {
     });
   }
 
+  static createRpc<In extends z.ZodSchema, Out extends z.ZodSchema>(args: {
+    name: string;
+    input: In;
+    output: Out;
+  }): RpcDefinition<z.infer<In>, z.infer<Out>> {
+    const { name, input, output } = args;
+    return {
+      name,
+      call: async function* (network, peerId, input) {
+        const dataFetchResult = network.rpcCall({
+          receiver: peerId,
+          port: name,
+          data: input,
+        });
+
+        for await (const chunk of dataFetchResult) {
+          yield output.safeParse(chunk.data);
+        }
+      },
+      singleExec: async function (network, run) {
+        await network.rpcSingleExec(name, async function* (chunk) {
+          const result = input.safeParse(chunk.data);
+          yield* run(chunk.sender, result);
+        });
+      },
+    };
+  }
+
   // TODO: add "sleep"/"wake" methods, for saving battery (as opposed to cleanup)
   // Should also probably add corresponding methods for connection definitions
 }
@@ -215,3 +259,5 @@ export class NetworkLayer {
 // - connection adapters, which provide a transport layer, encryption, and
 //   basic device authentication
 // - Channels, which receive datagrams
+
+export function createRpcDefinition() {}
