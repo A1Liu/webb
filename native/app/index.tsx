@@ -6,22 +6,12 @@ import "./globals.css";
 import Index from "./page";
 import { lazy } from "react";
 
-const Notes = lazy(() => import("./notes/page"));
-const ActiveNote = lazy(() => import("./notes/active/page"));
 const Settings = lazy(() => import("./settings/page"));
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: <Index />,
-  },
-  {
-    path: "/notes",
-    element: <Notes />,
-  },
-  {
-    path: "/notes/active",
-    element: <ActiveNote />,
   },
   {
     path: "/settings",
