@@ -22,6 +22,7 @@ Strong design goals:
 ## Projects
 - Notes.md - A WIP notes app which implements synchronization over WebRTC and protects notes from spyware on untrusted devices.
   Being used as MVP app to iterate on framework designs.
+- Upcoming: Library app - A library/inventory management app
 - Upcoming: Browser extension - Add version of platform which integrates with Firefox, running e.g. WASM
 
 ## Resources
